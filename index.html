@@ -6,7 +6,9 @@
 html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;font-family:system-ui,sans-serif}
 canvas{display:block;position:fixed;left:0;top:0;width:100vw;height:100vh;height:100dvh}
 #ap{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:none;gap:12px;align-items:center;padding:8px 14px;background:rgba(10,14,24,.8);border:1px solid rgba(180,200,230,.3);border-radius:10px;color:#cfe3f0;font-size:13px;z-index:2;flex-wrap:wrap;justify-content:center}
+#ap{width:max-content;max-width:calc(100vw - 24px);box-sizing:border-box}
 #ap input{width:110px;accent-color:#6cf}
+@media (max-width:520px){#ap{gap:8px;padding:6px 10px;font-size:12px}#ap input{width:68px}#ap button{font-size:12px;padding:4px 8px}}
 #ap button{background:#223047;color:#dfeaff;border:1px solid #4a6a90;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px}
 </style></head><body>
 <canvas id="c"></canvas>
@@ -476,12 +478,12 @@ function sayComm(who,text,dur){comm={who,text,t:0,max:dur||Math.max(5,text.lengt
 // ================= INPUT =================
 const K={};let mouse={x:0,y:0,down:false},touchMode=!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches),joy={id:null,ox:0,oy:0,x:0,y:0},tFire=false,fireId=null;
 const KEYMAP={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right',j:'fire',z:'fire'};
-addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright','tab'].includes(k))e.preventDefault();
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright','tab','backspace'].includes(k))e.preventDefault();
   unlockAudio();if(KEYMAP[k])K[KEYMAP[k]]=true;if(e.repeat)return;
   if(k==='m'){toggleMute();return}
   if(state==='gate'){setState('crawl');return}
   if(state==='crawl'){setState('menu');return}
-  if(state==='menu'){if(k==='enter'||k===' ')startGame();return}
+  if(state==='menu'){menuKey(k);return}
   if(state==='briefing'){if(k==='escape'||k==='s'||k==='tab')endBriefing();else if(k==='enter'||k===' ')briefNext();return}
   if(state==='play'){if(k===' '||k==='shift')setMode(ship.mode==='hover'?'burrow':'hover');if(k==='p'||k==='escape')setState('pause');return}
   if(state==='pause'){if(k==='p'||k==='escape'||k==='enter')setState('play');if(k==='q')setState('menu');return}
@@ -489,17 +491,17 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','ar
   if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8&&(k==='enter'||k===' '))advance()});
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(KEYMAP[k])K[KEYMAP[k]]=false});
 addEventListener('blur',()=>{for(const k in K)K[k]=false;mouse.down=false;if(state==='play')setState('pause')});
-function screenTap(){unlockAudio();if(state==='gate')setState('crawl');else if(state==='crawl')setState('menu');else if(state==='menu')startGame();else if(state==='briefing')briefNext();else if(state==='pause')setState('play');
+function screenTap(x,y){unlockAudio();if(state==='gate')setState('crawl');else if(state==='crawl')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='pause')setState('play');
   else if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8)advance()}
-cv.addEventListener('mousedown',e=>{mouse.x=e.clientX;mouse.y=e.clientY;if(state==='play'){unlockAudio();mouse.down=true}else screenTap()});
-addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
+cv.addEventListener('mousedown',e=>{mouse.x=e.clientX;mouse.y=e.clientY;if(state==='play'){unlockAudio();mouse.down=true}else screenTap(e.clientX,e.clientY)});
+addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;if(state==='menu'&&!touchMode)menuHover(e.clientX,e.clientY)});
 addEventListener('mouseup',()=>mouse.down=false);
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 const TB={mode:()=>({x:W-150,y:H-80,r:38}),fire:()=>({x:W-68,y:H-150,r:48}),pause:()=>({x:36,y:H-36,r:22})};
 const inB=(b,x,y)=>dist(x,y,b.x,b.y)<b.r+12;
 cv.addEventListener('touchstart',e=>{e.preventDefault();touchMode=true;unlockAudio();
   for(const t of e.changedTouches){const x=t.clientX,y=t.clientY;
-    if(state!=='play'){screenTap();continue}
+    if(state!=='play'){screenTap(x,y);continue}
     if(inB(TB.pause(),x,y)){setState('pause');continue}
     if(inB(TB.mode(),x,y)){setMode(ship.mode==='hover'?'burrow':'hover');continue}
     if(inB(TB.fire(),x,y)||x>W*0.5){tFire=true;fireId=t.identifier;continue}
@@ -519,8 +521,8 @@ mb.textContent=muted?'🔇 Unmute (M)':'🔊 Mute (M)';
 // ================= STATE =================
 function setState(s){const prev=state;state=s;stateT=0;
   ap.style.display=(s==='menu'||s==='pause'||s==='over'||s==='levelDone'||s==='epilogue')?'flex':'none';
-  if(s==='crawl'){crawlY=0;crawlMusic=false;Music.play(null)}
-  if(s==='menu'){Music.play('title')}
+  if(s==='crawl'){crawlY=56;crawlMusic=false;Music.play(null)}
+  if(s==='menu'){menuPage='main';menuSel=2;menuHits=[];if(prev!=='menu')Music.play('title')}else cv.style.cursor=''
   if(s==='dying'){Music.play('defeat')}
   if(s==='over'){if(score>hi){hi=score;localStorage.setItem('nm_hi',hi)}}
   if(s==='play'&&prev==='pause'){}
@@ -834,9 +836,9 @@ function drawHUD(t){const sm=W<640;
 }
 // ================= SCREENS =================
 const stars=[];for(let i=0;i<260;i++)stars.push({x:Math.random(),y:Math.random(),s:Math.random()*1.6+0.3,p:Math.random()*6});
-const CRAWL=['STAR WARS','MOON MINER','','Turmoil grips the Galactic Republic.','On peaceful Naboo, whispers of unrest','drift through the streets of Theed as','Senator Amidala prepares to travel to','Coruscant for a crucial vote in the Senate.','','Far from the capital, a young miner is','sent to Naboo\u2019s moons, Ohma-D\u2019un and','Rori, to harvest the plasma crystals','that keep Theed\u2019s lights burning....','','But deep in the mines, something is','waking. Tremors shake the tunnels, and','the creatures of the deep are restless.','','And in the dark, not every miner','is digging for crystals....']
+const CRAWL=['STAR WARS MOON MINER','','Turmoil grips the Galactic Republic.','On peaceful Naboo, whispers of unrest','drift through the streets of Theed as','Senator Amidala prepares to travel to','Coruscant for a crucial vote in the Senate.','','Far from the capital, a young miner is','sent to Naboo\u2019s moons, Ohma-D\u2019un and','Rori, to harvest the plasma crystals','that keep Theed\u2019s lights burning....','','But deep in the mines, something is','waking. Tremors shake the tunnels, and','the creatures of the deep are restless.','','And in the dark, not every miner','is digging for crystals....']
 const crawlC=document.createElement('canvas');crawlC.width=720;crawlC.height=CRAWL.length*46+60;
-{const c=crawlC.getContext('2d');c.textAlign='center';c.fillStyle='#f3d27a';CRAWL.forEach((l,i)=>{c.font=i===0?'bold 30px Georgia,serif':i===1?'bold 54px Georgia,serif':'bold 31px Georgia,serif';c.fillText(l,360,46+i*46+(i<2?0:20))})}
+{const c=crawlC.getContext('2d');c.textAlign='center';c.fillStyle='#f3d27a';CRAWL.forEach((l,i)=>{if(i===0){let f=50;c.font=`bold ${f}px Georgia,serif`;while(c.measureText(l).width>690&&f>30){f--;c.font=`bold ${f}px Georgia,serif`}}else c.font='bold 31px Georgia,serif';c.fillText(l,360,46+i*46+(i<1?0:20))})}
 let crawlY=0,crawlMusic=false;
 function drawStars(t,alpha=1){ctx.fillStyle='#02030a';ctx.fillRect(0,0,W,H);for(const s of stars){ctx.globalAlpha=alpha*(0.5+0.5*Math.sin(t*1.5+s.p));ctx.fillStyle='#fff';ctx.fillRect(s.x*W,s.y*H,s.s,s.s)}ctx.globalAlpha=1}
 function drawMoon(t){const r=Math.max(W,H)*0.9,cx=W*0.5,cy=H+r*0.78;const g=ctx.createRadialGradient(cx-r*0.2,cy-r*0.3,r*0.2,cx,cy,r);g.addColorStop(0,'#5d6b58');g.addColorStop(0.7,'#2c3326');g.addColorStop(1,'#10140e');ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,6.283);ctx.fill();
@@ -852,25 +854,183 @@ function drawTitle(t){drawStars(t);
     if(ct<5.5){const a=clamp(Math.min(ct-0.4,5.2-ct)*1.5,0,1);ctx.globalAlpha=a;ctx.fillStyle='#4bd5ee';ctx.textAlign='left';const fs=Math.min(30,W/22);ctx.font=`${fs}px Georgia,serif`;const x0=W/2-fs*7.5;ctx.fillText('A long time ago in a galaxy far,',x0,H*0.45);ctx.fillText('far away....',x0,H*0.45+fs*1.3);ctx.globalAlpha=1;
       ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='12px system-ui,sans-serif';ctx.textAlign='right';ctx.fillText(touchMode?'tap to skip':'press any key to skip',W-16,H-14);return}
     if(!crawlMusic){crawlMusic=true;Music.play('title')}
-    if(ct<13){const p=(ct-5.5)/7.5,sc=Math.max(0.02,2.4*Math.pow(1-p,2.2));ctx.save();ctx.translate(W/2,H*0.45);ctx.scale(sc,sc);ctx.globalAlpha=clamp((1-p)*3,0,1);ctx.textAlign='center';ctx.lineJoin='round';
-      const fs=Math.min(150,W/5);ctx.font=`900 ${fs}px "Trebuchet MS",system-ui,sans-serif`;ctx.lineWidth=fs*0.06;ctx.strokeStyle='#f3d27a';ctx.fillStyle='#000';ctx.strokeText('STAR',0,-fs*0.1);ctx.fillText('STAR',0,-fs*0.1);ctx.strokeText('WARS',0,fs*0.85);ctx.fillText('WARS',0,fs*0.85);ctx.restore();ctx.globalAlpha=1}
-    if(ct<8)return;crawlY+=1/60*50;const yh=H*0.18,D=1.0;
+    crawlY+=1/60*50;const yh=H*0.18,D=1.0;
     for(let y=Math.ceil(yh);y<H;y+=2){const s=(y-yh)/(H-yh);if(s<0.02)continue;const dd=D*(1/s-1)*H*0.55;const srcY=crawlY-dd-60;const nY=crawlY-D*(1/((y+2-yh)/(H-yh))-1)*H*0.55-60;const sh=Math.max(0.5,nY-srcY);
       if(srcY+sh<0||srcY>crawlC.height)continue;const w=Math.min(W*1.15,900)*s*1.15;ctx.globalAlpha=Math.min(1,s*4);ctx.drawImage(crawlC,0,Math.max(0,srcY),720,sh,W/2-w/2,y,w,2.2)}
     ctx.globalAlpha=1;ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='12px system-ui,sans-serif';ctx.textAlign='right';ctx.fillText(touchMode?'tap to skip':'press any key to skip',W-16,H-14);
     if(crawlY>crawlC.height+H*0.55*5)setState('menu');return}
-  // menu
-  drawMoon(t);
-  const sz=Math.min(76,W/9);chromeText('STAR WARS',W/2,H*0.2,sz*0.7);chromeText('MOON MINER',W/2,H*0.2+sz*0.95,sz);
-  drawShip(W/2+Math.sin(t*0.7)*W*0.3,H*0.2+sz*1.55,Math.cos(t*0.7)>0?0:Math.PI,'hover',t,1.8);
-  ctx.textAlign='center';ctx.fillStyle='#cfe3f0';ctx.font=`${W<640?12:15}px system-ui,sans-serif`;
-  const lines=['A young Naboo miner on the moons Ohma-D\u2019un and Rori. Mine plasma crystals for Theed,','burrow through rock, survive the creatures waking in the deep, and uncover','the plot hidden in the mines. An 8-mission campaign, then endless sectors.'];
-  lines.forEach((l,i)=>ctx.fillText(l,W/2,H*0.2+sz*2.2+i*20));
-  const y0=H*0.2+sz*2.2+80;ctx.font=`${W<640?11:13}px monospace`;ctx.fillStyle='#ffd98a';
-  const C=touchMode?['Left thumb: steer   ·   FIRE: auto-aim laser','BURROW/HOVER button: switch drill mode   ·   II: pause']:['WASD / Arrows  steer        Space / Shift  hover ⇄ burrow','J / Z / Click  fire laser   P / Esc  pause   M  mute'];
-  C.forEach((l,i)=>ctx.fillText(l,W/2,y0+i*20));
-  ctx.fillStyle=`rgba(140,255,200,${0.6+0.4*Math.sin(t*4)})`;ctx.font=`bold ${W<640?16:20}px system-ui,sans-serif`;ctx.fillText(touchMode?'TAP TO LAUNCH':'PRESS ENTER TO LAUNCH',W/2,y0+68);
-  ctx.fillStyle='#ffd27a';ctx.font='14px system-ui,sans-serif';ctx.fillText('HIGH SCORE  '+hi,W/2,y0+96)}
+  drawMenu(t)}
+// ================= BOX-ART MENU (MENU_V3_BOXART) =================
+let menuPage='main',menuSel=2,menuHits=[],artC=null,artKey='',logoC=null,logoKey='';
+const MENU_ITEMS=['ABOUT','CONTROLS','START'];
+const ABOUT_TEXT=['The Trade Federation\u2019s invasion is over, but Naboo still runs on plasma. You are a young miner shipped out to the moons Ohma-D\u2019un and Rori to harvest the glowing crystals that keep Theed\u2019s lights burning.',
+  'Fly your mining skiff through twisting tunnels. Hover across open caverns, or drop into burrow mode and drill straight through solid rock. Watch your shields, and watch your drill energy.',
+  'But the tremors are getting worse, the creatures in the walls are waking up, and not everyone down here is digging for crystals. Keep your eyes open and uncover the plot hidden in the mines.',
+  'An 8-mission campaign, then endless sectors.'];
+const CTRL_KEYS=[['WASD / ARROWS','Steer your skiff'],['SPACE / SHIFT','Switch hover \u21c4 burrow'],['J / Z / CLICK','Fire laser (click aims)'],['P / ESC','Pause  (Q quits to title)'],['ENTER','Next line / continue'],['ESC','Skip a briefing'],['M','Mute / unmute']];
+const CTRL_TOUCH=[['LEFT THUMB','Steer (virtual stick)'],['FIRE / RIGHT SIDE','Auto-aim laser'],['BURROW / HOVER','Switch drill mode'],['II','Pause'],['TAP','Next line / continue']];
+const RAINBOW=['#e8312a','#f2741c','#f7b21b','#58b947','#2a8fd8'];
+function menuAct(i){unlockAudio();menuSel=i;if(i===2){startGame();return}SFX.click();menuPage=i===0?'about':'controls';menuHits=[];if(H<520&&W>H)ap.style.display='none'}
+function menuBack(){SFX.click();menuPage='main';menuHits=[];if(state==='menu')ap.style.display='flex'}
+function menuMove(d){menuSel=(menuSel+d+3)%3;SFX.click()}
+function menuKey(k){if(menuPage==='main'){if(k==='arrowleft'||k==='a'||k==='arrowup'||k==='w')menuMove(-1);else if(k==='arrowright'||k==='d'||k==='arrowdown'||k==='s'||k==='tab')menuMove(1);else if(k==='enter'||k===' ')menuAct(menuSel)}
+  else if(k==='escape'||k==='backspace'||k==='enter'||k===' ')menuBack()}
+function menuHitAt(x,y){for(const h of menuHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h)return h;return null}
+function menuClick(x,y){const h=menuHitAt(x,y);if(menuPage==='main'){if(h)h.act()}else menuBack()}
+function menuHover(x,y){if(state!=='menu'){cv.style.cursor='';return}const h=menuHitAt(x,y);cv.style.cursor=h||menuPage!=='main'?'pointer':'';if(h&&menuPage==='main'&&h.i!=null)menuSel=h.i}
+function boxFont(sz){return `900 ${sz}px "Futura Condensed ExtraBold","Futura-CondensedExtraBold","Arial Black",Impact,"Helvetica Neue",system-ui,sans-serif`}
+function boxLayout(){const apOn=ap.style.display!=='none',apH=ap.offsetHeight||44;const m=Math.max(6,Math.min(W,H)*0.022);const bx=m,by=m,bw=W-2*m,bh=H-m-(apOn?apH+22:m);
+  const fr=clamp(Math.min(bw,bh)*0.03,7,20);const ix=bx+fr,iy=by+fr,iw=bw-2*fr,ih=bh-2*fr;
+  const land=H<520&&W>H;const hh=clamp(land?ih*0.21:Math.min(ih*0.2,iw*0.3),46,170);const sb=clamp(ih*0.012,3,7);
+  const fh=land?0:clamp(ih*0.17,62,120);
+  return{bx,by,bw,bh,fr,ix,iy,iw,ih,hh,sb,fh,ay:iy+hh+sb*5,ah:ih-hh-fh-sb*(land?5:10),fy:iy+ih-fh,land}}
+// ---------- painted illustration (cached) ----------
+function buildArt(w,h){const c=document.createElement('canvas');const s=DPR;c.width=Math.max(1,Math.ceil(w*s));c.height=Math.max(1,Math.ceil(h*s));const g=c.getContext('2d');g.scale(s,s);
+  let seed=1138;const R=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
+  // deep cavern base
+  let gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#160a2e');gr.addColorStop(0.45,'#3a1550');gr.addColorStop(0.8,'#5a2238');gr.addColorStop(1,'#2a0e18');g.fillStyle=gr;g.fillRect(0,0,w,h);
+  // opening in the cave roof: starfield + Naboo
+  const ox=w*0.66,oy=h*0.02,orx=w*0.36,ory=h*0.42;g.save();g.beginPath();
+  for(let k=0;k<=40;k++){const a=Math.PI+k/40*Math.PI;const j=0.82+R()*0.18;g.lineTo(ox+Math.cos(a)*orx*j,oy-Math.sin(a)*ory*j)}g.closePath();g.clip();
+  gr=g.createLinearGradient(0,0,0,ory);gr.addColorStop(0,'#04061a');gr.addColorStop(1,'#14305a');g.fillStyle=gr;g.fillRect(0,0,w,h);
+  for(let k=0;k<160;k++){g.fillStyle=`rgba(255,255,240,${0.3+R()*0.7})`;g.fillRect(ox-orx+R()*orx*2,R()*ory,R()*1.6+0.4,R()*1.6+0.4)}
+  const pr=Math.min(w,h)*0.2,px=ox+orx*0.32,py=oy+ory*0.38;const pg=g.createRadialGradient(px-pr*0.35,py-pr*0.35,pr*0.1,px,py,pr);pg.addColorStop(0,'#d6f3c4');pg.addColorStop(0.45,'#5aa36c');pg.addColorStop(0.8,'#1f5a6a');pg.addColorStop(1,'#0b2034');
+  g.shadowColor='#7fd6a0';g.shadowBlur=30;g.fillStyle=pg;g.beginPath();g.arc(px,py,pr,0,6.283);g.fill();g.shadowBlur=0;
+  g.fillStyle='rgba(255,255,255,0.18)';for(let k=0;k<5;k++){g.beginPath();g.ellipse(px-pr*0.2+R()*pr*0.6,py-pr*0.5+k*pr*0.25,pr*0.5*R()+pr*0.2,pr*0.05,-0.2,0,6.283);g.fill()}
+  const mr=pr*0.28,mx=px-pr*1.25,my=py+pr*0.55;const mg=g.createRadialGradient(mx-mr*0.3,my-mr*0.3,1,mx,my,mr);mg.addColorStop(0,'#e8e4d6');mg.addColorStop(1,'#6a6658');g.fillStyle=mg;g.beginPath();g.arc(mx,my,mr,0,6.283);g.fill();
+  g.restore();
+  // glow pools from crystals
+  const glow=(x,y,r,col)=>{const q=g.createRadialGradient(x,y,0,x,y,r);q.addColorStop(0,col);q.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=q;g.fillRect(x-r,y-r,r*2,r*2)};
+  glow(w*0.5,h*0.78,Math.max(w,h)*0.45,'rgba(80,220,255,0.35)');glow(w*0.12,h*0.55,Math.max(w,h)*0.25,'rgba(255,80,200,0.3)');glow(w*0.9,h*0.8,Math.max(w,h)*0.25,'rgba(120,255,190,0.28)');
+  // rock masses (left wall, right wall, floor, roof lip)
+  const rock=(pts,c1,c2)=>{const q=g.createLinearGradient(0,0,w,h);q.addColorStop(0,c1);q.addColorStop(1,c2);g.fillStyle=q;g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fill()};
+  const jag=(x0,y0,x1,y1,n,amp)=>{const out=[];for(let k=0;k<=n;k++){const t=k/n;out.push([lerp(x0,x1,t)+(R()-0.5)*amp,lerp(y0,y1,t)+(R()-0.5)*amp])}return out};
+  rock([[0,0],[w*0.3,0],...jag(w*0.3,0,w*0.24,h*0.3,6,w*0.05),...jag(w*0.24,h*0.3,w*0.14,h*0.7,7,w*0.05),...jag(w*0.14,h*0.7,w*0.22,h,5,w*0.04),[0,h]],'#4a2440','#1a0a18');
+  rock([[w,h*0.3],...jag(w,h*0.3,w*0.84,h*0.5,5,w*0.04),...jag(w*0.84,h*0.5,w*0.78,h,6,w*0.05),[w,h]],'#3a2a4a','#120816');
+  rock([[0,h],...jag(0,h*0.86,w*0.5,h*0.92,8,h*0.06),...jag(w*0.5,h*0.92,w,h*0.84,8,h*0.06),[w,h]],'#5a2e3a','#1a0a10');
+  rock([[w*0.3,0],...jag(w*0.3,0,w*0.32,h*0.12,3,w*0.03),...jag(w*0.32,h*0.12,w*0.48,h*0.06,4,w*0.03),[w*0.5,0]],'#2a1430','#120818');
+  // lit rim edges
+  g.strokeStyle='rgba(120,230,255,0.35)';g.lineWidth=2;g.beginPath();const e1=jag(w*0.24,h*0.3,w*0.14,h*0.7,9,w*0.02);e1.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.stroke();
+  g.strokeStyle='rgba(255,140,220,0.3)';g.beginPath();const e2=jag(w*0.84,h*0.5,w*0.78,h,9,w*0.02);e2.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.stroke();
+  // crystal clusters
+  const crystal=(x,y,sz,col,hi)=>{glow(x,y,sz*3,col.replace('1)','0.35)'));for(let k=0;k<5;k++){const a=-Math.PI/2+(k-2)*0.38+(R()-0.5)*0.2,L=sz*(0.6+R()*0.8),wd=sz*0.22;g.save();g.translate(x,y);g.rotate(a+Math.PI/2);
+      const q=g.createLinearGradient(-wd,0,wd,0);q.addColorStop(0,col);q.addColorStop(0.5,hi);q.addColorStop(1,col);g.fillStyle=q;g.beginPath();g.moveTo(-wd,0);g.lineTo(-wd*0.8,-L*0.8);g.lineTo(0,-L);g.lineTo(wd*0.8,-L*0.8);g.lineTo(wd,0);g.closePath();g.fill();g.restore()}};
+  const S=Math.min(w,h);
+  crystal(w*0.2,h*0.93,S*0.09,'rgba(60,200,255,1)','#e8fbff');crystal(w*0.06,h*0.6,S*0.06,'rgba(255,70,200,1)','#ffe0f6');crystal(w*0.62,h*0.94,S*0.07,'rgba(80,230,255,1)','#f0ffff');
+  crystal(w*0.9,h*0.88,S*0.1,'rgba(90,255,170,1)','#eafff4');crystal(w*0.83,h*0.55,S*0.05,'rgba(60,200,255,1)','#e8fbff');crystal(w*0.42,h*0.97,S*0.05,'rgba(255,70,200,1)','#ffe0f6');
+  // painterly pass: re-dab the image with short strokes sampled from itself
+  try{const id=g.getImageData(0,0,c.width,c.height).data;const N=Math.min(9000,Math.round(w*h/45));g.setTransform(1,0,0,1,0,0);
+    for(let k=0;k<N;k++){const x=R()*c.width,y=R()*c.height,i=((y|0)*c.width+(x|0))*4;const L=(3+R()*9)*s,a=(R()-0.5)*1.2+0.5;
+      g.strokeStyle=`rgba(${id[i]},${id[i+1]},${id[i+2]},0.55)`;g.lineWidth=(1.5+R()*2.5)*s;g.lineCap='round';g.beginPath();g.moveTo(x-Math.cos(a)*L,y-Math.sin(a)*L);g.lineTo(x+Math.cos(a)*L,y+Math.sin(a)*L);g.stroke()}
+    g.setTransform(s,0,0,s,0,0)}catch(e){}
+  // vignette
+  const v=g.createRadialGradient(w/2,h*0.55,Math.min(w,h)*0.3,w/2,h*0.55,Math.max(w,h)*0.75);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,0.55)');g.fillStyle=v;g.fillRect(0,0,w,h);
+  return c}
+function drawBoxWorm(x,y,s,t,flip){ctx.save();ctx.translate(x,y);ctx.scale(flip?-s:s,s);
+  const segs=9;for(let k=segs;k>=0;k--){const u=k/segs;const sx=-u*90-Math.sin(t*1.6+u*4)*8,sy=u*60+Math.cos(t*1.6+u*3)*6,r=26-u*8;
+    const q=ctx.createRadialGradient(sx-r*0.3,sy-r*0.4,1,sx,sy,r);q.addColorStop(0,'#e7b38c');q.addColorStop(0.6,'#a4574e');q.addColorStop(1,'#3e1622');ctx.fillStyle=q;ctx.beginPath();ctx.arc(sx,sy,r,0,6.283);ctx.fill();
+    ctx.strokeStyle='rgba(40,8,16,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx,sy,r*0.92,-1.2,1.2);ctx.stroke()}
+  const o=0.35+Math.sin(t*3)*0.12;ctx.fillStyle='#2a0508';ctx.beginPath();ctx.moveTo(18,0);ctx.arc(10,0,22,-o,o);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#fff3d8';for(let k=-3;k<=3;k++){const a=k*o/3.4;ctx.beginPath();ctx.moveTo(10+Math.cos(a)*22,Math.sin(a)*22);ctx.lineTo(10+Math.cos(a)*13,Math.sin(a)*13);ctx.lineTo(10+Math.cos(a+0.08)*22,Math.sin(a+0.08)*22);ctx.fill()}
+  ctx.shadowColor='#ff7a00';ctx.shadowBlur=14;ctx.fillStyle='#ffd23a';ctx.beginPath();ctx.arc(-4,-16,4.5,0,6.283);ctx.arc(-14,-11,3.5,0,6.283);ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle='#2a0508';ctx.beginPath();ctx.arc(-4,-16,1.8,0,6.283);ctx.arc(-14,-11,1.4,0,6.283);ctx.fill();ctx.restore()}
+function drawBoxCrawler(x,y,s,a,t){ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.scale(s,s);ctx.strokeStyle='#1c0d18';ctx.lineWidth=2.5;
+  for(let k=-1;k<=1;k++)for(const sd of[-1,1]){const w=Math.sin(t*14+k+(sd>0?1.5:0))*3;ctx.beginPath();ctx.moveTo(k*5,0);ctx.lineTo(k*5+w,sd*14);ctx.stroke()}
+  const q=ctx.createRadialGradient(-3,-3,1,0,0,13);q.addColorStop(0,'#b07aa0');q.addColorStop(1,'#3a1d32');ctx.fillStyle=q;ctx.beginPath();ctx.ellipse(0,0,13,9,0,0,6.283);ctx.fill();
+  ctx.fillStyle='#ff9a2a';ctx.shadowColor='#f80';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(9,-3,2,0,6.283);ctx.arc(9,3,2,0,6.283);ctx.fill();ctx.shadowBlur=0;ctx.restore()}
+function drawArtScene(L,t){const{ix,ay,iw,ah}=L;const key=Math.round(iw)+'x'+Math.round(ah)+'@'+DPR;if(artKey!==key){artC=buildArt(iw,ah);artKey=key}
+  ctx.drawImage(artC,ix,ay,iw,ah);ctx.save();ctx.beginPath();ctx.rect(ix,ay,iw,ah);ctx.clip();const S=Math.min(iw,ah)/260;
+  // crystal sparkles
+  const sp=[[0.2,0.86],[0.06,0.55],[0.62,0.89],[0.9,0.8],[0.83,0.5]];sp.forEach((p,k)=>{const a=Math.max(0,Math.sin(t*2.2+k*1.7));if(a<0.2)return;const x=ix+p[0]*iw,y=ay+p[1]*ah,r=(4+a*7)*S;ctx.globalAlpha=a;ctx.strokeStyle='#fff';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(x-r,y);ctx.lineTo(x+r,y);ctx.moveTo(x,y-r);ctx.lineTo(x,y+r);ctx.stroke();ctx.globalAlpha=1});
+  // creature bursting from the left wall
+  const wx=ix+iw*0.2,wy=ay+ah*0.5;drawBoxWorm(wx+Math.sin(t*1.3)*4*S,wy,S*1.05,t,false);
+  // rock debris
+  ctx.fillStyle='#4a2a3a';for(let k=0;k<7;k++){const ph=(t*0.6+k*0.37)%1;ctx.globalAlpha=1-ph;ctx.beginPath();ctx.arc(wx+(10+k*9+ph*50)*S,wy+(-30+k*8+ph*ph*60)*S,(2+k%3)*S,0,6.283);ctx.fill()}ctx.globalAlpha=1;
+  // crawlers on the right wall and floor
+  drawBoxCrawler(ix+iw*0.8,ay+ah*(0.62+Math.sin(t*0.9)*0.04),S*1.1,Math.PI*0.95,t);drawBoxCrawler(ix+iw*(0.55+Math.sin(t*0.5)*0.05),ay+ah*0.86,S*0.9,Math.PI*(Math.cos(t*0.5)>0?0:1),t);
+  // the miner skiff, firing at the worm
+  const shx=ix+iw*0.56+Math.sin(t*0.8)*iw*0.03,shy=ay+ah*0.48+Math.sin(t*1.1)*ah*0.04;
+  const head={x:wx+10*S*1.05,y:wy};const ang=Math.atan2(head.y-shy,head.x-shx);
+  if(Math.sin(t*5)>0.1){ctx.strokeStyle='rgba(255,90,60,0.9)';ctx.lineWidth=3*S;ctx.shadowColor='#f42';ctx.shadowBlur=12;ctx.beginPath();const ph=(t*4)%1;const bx0=lerp(shx,head.x,ph*0.6),by0=lerp(shy,head.y,ph*0.6);ctx.moveTo(bx0,by0);ctx.lineTo(lerp(shx,head.x,ph*0.6+0.25),lerp(shy,head.y,ph*0.6+0.25));ctx.stroke();ctx.shadowBlur=0}
+  const eg=ctx.createRadialGradient(shx,shy,0,shx,shy,60*S);eg.addColorStop(0,'rgba(140,220,255,0.35)');eg.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=eg;ctx.fillRect(shx-60*S,shy-60*S,120*S,120*S);
+  drawShip(shx,shy,ang,'hover',t,2.6*S);
+  ctx.restore()}
+// ---------- chunky retro logo (cached) ----------
+function buildLogo(w,h){const c=document.createElement('canvas');c.width=Math.ceil(w*DPR);c.height=Math.ceil(h*DPR);const g=c.getContext('2d');g.scale(DPR,DPR);g.textAlign='center';g.textBaseline='alphabetic';g.lineJoin='round';
+  const two=w<h*4.6;const lines=two?[['STAR WARS',0.36],['MOON MINER',0.64]]:[['STAR WARS MOON MINER',1]];
+  let fs=h*(two?0.5:0.78);g.font=boxFont(fs);const widest=Math.max(...lines.map(l=>{g.font=boxFont(fs*(two?(l[1]<0.5?0.62:1):1));return g.measureText(l[0]).width}));const fit=Math.min(1,(w*0.86)/widest);fs*=fit;
+  const ext=Math.max(3,fs*0.09);let y=0;const rows=[];const totalH=two?fs*0.62+fs*1.02:fs;y=(h-totalH)/2+(two?fs*0.62*0.82:fs*0.84);
+  if(two){rows.push({t:'STAR WARS',fs:fs*0.62,y});rows.push({t:'MOON MINER',fs,y:y+fs*0.9})}else rows.push({t:'STAR WARS MOON MINER',fs,y});
+  for(const r of rows){g.save();g.translate(w/2,r.y);g.transform(1,0,-0.16,1,0,0);g.font=boxFont(r.fs);const e=Math.max(2,r.fs*0.09);
+    for(let k=e;k>0;k-=0.75){g.fillStyle=k>e*0.5?'#3a0a04':'#7a1a06';g.fillText(r.t,k,k)}
+    g.lineWidth=Math.max(3,r.fs*0.12);g.strokeStyle='#000';g.strokeText(r.t,0,0);
+    const q=g.createLinearGradient(0,-r.fs*0.8,0,0);q.addColorStop(0,'#fff6b0');q.addColorStop(0.3,'#ffd21f');q.addColorStop(0.62,'#ff8a10');q.addColorStop(1,'#e8291c');g.fillStyle=q;g.fillText(r.t,0,0);g.restore()}
+  // 70s speed stripes cut through the lower half of the letters
+  g.globalCompositeOperation='source-atop';for(const r of rows){const n=3;for(let k=0;k<n;k++){const yy=r.y-r.fs*0.3+k*r.fs*0.11;g.fillStyle='rgba(120,10,0,0.75)';g.fillRect(0,yy,w,Math.max(1.5,r.fs*0.035))}}
+  g.globalCompositeOperation='source-over';
+  // shine
+  return c}
+function drawLogo(x,y,w,h,t){const key=Math.round(w)+'x'+Math.round(h)+'@'+DPR;if(logoKey!==key){logoC=buildLogo(w,h);logoKey=key}ctx.drawImage(logoC,x,y,w,h)}
+function stripes(x,y,w,sb){RAINBOW.forEach((c,k)=>{ctx.fillStyle=c;ctx.fillRect(x,y+k*sb,w,sb)})}
+function rrect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function drawBadge(x,y,s){ctx.save();ctx.translate(x,y);ctx.rotate(-0.06);const w=92*s,h=40*s;ctx.fillStyle='rgba(0,0,0,0.5)';rrect(3*s,3*s,w,h,5*s);ctx.fill();ctx.fillStyle='#ffd21f';rrect(0,0,w,h,5*s);ctx.fill();ctx.lineWidth=2.5*s;ctx.strokeStyle='#111';ctx.stroke();
+  ctx.fillStyle='#111';ctx.textAlign='center';ctx.font=boxFont(13*s);ctx.fillText('GAME',w/2,17*s);ctx.fillText('PROGRAM',w/2,32*s);ctx.fillStyle='#e8312a';ctx.fillRect(6*s,20.5*s,w-12*s,1.5*s);ctx.restore()}
+function drawStarburst(x,y,r,t){ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(t*0.8)*0.06);ctx.fillStyle='rgba(0,0,0,0.45)';ctx.beginPath();for(let k=0;k<32;k++){const a=k/32*6.283,rr=k%2?r*0.78:r;ctx.lineTo(Math.cos(a)*rr+3,Math.sin(a)*rr+3)}ctx.fill();
+  ctx.fillStyle='#e8312a';ctx.beginPath();for(let k=0;k<32;k++){const a=k/32*6.283,rr=k%2?r*0.78:r;ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath();ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#111';ctx.stroke();
+  ctx.rotate(-0.2);ctx.fillStyle='#fff6b0';ctx.textAlign='center';ctx.font=boxFont(r*0.52);ctx.fillText('8',0,-r*0.04);ctx.font=boxFont(r*0.22);ctx.fillText('MISSIONS',0,r*0.3);ctx.restore()}
+function chunkyButton(x,y,w,h,label,sel,t,primary,arrow=true){ctx.save();const lift=sel?2:0;ctx.fillStyle='#000';rrect(x+4,y+4,w,h,6);ctx.fill();
+  ctx.fillStyle=sel?(primary?'#ffd21f':'#f7b21b'):'#1a1220';rrect(x-lift,y-lift,w,h,6);ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=sel?'#fff6b0':(primary?'#f2741c':'#7a5a40');ctx.stroke();
+  const fs=Math.min(h*0.52,w/(label.length*0.62+1));ctx.font=boxFont(fs);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=sel?'#1a0a00':(primary?'#ffd21f':'#f0dcc0');ctx.fillText(label,x+w/2-lift,y+h/2-lift+1);
+  if(sel&&arrow){const bob=Math.sin(t*8)*3;ctx.fillStyle='#fff6b0';ctx.beginPath();const ay=y+h/2-lift;ctx.moveTo(x-10+bob,ay);ctx.lineTo(x-20+bob,ay-7);ctx.lineTo(x-20+bob,ay+7);ctx.fill()}
+  ctx.textBaseline='alphabetic';ctx.restore()}
+function drawBoxShell(L,t){// tabletop + cardboard box with thick frame
+  ctx.fillStyle='#07060c';ctx.fillRect(0,0,W,H);const{bx,by,bw,bh,fr,ix,iy,iw,ih,hh,sb}=L;
+  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(bx+6,by+8,bw,bh);
+  const fg=ctx.createLinearGradient(bx,by,bx+bw,by+bh);fg.addColorStop(0,'#e8571c');fg.addColorStop(0.5,'#d23a16');fg.addColorStop(1,'#9e2410');ctx.fillStyle=fg;ctx.fillRect(bx,by,bw,bh);
+  // woodgrain-ish texture on the frame
+  ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=1;for(let k=0;k<bh;k+=5){ctx.beginPath();ctx.moveTo(bx,by+k);ctx.lineTo(bx+bw,by+k+Math.sin(k)*2);ctx.stroke()}
+  ctx.lineWidth=2;ctx.strokeStyle='#1a0602';ctx.strokeRect(bx+1,by+1,bw-2,bh-2);ctx.strokeRect(ix-2,iy-2,iw+4,ih+4);
+  ctx.fillStyle='#000';ctx.fillRect(ix,iy,iw,ih);
+  // header (black) with logo
+  const hg=ctx.createLinearGradient(0,iy,0,iy+hh);hg.addColorStop(0,'#000');hg.addColorStop(1,'#120a18');ctx.fillStyle=hg;ctx.fillRect(ix,iy,iw,hh);
+  drawLogo(ix+iw*0.02,iy+hh*0.04,iw*0.96,hh*0.92,t);
+  stripes(ix,iy+hh,iw,sb)}
+function drawBoxSheen(L,t){const{bx,by,bw,bh}=L;ctx.save();ctx.beginPath();ctx.rect(bx,by,bw,bh);ctx.clip();ctx.globalCompositeOperation='lighter';
+  const g=ctx.createLinearGradient(bx,by,bx+bw,by+bh);g.addColorStop(0,'rgba(255,255,255,0.07)');g.addColorStop(0.35,'rgba(255,255,255,0)');g.addColorStop(0.62,'rgba(255,255,255,0)');g.addColorStop(0.7,'rgba(255,255,255,0.05)');g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.fillRect(bx,by,bw,bh);ctx.restore()}
+function drawMenu(t){const L=boxLayout();menuHits=[];drawBoxShell(L,t);const{ix,iy,iw,ih,hh,sb,ay,ah,fy,fh}=L;
+  if(menuPage==='main'){drawArtScene(L,t);
+    const bs=clamp(Math.min(iw,ah)/230,0.6,1.25);drawBadge(ix+10*bs,ay+10*bs,bs);if(iw>300)drawStarburst(ix+iw-48*bs,ay+46*bs,38*bs,t);
+    let FY=fy,FH=fh;if(L.land){FH=clamp(ah*0.36,64,96);FY=iy+ih-FH;const og=ctx.createLinearGradient(0,FY-20,0,iy+ih);og.addColorStop(0,'rgba(5,3,10,0)');og.addColorStop(0.35,'rgba(5,3,10,0.82)');og.addColorStop(1,'rgba(5,3,10,0.95)');ctx.fillStyle=og;ctx.fillRect(ix,FY-20,iw,FH+20)}
+    else{stripes(ix,fy-sb*5,iw,sb);ctx.fillStyle='#0b0710';ctx.fillRect(ix,fy,iw,fh)}
+    const gap=clamp(iw*0.03,10,28),bh=clamp(FH*0.46,32,52);const bw=Math.min(220,(iw-gap*2-48)/3);const tot=bw*3+gap*2;const x0=ix+(iw-tot)/2,yb=FY+FH*0.14;
+    MENU_ITEMS.forEach((lab,i)=>{const x=x0+i*(bw+gap);chunkyButton(x,yb,bw,bh,lab,menuSel===i,t,i===2,gap>=22);menuHits.push({x:x-6,y:yb-6,w:bw+12,h:bh+12,i,act:()=>menuAct(i)})});
+    ctx.textAlign='center';const fs2=clamp(FH*0.15,10,14);ctx.font=`700 ${fs2}px system-ui,sans-serif`;const ty=yb+bh+(FH-(yb-FY)-bh)*0.62;
+    ctx.fillStyle='#ffd27a';ctx.fillText('HIGH SCORE  '+hi,ix+iw/2,ty);
+    if(iw>520){ctx.font=`600 ${fs2*0.85}px system-ui,sans-serif`;ctx.fillStyle='rgba(240,220,190,0.5)';ctx.textAlign='left';ctx.fillText(touchMode?'TAP TO SELECT':'\u2190 \u2192  SELECT   \u00b7   ENTER  OK',ix+12,ty);ctx.textAlign='right';ctx.fillText('1 PLAYER  \u00b7  AGES 8 AND UP',ix+iw-12,ty)}}
+  else{// "back of the box" page
+    drawArtScene(L,t);const top=iy+hh+sb*5;ctx.fillStyle='rgba(6,4,12,0.86)';ctx.fillRect(ix,top,iw,iy+ih-top);ctx.fillStyle='rgba(6,4,12,0.35)';ctx.fillRect(ix,top,iw,iy+ih-top);
+    const pad=clamp(iw*0.05,14,40),avW=iw-pad*2,bottom=iy+ih-12;const title=menuPage==='about'?'ABOUT THE GAME':'CONTROLS';
+    const tf=clamp(Math.min(iw/14,(bottom-top)/9),18,40);const backH=clamp(tf*1.15,30,46),bw=clamp(tf*4.2,96,170);
+    const cw0=Math.min(avW,menuPage==='about'?760:860),cx=ix+(iw-cw0)/2;let y=top+tf*0.5+backH*0.5+tf*0.35;
+    ctx.font=boxFont(tf);const tfT=Math.min(tf,tf*(cw0-bw-14)/ctx.measureText(title).width);ctx.font=boxFont(tfT);ctx.textAlign='left';ctx.fillStyle='#3a0a04';ctx.fillText(title,cx+3,y+3);ctx.fillStyle='#ffd21f';ctx.fillText(title,cx,y);const tw=ctx.measureText(title).width;
+    const bxb=cx+cw0-bw,byb=y-tf*0.72-(backH-tf*0.72)/2;chunkyButton(bxb,byb,bw,backH,'\u25c0 BACK',true,t,true,false);menuHits.push({x:bxb-6,y:byb-6,w:bw+12,h:backH+12,act:menuBack});
+    RAINBOW.forEach((c,k)=>{ctx.fillStyle=c;ctx.fillRect(cx,y+7+k*3,Math.min(cw0-bw-12,tw+40),3)});y+=7+15+Math.max(6,tf*0.3);
+    const avail=bottom-y;ctx.textAlign='left';
+    if(menuPage==='about'){const fit=(cols,fs)=>{const colW=(cw0-(cols-1)*24)/cols;ctx.font=`${fs}px Georgia,serif`;const lines=[];ABOUT_TEXT.forEach((p,pi)=>{wrapLines(p,colW).forEach(l=>lines.push([l,pi]));lines.push(['',pi])});lines.pop();let split=lines.length;if(cols===2){let bd=1e9;lines.forEach((l,i)=>{if(!l[0]&&Math.abs(i-lines.length/2)<bd){bd=Math.abs(i-lines.length/2);split=i}})}const rows=cols===2?Math.max(split,lines.length-split-1):lines.length;return{lines,colW,split,h:rows*fs*1.42}};
+      let best=null;for(let fs=clamp(Math.min(iw/30,avail/13),12,20);fs>=9;fs-=0.5){for(const cols of cw0>560?[1,2]:[1]){const r=fit(cols,fs);if(r.h<=avail){best={...r,cols,fs};break}}if(best)break}
+      if(!best)best={...fit(1,9),cols:1,fs:9};const{lines,colW,cols,fs,split}=best;
+      lines.forEach(([l,pi],i)=>{if(cols===2&&i===split)return;const c=cols===2&&i>split?1:0,r=c?i-split-1:i;ctx.fillStyle=pi===3?'#8fc':'#f0e4cc';ctx.font=(pi===3?'italic bold ':'')+`${fs}px Georgia,serif`;ctx.fillText(l,cx+c*(colW+24),y+fs+r*fs*1.42)})}
+    else{let secs=touchMode?[['TOUCH',CTRL_TOUCH],['KEYBOARD',CTRL_KEYS]]:[['KEYBOARD',CTRL_KEYS],['TOUCH',CTRL_TOUCH]];const cols=cw0>=600?2:1;const colW=(cw0-(cols-1)*28)/cols;
+      const rowsPerCol=cols===2?Math.max(...secs.map(s=>s[1].length+1.4)):secs.reduce((a,s)=>a+s[1].length+1.6,0);
+      let fs=clamp(Math.min(avail/(rowsPerCol*1.55),colW/24),9,17);
+      secs.forEach(([name,list],si)=>{const x=cx+(cols===2?si*(colW+28):0);ctx.font=`700 ${fs}px ui-monospace,Menlo,monospace`;const kw=Math.max(...(cols===2?list:CTRL_KEYS.concat(CTRL_TOUCH)).map(r=>ctx.measureText(r[0]).width))+fs*1.2;
+        ctx.font=boxFont(fs*1.15);ctx.fillStyle='#f2741c';ctx.fillText(name,x,y+fs*1.15);y+=fs*1.9;
+        for(const[k2,v]of list){ctx.font=`700 ${fs}px ui-monospace,Menlo,monospace`;ctx.fillStyle='#ffd98a';ctx.fillText(k2,x,y+fs);ctx.font=`${fs}px system-ui,sans-serif`;ctx.fillStyle='#e6e0f0';ctx.fillText(v,x+kw,y+fs);y+=fs*1.55}
+        if(cols===2&&si===0)y-=fs*1.9+list.length*fs*1.55;else y+=fs*0.4})}
+    if(!touchMode&&iw>420&&H>520){ctx.font='12px system-ui,sans-serif';ctx.textAlign='right';ctx.fillStyle='rgba(240,220,190,0.45)';ctx.fillText('ESC / BACKSPACE',ix+iw-12,iy+ih-10)}}
+  drawBoxSheen(L,t)}
+
 function overlay(title,sub,lines,col){ctx.fillStyle='rgba(2,4,10,0.72)';ctx.fillRect(0,0,W,H);ctx.textAlign='center';
   if(col==='chrome')chromeText(title,W/2,H*0.3,Math.min(54,W/12));else{ctx.fillStyle=col;ctx.font=`900 ${Math.min(50,W/12)}px system-ui,sans-serif`;ctx.shadowColor=col;ctx.shadowBlur=20;ctx.fillText(title,W/2,H*0.3);ctx.shadowBlur=0}
   ctx.fillStyle='#dde6f0';ctx.font='16px system-ui,sans-serif';ctx.fillText(sub,W/2,H*0.3+40);

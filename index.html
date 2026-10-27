@@ -242,39 +242,39 @@ const CHARS={F:{name:'FOREMAN BRAKKA TOLN',sub:'Mining Guild, Ohma-D\u2019un Sta
   M:{name:'STRANDED MINER',sub:'Drill Crew Seven',col:'#9bd36a'},I:{name:'INTEL RECOVERED',sub:'evidence log',col:'#ff9a3c'}};
 let leaderRevealed=false;
 const CAMPAIGN={
-1:{moon:'OHMA-D\u2019UN',name:'Routine Shift',crystals:8,spawnMul:0.6,music:'explore',
+1:{moon:'OHMA-D\u2019UN',name:'Routine Shift',crystals:12,spawnMul:0.6,music:'explore',
   brief:[['F','Morning, kid. First shift on Ohma-D\u2019un. Theed runs on plasma, and the Guild runs on crystals. Try not to crash my drill.'],
     ['D','Hover mode for open tunnels. Burrow mode chews through soft rock, but it drains energy. Purple bedrock cannot be drilled. I calculate a 94% chance you scrape the paint.'],
     ['F','Survey Chief Vosh wants this seam cleared by end of shift. Grab the crystals, ride the lift up. Simple.']],
   intel:[['transmission','V','Garbled signal: \u201c\u2026the shipment stays below until the Senator\u2019s schedule is confirmed\u2026\u201d']]},
-2:{moon:'OHMA-D\u2019UN',name:'Tremors',crystals:10,spawnMul:0.8,quakes:true,music:'explore',
+2:{moon:'OHMA-D\u2019UN',name:'Tremors',crystals:16,spawnMul:0.8,quakes:true,music:'explore',
   brief:[['D','Seismic readings are up 300 percent. Those are not natural tremors, sir. They have a rhythm.'],
     ['F','Moons rumble. Always have. ...Though I never felt one hit on the hour, every hour.'],
     ['F','Somebody\u2019s been leaving datapads in the old tunnels. Bring back anything that isn\u2019t rock.']],
   intel:[['datapad','I','Blasting log: six charges set in the east galleries. No Guild permit number.'],['transmission','V','\u201cKeep the drill crews out of the east galleries.\u201d \u2014 signed only \u201cV.\u201d']]},
-3:{moon:'RORI',name:'Things in the Walls',crystals:12,spawnMul:1.6,music:'explore',
+3:{moon:'RORI',name:'Things in the Walls',crystals:20,spawnMul:1.6,music:'explore',
   brief:[['F','We lost two drills on Rori last night. Something came out of the walls. A LOT of somethings.'],
     ['D','Bioscans show the burrowers nesting deeper than ever recorded. And they are agitated. Very agitated.'],
     ['F','Shoot anything with more legs than me. Crystals, then the lift.']],
   intel:[['datapad','I','Xenobiology note: \u201cBurrowers react violently to percussive blasts. If the blasting continues, they will swarm.\u201d'],['transmission','V','\u201cThe miners are getting curious. Good. Let the bugs keep them busy.\u201d']]},
-4:{moon:'RORI',name:'Lost Crew',crystals:5,spawnMul:1.2,rescue:3,music:'explore',
+4:{moon:'RORI',name:'Lost Crew',crystals:9,spawnMul:1.2,rescue:3,music:'explore',
   brief:[['F','Drill Crew Seven went dark in the lower galleries. Three miners, one wrecked hauler. You\u2019re closest.'],
     ['D','I read three distress beacons. They are on your minimap. Fly close to each one and I will lock the tow beam.'],
     ['F','Bring \u2019em home, kid. Crystals are secondary.']],
   rescueLines:['Thanks, kid! We saw people in black masks hauling crates down here!','They sealed the tunnel behind us with charges. On purpose!','Those crates had hazard runes. Baradium, I\u2019d bet my pension on it.'],
   intel:[['crate','I','Sealed crate: BARADIUM. Military-grade explosive. Definitely not Guild stock.'],['datapad','I','Shipping manifest: \u201cmining supplies\u201d bound for the Theed royal hangar.']]},
-5:{moon:'OHMA-D\u2019UN',name:'Illegal Blasting',crystals:8,spawnMul:1.2,intelNeed:3,music:'tension',
+5:{moon:'OHMA-D\u2019UN',name:'Illegal Blasting',crystals:14,spawnMul:1.2,intelNeed:3,music:'tension',
   brief:[['R','This is Captain Gavin Sykes, Naboo Royal Security Forces. I flew against the Trade Federation during the invasion, and I know trouble when I hear it. Your foreman forwarded your reports. Unofficially.'],
     ['R','Baradium on a mining moon is a serious accusation. I need proof. The caches will be sealed inside the rock.'],
     ['D','Burrow mode recommended. And sir? Please do not shoot the explosive crates.']],
   intel:[['crate','I','Cache #1: twelve kilos of baradium under forged Guild seals.'],['crate','I','Cache #2: detonators keyed to a royal transponder code.'],['datapad','I','Blast schedule: \u201cOn the hour, every hour. Drive the miners out of the deep galleries.\u201d']]},
-6:{moon:'RORI',name:'The Agitator Cell',crystals:6,spawnMul:1.3,intelNeed:4,music:'tension',
+6:{moon:'RORI',name:'The Agitator Cell',crystals:12,spawnMul:1.3,intelNeed:4,music:'tension',
   brief:[['R','We intercepted chatter from an agitator cell. They want to overthrow the government, and they\u2019re using your mine as cover.'],
     ['F','Agitators. In MY mine. Find out who, kid.'],
     ['D','The transmissions are scattered through this sector. Collect all four and I can decrypt the sender\u2019s identity.']],
   intel:[['transmission','V','\u201cThe Senator will vote against the Military Creation Act. She must never reach Coruscant.\u201d'],['transmission','V','\u201cThe baradium goes aboard the royal cruiser before it leaves the Theed landing platform.\u201d'],
     ['datapad','V','\u201cOur people inside the Guild will clear the cargo manifests. Nobody checks mining freight.\u201d'],['transmission','V','DECRYPTED. Sender identified: SURVEY CHIEF DELLAN VOSH.']]},
-7:{moon:'OHMA-D\u2019UN DEPTHS',name:'Queen of the Deep',crystals:6,spawnMul:1,boss:true,music:'explore',
+7:{moon:'OHMA-D\u2019UN DEPTHS',name:'Queen of the Deep',crystals:12,spawnMul:1,boss:true,music:'explore',
   brief:[['D','Vosh\u2019s blasting has woken something enormous. The seismic signature is the size of an ore hauler.'],
     ['F','The hive queen. An old miners\u2019 legend. Looks like she\u2019s real, and she\u2019s furious.'],
     ['R','Vosh\u2019s cell has sealed the lower lift. Kill that thing, or you\u2019re trapped down there with it.']],
@@ -285,10 +285,12 @@ const CAMPAIGN={
     ['D','The comm relay is at the far end of this sector. Burrowing is the shortest path. Go, go, GO!']],
   intel:[]}
 };
+// endless quota (old: min(34, boss?5+lv:6+lv*2))
+function endlessQuota(lv,boss){return Math.min(56,Math.round((boss?5+lv:6+lv*2)*1.6))}
 function levelCfg(lv){if(CAMPAIGN[lv])return Object.assign({campaign:true},CAMPAIGN[lv]);
   const boss=lv%5===0,timed=!boss&&lv%5===3;
-  return{moon:lv%2?'OHMA-D\u2019UN':'RORI',name:SECTORS[(lv-1)%SECTORS.length],crystals:Math.min(34,boss?5+lv:6+lv*2),spawnMul:1,boss,timed:timed?1:0,music:timed?'tension':'explore',
-    brief:[['D',`Endless sector ${lv}. Theed still needs plasma, sir. Quota: ${Math.min(34,boss?5+lv:6+lv*2)} crystals.`+(boss?' Another queen signature detected near the lift.':'')+(timed?' Warning: the crust is unstable.':'')]],intel:[]}}
+  return{moon:lv%2?'OHMA-D\u2019UN':'RORI',name:SECTORS[(lv-1)%SECTORS.length],crystals:endlessQuota(lv,boss),spawnMul:1,boss,timed:timed?1:0,music:timed?'tension':'explore',
+    brief:[['D',`Endless sector ${lv}. Theed still needs plasma, sir. Quota: ${endlessQuota(lv,boss)} crystals.`+(boss?' Another queen signature detected near the lift.':'')+(timed?' Warning: the crust is unstable.':'')]],intel:[]}}
 const EPILOGUE=[['R','Your evidence came through. Honestly? Command thinks a miner\u2019s story about bugs and baradium sounds far-fetched.'],
   ['R','But it\u2019s credible enough. Survey Chief Dellan Vosh was arrested at the Theed hangar an hour ago.'],
   ['R','And the Senator won\u2019t ride the royal cruiser. A handmaiden will travel aboard it as a decoy, while the Senator flies escort in a starfighter.'],
@@ -344,6 +346,22 @@ function bfs(sx,sy,maxD){const N=MW*MH,d=new Int16Array(N).fill(-1),q=new Int32A
     if(c>=MW&&d[c-MW]<0&&passable(map[c-MW])){d[c-MW]=cd+1;q[tl++]=c-MW}
     if(c+MW<N&&d[c+MW]<0&&passable(map[c+MW])){d[c+MW]=cd+1;q[tl++]=c+MW}}
   return d}
+// flood fill through open tunnels AND drillable rock (not bedrock) - used to keep buried crystals reachable
+function bfsDrill(sx,sy){const N=MW*MH,d=new Int16Array(N).fill(-1),q=new Int32Array(N);let h=0,tl=0;const s=sy*MW+sx;d[s]=0;q[tl++]=s;
+  while(h<tl){const c=q[h++],x=c%MW;for(const n of[x>0?c-1:-1,x<MW-1?c+1:-1,c-MW,c+MW])if(n>=0&&n<N&&d[n]<0&&map[n]!==BED){d[n]=d[c]+1;q[tl++]=n}}return d}
+let crystalPlan=null,relayPath=0,explorer=null;
+// Simulated first-time run to the lift: no map knowledge, always takes the unexplored tunnel that heads toward the lift arrow,
+// fully enters dead ends and backtracks (DFS on 2x2-tile blocks). est = seconds at a ~110px/s cruise + 0.8s per turnaround.
+function explorerRoute(gx,gy){const BW=Math.floor((MW-1)/2),bt=(bx,by,k)=>(1+2*by+(k>>1))*MW+1+2*bx+(k&1);
+  const bp=(bx,by)=>{if(bx<0||by<0||bx>=BW||by>=BW)return false;let n=0;for(let k=0;k<4;k++)if(passable(map[bt(bx,by,k)]))n++;return n>=2};
+  const link=(ax,ay,bx,by)=>{if(!bp(bx,by))return false;if(ax!==bx){const x0=Math.max(ax,bx)*2+1;for(let k=0;k<2;k++){const y=1+2*ay+k;if(passable(map[y*MW+x0-1])&&passable(map[y*MW+x0]))return true}}
+    else{const y0=Math.max(ay,by)*2+1;for(let k=0;k<2;k++){const x=1+2*ax+k;if(passable(map[(y0-1)*MW+x])&&passable(map[y0*MW+x]))return true}}return false};
+  const sb=[1,1],gb=[Math.floor((gx-1)/2),Math.floor((gy-1)/2)],seen=new Uint8Array(BW*BW),st=[sb],route=[sb];let rev=0,fwd=true,steps=0;seen[sb[1]*BW+sb[0]]=1;
+  for(let guard=0;guard<BW*BW*4&&st.length;guard++){const[cx,cy]=st[st.length-1];
+    if(Math.abs(cx-gb[0])+Math.abs(cy-gb[1])<=4&&los((cx*2+2)*T,(cy*2+2)*T,(gx+0.5)*T,(gy+0.5)*T)){steps+=Math.hypot(cx-gb[0],cy-gb[1]);route.push(gb);break}
+    let best=null,bd=1e9;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=BW||ny>=BW||seen[ny*BW+nx]||!link(cx,cy,nx,ny))continue;const d=Math.hypot(nx-gb[0],ny-gb[1]);if(d<bd){bd=d;best=[nx,ny]}}
+    if(best){seen[best[1]*BW+best[0]]=1;st.push(best);route.push(best);steps++;fwd=true}else{st.pop();if(fwd)rev++;fwd=false;if(st.length){route.push(st[st.length-1]);steps++}}}
+  const est=steps*2*T/110+rev*0.8;return{steps,rev,est,route}}
 function genLevel(lv){
   const R=mulberry((Date.now()^Math.imul(lv,7919))>>>0);
   cfg=levelCfg(lv);const cells=cfg.cells||Math.min(24,7+lv*2);MW=MH=cells*4+3;
@@ -391,12 +409,22 @@ function genLevel(lv){
   intelGot=0;intelTotal=cfg.intel.length;intelNeed=Math.min(intelTotal,cfg.intelNeed||0);
   for(const[kind]of cfg.intel){const i=kind==='crate'?(pick(deep)??pick(rocks)):pick(floors);if(i!=null)items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'intel',kind,ph:Math.random()*6})}
   intelTotal=items.filter(i=>i.type==='intel').length;intelNeed=Math.min(intelNeed,intelTotal);
-  for(let k=0;k<need+(need?5:0);k++)add(pick(floors),'crystal');
-  for(let k=0;k<5+lv;k++)add(pick(rocks),'crystal');
+  // MECH_V1 crystals: ~1.3x the quota spawned, ~65% buried in drillable rock next to the tunnels (never bedrock, always reachable by drilling)
+  {const dd=bfsDrill(4,4),ok=i=>dd[i]>=0&&map[i]===ROCK&&dist(i%MW,(i/MW)|0,4,4)>5&&dist(i%MW,(i/MW)|0,ptx,pty)>3;
+   const rk=rocks.filter(ok),dp=deep.filter(ok);const pickR=()=>pick(rk)??pick(dp);
+   const tot=need?Math.ceil(need*1.3):0,nb=need?Math.round(tot*0.65):5+lv;crystalPlan={tot,buried:0,open:0,need};
+   for(let k=0;k<nb;k++){const i=pickR();if(i!=null){add(i,'crystal');crystalPlan.buried++}}
+   while(crystalPlan.buried+crystalPlan.open<tot){const i=pick(floors)??pickR();if(i==null)break;add(i,'crystal');if(map[i]===ROCK)crystalPlan.buried++;else crystalPlan.open++}}
   for(let k=0;k<4+(lv>>1);k++)add(pick(floors),'energy');
   for(let k=0;k<2+(lv>>1);k++)add(pick(rocks),'energy');
   for(let k=0;k<3+(lv>>2);k++)add(pick(floors),'shield');
-  timeMax=timeLeft=timed?(cfg.timed>1?cfg.timed:Math.round(70+cells*9)):0;
+  relayPath=d[pty*MW+ptx];
+  // MECH_V1 timed missions: timer is sized to THIS map's route (old: L8 150s fixed, endless 70+cells*9).
+  // decent first-time run = 3x the shortest tunnel route (explorer sims: median 1.9-2.7x, 75th pct ~3.3x) at a 110px/s cruise (measured: keyboard bot on real physics averages ~100-110px/s along winding tunnels), +20% for fights and debris,
+  // plus ~4s per required crystal on timed sectors that have a quota (1.2s dig + drill deploy + braking + a short detour);
+  // the timer leaves 25% on top of that, and never drops below the campaign's old value (L8: 150s) or 90s.
+  explorer=timed?explorerRoute(ptx,pty):null;
+  timeMax=timeLeft=timed?Math.max(cfg.timed>1?cfg.timed:90,Math.ceil((relayPath*T*3/110*1.2+need*4)/0.75/5)*5):0;
   boss=null;bossWoke=false;bossDead=false;
   // canvases
   mapC=document.createElement('canvas');mapC.width=MW*T;mapC.height=MH*T;mctx=mapC.getContext('2d');
@@ -452,7 +480,7 @@ function flowDir(m){const tx=Math.floor(m.x/T),ty=Math.floor(m.y/T);const dx=shi
   let best=cd,bx=tx,by=ty;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){if(!a&&!b)continue;const nx=tx+a,ny=ty+b;if(nx<0||ny<0||nx>=MW||ny>=MH)continue;
     if(a&&b&&(solidAt(tx+a,ty)||solidAt(tx,ty+b)))continue;const v=flow[ny*MW+nx];if(v>=0&&v<best){best=v;bx=nx;by=ny}}
   if(best===cd)return[dx/dd,dy/dd];const ex=(bx+0.5)*T-m.x,ey=(by+0.5)*T-m.y,ed=Math.hypot(ex,ey)||1;return[ex/ed,ey/ed]}
-const MOB={crawler:{hp:2,r:9,sp:150,dmg:9,pts:50},spitter:{hp:4,r:12,sp:80,dmg:12,pts:80},worm:{hp:8,r:13,sp:72,dmg:16,pts:150},boss:{hp:90,r:44,sp:50,dmg:25,pts:2500}};
+const MOB={crawler:{hp:2,r:9,sp:92,dmg:9,pts:50},spitter:{hp:4,r:12,sp:50,dmg:12,pts:80},worm:{hp:8,r:13,sp:44,dmg:16,pts:150},boss:{hp:90,r:44,sp:34,dmg:25,pts:2500}};
 function spawnMob(type,x,y){const d=MOB[type];const m={type,x,y,vx:0,vy:0,hp:d.hp+(type==='boss'?level*6:Math.floor((level-1)/3)),r:d.r,t:Math.random()*5,hf:0,cd:rnd(1,2),stun:0,seg:[],a:0,scd:5};m.max=m.hp;
   if(type==='worm')for(let k=0;k<7;k++)m.seg.push({x,y});mobs.push(m);if(type==='boss')boss=m;return m}
 function addCrack(tx,ty,type,dur){cracks.push({tx,ty,type,t:0,max:dur||1.4,seed:Math.random()*99});SFX.crack()}
@@ -564,19 +592,20 @@ function updatePlay(dt){
   let ix=(K.right?1:0)-(K.left?1:0),iy=(K.down?1:0)-(K.up?1:0);
   if(joy.id!==null){const dx=joy.x-joy.ox,dy=joy.y-joy.oy,d=Math.hypot(dx,dy);if(d>8){ix+=dx/Math.max(d,50);iy+=dy/Math.max(d,50)}}
   const im=Math.hypot(ix,iy);if(im>1){ix/=im;iy/=im}
-  const hov=ship.mode==='hover',acc=hov?1050:600,max=hov?285:118,drag=hov?2.2:7;
+  // MECH_V1 heavy mining vessel: slow top speed, sluggish thrust, coasting drift, slow hull turn (old: acc 1050/600, max 285/118, drag 2.2/7, turn 10)
+  const hov=ship.mode==='hover',acc=hov?400:250,max=hov?160:60,drag=hov?1.5:6;
   ship.vx+=ix*acc*dt;ship.vy+=iy*acc*dt;const f=Math.exp(-drag*dt*(im>0.1?0.3:1));ship.vx*=f;ship.vy*=f;
   let sp=Math.hypot(ship.vx,ship.vy);if(sp>max){ship.vx*=max/sp;ship.vy*=max/sp;sp=max}
-  if(im>0.1)ship.a+=angDiff(ship.a,Math.atan2(iy,ix))*Math.min(1,dt*10);
+  if(im>0.1)ship.a+=angDiff(ship.a,Math.atan2(iy,ix))*Math.min(1,dt*(hov?4:3));
   ship.drilling=false;
-  const dig=hov?null:(tx,ty)=>{const i=ty*MW+tx;if(map[i]===ROCK){thp[i]-=dt*1.25/Math.max(1,(sp<20?1.6:1));ship.drilling=true;
+  const dig=hov?null:(tx,ty)=>{const i=ty*MW+tx;if(map[i]===ROCK){thp[i]-=dt*0.72/Math.max(1,(sp<20?1.6:1));ship.drilling=true;
       if(Math.random()<0.6){const sp2=Math.random()<0.3;parts.push({x:ship.x+Math.cos(ship.a)*(14+14*ship.dp),y:ship.y+Math.sin(ship.a)*(14+14*ship.dp),vx:rnd(-90,90)-ship.vx*0.3,vy:rnd(-90,90)-ship.vy*0.3,life:sp2?0.35:0.7,max:sp2?0.35:0.7,c:sp2?'#ffd9a0':(Math.random()<0.5?'#8a8580':'#5c5852'),s:sp2?rnd(1,2):rnd(2,4.5),drag:sp2?3:4,g:sp2?1:0})}
-      if(thp[i]<=0){breakTile(tx,ty);ship.en-=1.2}}
+      if(thp[i]<=0){breakTile(tx,ty);ship.en-=0.8}}
     else if(map[i]===BED&&Math.random()<0.1){parts.push({x:ship.x+Math.cos(ship.a)*(14+14*ship.dp),y:ship.y+Math.sin(ship.a)*(14+14*ship.dp),vx:rnd(-120,120),vy:rnd(-120,120),life:0.3,max:0.3,c:'#cbf',s:2,drag:2,g:1});if(Math.random()<0.2)toast('Bedrock — too hard to drill',null,null,'#b9f')}};
   const h=moveEnt(ship,ship.vx*dt,ship.vy*dt,11,dig);
   if(h.hx)ship.vx*=hov?-0.35:0.2;if(h.hy)ship.vy*=hov?-0.35:0.2;
   if(ship.drilling){SFX.drill();shake=Math.max(shake,1.6)}
-  if(!hov){ship.en-=(sp>15?1.6:0.6)*dt+(ship.drilling?3*dt:0);if(ship.en<=0){ship.en=0;setMode('hover');toast('Energy depleted — drill offline',null,null,'#f96')}}
+  if(!hov){ship.en-=(sp>15?1.2:0.5)*dt+(ship.drilling?2*dt:0);if(ship.en<=0){ship.en=0;setMode('hover');toast('Energy depleted — drill offline',null,null,'#f96')}}
   else if(ship.en<40)ship.en=Math.min(40,ship.en+1.6*dt);
   // drill deploy (about 0.2s), spin, engine thrust
   ship.dp=clamp(ship.dp+(hov?-dt:dt)*5,0,1);ship.spin+=dt*(ship.drilling?42:ship.dp>0.9?16:6*ship.dp);ship.chomp=ship.drilling?Math.sin(gameT*30)*0.08:0;ship.thr=lerp(ship.thr,im,Math.min(1,dt*6));ship.mf=Math.max(0,ship.mf-dt);
@@ -598,7 +627,7 @@ function updatePlay(dt){
   flowT-=dt;if(flowT<=0){flowT=0.25;flow=bfs(Math.floor(ship.x/T),Math.floor(ship.y/T),48)}
   mmT-=dt;if(mmT<=0){mmT=0.3;updateMinimap()}
   // items
-  for(const it of items){it.ph+=dt;if(solidAt(Math.floor(it.x/T),Math.floor(it.y/T)))continue;const d=dist(it.x,it.y,ship.x,ship.y);
+  for(const it of items){it.ph+=dt;if(solidAt(Math.floor(it.x/T),Math.floor(it.y/T))){if(it.type==='crystal'&&Math.random()<dt*1.4&&dist(it.x,it.y,ship.x,ship.y)<560)parts.push({x:it.x+rnd(-9,9),y:it.y+rnd(-9,9),vx:rnd(-8,8),vy:rnd(-22,-6),life:0.7,max:0.7,c:Math.random()<0.5?'#bff':'#6ef',s:rnd(1.2,2.2),drag:1,g:1});continue}const d=dist(it.x,it.y,ship.x,ship.y);
     if(d<75){const p=(1-d/75)*500*dt;it.x+=(ship.x-it.x)/d*p;it.y+=(ship.y-it.y)/d*p}
     if(d<20){it.dead=true;SFX.pickup(it.type);
       if(it.type==='crystal'){got++;score+=100;toast('+100',it.x,it.y,'#7ff');if(got===need)toast(padIsActive()?'Quota met! Return to the extraction lift':'Crystal quota met — finish your other objectives',null,null,'#8f8')}
@@ -615,7 +644,7 @@ function updatePlay(dt){
       sayComm('M',(cfg.rescueLines||[])[rescued-1]||'Thank you, pilot!');if(rescued===rescueNeed)toast('All survivors aboard!',null,null,'#9f8')}}
   if(comm){comm.t+=dt;if(comm.t>comm.max)comm=null}
   // cracks / spawning
-  if(!bossLevel||!boss){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*rnd(0.6,1.4)/(cfg.spawnMul||1);trySpawn()}}
+  if(!bossLevel||!boss){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1);trySpawn()}}
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
     if(c.type==='boss')shake=Math.max(shake,4+c.t*4);if(c.t>=c.max){c.done=true;burst(c)}}
   cracks=cracks.filter(c=>!c.done);
@@ -628,11 +657,11 @@ function updatePlay(dt){
     let tvx=0,tvy=0,spd=MOB[m.type].sp*(1+Math.min(0.5,(level-1)*0.05));
     if(m.type==='crawler'){const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}
     else if(m.type==='spitter'){m.cd-=dt;const see=d<300&&los(m.x,m.y,ship.x,ship.y);
-      if(see){if(d<140){tvx=-dx/d*spd;tvy=-dy/d*spd}if(m.cd<=0){m.cd=rnd(1.4,2.2);const a=Math.atan2(dy,dx);globs.push({x:m.x,y:m.y,vx:Math.cos(a)*240,vy:Math.sin(a)*240,life:2,r:5});SFX.spit()}}
+      if(see){if(d<140){tvx=-dx/d*spd;tvy=-dy/d*spd}if(m.cd<=0){m.cd=rnd(1.4,2.2);const a=Math.atan2(dy,dx);globs.push({x:m.x,y:m.y,vx:Math.cos(a)*165,vy:Math.sin(a)*165,life:2.6,r:5});SFX.spit()}}
       else{const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}}
     else if(m.type==='worm'){if(m.bf>0){m.bf-=dt;const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}else{tvx=dx/d*spd;tvy=dy/d*spd}}
     else if(m.type==='boss'){const ph2=m.hp<m.max/2;spd*=ph2?1.5:1;if(d>170){tvx=dx/d*spd;tvy=dy/d*spd}else{tvx=-dy/d*spd*0.6;tvy=dx/d*spd*0.6}
-      m.cd-=dt;if(m.cd<=0){m.cd=ph2?1.8:2.8;const n=ph2?18:12,off=m.t;for(let k=0;k<n;k++){const a=off+k/n*6.283;globs.push({x:m.x+Math.cos(a)*30,y:m.y+Math.sin(a)*30,vx:Math.cos(a)*200,vy:Math.sin(a)*200,life:3,r:7,ign:0.25})}SFX.spit()}
+      m.cd-=dt;if(m.cd<=0){m.cd=ph2?1.8:2.8;const n=ph2?18:12,off=m.t;for(let k=0;k<n;k++){const a=off+k/n*6.283;globs.push({x:m.x+Math.cos(a)*30,y:m.y+Math.sin(a)*30,vx:Math.cos(a)*140,vy:Math.sin(a)*140,life:4,r:7,ign:0.25})}SFX.spit()}
       m.scd-=dt;if(m.scd<=0){m.scd=ph2?5:7;if(mobs.length<14)for(let k=0;k<2;k++)spawnMob('crawler',m.x+rnd(-30,30),m.y+rnd(-30,30))}}
     if(m.stun>0){tvx*=0.1;tvy*=0.1}
     const k=Math.min(1,dt*(m.type==='crawler'?6:3));m.vx=lerp(m.vx,tvx,k);m.vy=lerp(m.vy,tvy,k);
@@ -642,14 +671,14 @@ function updatePlay(dt){
     else if(m.type==='worm'){let hitBed=false;const hh=moveEnt(m,m.vx*dt,m.vy*dt,m.r-3,(tx,ty)=>{if(tileAt(tx,ty)===ROCK&&tx>1&&ty>1&&tx<MW-2&&ty<MH-2){breakTile(tx,ty,true)}else hitBed=true});if(hitBed&&(hh.hx||hh.hy))m.bf=1.2;
       const last=m.seg[0];if(dist(last.x,last.y,m.x,m.y)>7){m.seg.unshift({x:m.x,y:m.y});m.seg.length=7}}
     else moveEnt(m,m.vx*dt,m.vy*dt,m.r,null);
-    if(d<m.r+11){hurtShip(MOB[m.type].dmg);if(m.type!=='boss'){m.vx=-dx/d*220;m.vy=-dy/d*220;m.stun=0.5}}
+    if(d<m.r+11){hurtShip(MOB[m.type].dmg);if(m.type!=='boss'){m.vx=-dx/d*160;m.vy=-dy/d*160;m.stun=0.7}}
     if(m.type==='worm')for(let s=2;s<m.seg.length;s+=2){if(dist(m.seg[s].x,m.seg[s].y,ship.x,ship.y)<20)hurtShip(8)}}
   for(let i=0;i<mobs.length;i++)for(let j=i+1;j<mobs.length;j++){const a=mobs[i],b=mobs[j];if(a.type==='boss'||b.type==='boss')continue;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),rr=a.r+b.r;
     if(d>0&&d<rr){const p=(rr-d)/2/d;const ox=dx*p,oy=dy*p;if(!overlap(a.x-ox,a.y-oy,a.r)){a.x-=ox;a.y-=oy}if(!overlap(b.x+ox,b.y+oy,b.r)){b.x+=ox;b.y+=oy}}}
   Music.battle(clamp(threat*0.7,0,1));
   // bolts
   for(const b of bolts){b.life-=dt;const n=2;for(let s=0;s<n&&!b.dead;s++){b.x+=b.vx*dt/n;b.y+=b.vy*dt/n;const tx=Math.floor(b.x/T),ty=Math.floor(b.y/T);
-      if(solidAt(tx,ty)){b.dead=true;const t=tileAt(tx,ty);if(t===ROCK){const i=ty*MW+tx;thp[i]-=0.12;if(thp[i]<=0)breakTile(tx,ty)}
+      if(solidAt(tx,ty)){b.dead=true;const t=tileAt(tx,ty);if(t===ROCK){const i=ty*MW+tx;thp[i]-=0.0175;/* MECH_V1: blaster vs rock ~3x slower than the drill (old 0.12) */if(thp[i]<=0)breakTile(tx,ty)}
         for(let k=0;k<5;k++)parts.push({x:b.x-b.vx*0.01,y:b.y-b.vy*0.01,vx:rnd(-100,100),vy:rnd(-100,100),life:0.25,max:0.25,c:t===BED?'#c9f':'#fc8',s:2,drag:3,g:1});break}
       for(const m of mobs){if(m.dead)continue;let hit=dist(b.x,b.y,m.x,m.y)<m.r+4;if(!hit&&m.type==='worm')for(const sg of m.seg)if(dist(b.x,b.y,sg.x,sg.y)<10){hit=true;break}
         if(hit){b.dead=true;m.hp--;m.hf=0.08;if(m.type!=='boss'){m.vx+=b.vx*0.12;m.vy+=b.vy*0.12}
@@ -1186,6 +1215,6 @@ resize();
 const fontsReady=(document.fonts&&document.fonts.load)?Promise.race([Promise.all([`16px ${FB}`,`bold 16px ${FB}`,`16px ${FW}`,`bold 16px ${FT}`].map(f=>document.fonts.load(f).catch(()=>null))).then(()=>document.fonts.ready),new Promise(r=>setTimeout(r,3000))]):Promise.resolve();
 fontsReady.then(()=>{renderCrawl();lastT=performance.now();requestAnimationFrame(frame)});
 // test hooks
-window.NM={get state(){return state},get ship(){return ship},get mobs(){return mobs},get items(){return items},get cracks(){return cracks},get map(){return map},get MW(){return MW},get got(){return got},get need(){return need},get pad(){return[padX,padY]},get level(){return level},get score(){return score},
+window.NM={get state(){return state},get ship(){return ship},get mobs(){return mobs},get items(){return items},get cracks(){return cracks},get map(){return map},get MW(){return MW},get got(){return got},get need(){return need},get crystalPlan(){return crystalPlan},get relayPath(){return relayPath},get explorer(){return explorer},get timeMax(){return timeMax},get timeMax(){return timeMax},get pad(){return[padX,padY]},get level(){return level},get score(){return score},
   setLevel(l){level=l},startGame,startLevel,trySpawn,setState,T,setMode,giveCrystals(n){got+=n},get intel(){return[intelGot,intelTotal,intelNeed]},get rescue(){return[rescued,rescueNeed]},get miners(){return miners},get brief(){return[briefIdx,cfg&&cfg.brief.length]},get epi(){return epiIdx},get comm(){return comm},get leader(){return leaderRevealed},get timeLeft(){return timeLeft},get music(){return Music.cur&&Music.cur.name},get ac(){return ac&&ac.state},get lightFrames(){return lightFrames},get cam(){return lastCam},lightC,get boss(){return boss}};
 </script></body></html>

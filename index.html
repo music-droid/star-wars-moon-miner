@@ -229,6 +229,7 @@ const SFX={last:{},
       [[196,0],[262,0.09],[196,0.18],[330,0.27]].forEach(([fq,d])=>{const g2=Gn(sfxBus,0);g2.gain.setValueAtTime(0.07,t+d);g2.gain.exponentialRampToValueAtTime(0.001,t+d+0.16);O('square',fq,t+d,t+d+0.18,g2)});return}
     const ns=k==='crystal'?[1318,1661,1976,2637]:k==='energy'?[523,784,1047]:[392,523,659,784];ns.forEach((f,i)=>{const g=Gn(sfxBus,0);g.gain.setValueAtTime(0.09,t+i*0.05);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.05+0.25);O(k==='crystal'?'sine':'triangle',f,t+i*0.05,t+i*0.05+0.3,g)})},
   hurt(){if(!this.ok('h',0.1))return;const t=ac.currentTime,g=Gn(sfxBus,0);g.gain.setValueAtTime(0.2,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.25);const o=O('sawtooth',300,t,t+0.26,g);o.frequency.exponentialRampToValueAtTime(50,t+0.25)},
+  grind(k){if(!this.ok('g',0.08))return;const t=ac.currentTime,v=0.04+0.1*(k||0),g=Gn(sfxBus,0),f=Fl(g,'bandpass',rnd(900,1500),4);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.09);Nz(t,0.1,f);const g2=Gn(sfxBus,0),f2=Fl(g2,'lowpass',260,1);g2.gain.setValueAtTime(v*0.8,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.12);Nz(t,0.13,f2)},
   crack(){if(!this.ok('c',0.15))return;const t=ac.currentTime,g=Gn(sfxBus,0),f=Fl(g,'lowpass',220,2);g.gain.setValueAtTime(0.001,t);g.gain.exponentialRampToValueAtTime(0.25,t+0.3);g.gain.exponentialRampToValueAtTime(0.001,t+0.9);Nz(t,0.95,f)},
   drill(){if(!this.ok('d',0.09))return;const t=ac.currentTime,g=Gn(sfxBus,0),f=Fl(g,'bandpass',rnd(300,700),3);g.gain.setValueAtTime(0.14,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.1);Nz(t,0.11,f);const g2=Gn(sfxBus,0);g2.gain.setValueAtTime(0.03,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.1);O('sawtooth',rnd(70,90),t,t+0.11,g2)},
   spit(){if(!this.ok('s',0.08))return;const t=ac.currentTime,g=Gn(sfxBus,0),f=Fl(g,'bandpass',900,2);f.frequency.exponentialRampToValueAtTime(300,t+0.2);g.gain.setValueAtTime(0.15,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.22);Nz(t,0.23,f)},
@@ -743,24 +744,28 @@ function updatePlay(dt){
   if(joy.id!==null){const dx=joy.x-joy.ox,dy=joy.y-joy.oy,d=Math.hypot(dx,dy);if(d>8){ix+=dx/Math.max(d,50);iy+=dy/Math.max(d,50)}}
   const im=Math.hypot(ix,iy);if(im>1){ix/=im;iy/=im}
   // MECH_V1 heavy mining vessel: slow top speed, sluggish thrust, coasting drift, slow hull turn (old: acc 1050/600, max 285/118, drag 2.2/7, turn 10)
-  const hov=ship.mode==='hover',acc=hov?400:250,max=hov?160:60,drag=hov?1.5:6;
+  const hov=ship.mode==='hover',acc=hov?HANDLING.accH:HANDLING.accB,max=hov?160:60,drag=hov?HANDLING.dragH:HANDLING.dragB;
   ship.vx+=ix*acc*dt;ship.vy+=iy*acc*dt;const f=Math.exp(-drag*dt*(im>0.1?0.3:1));ship.vx*=f;ship.vy*=f;
   let sp=Math.hypot(ship.vx,ship.vy);if(sp>max){ship.vx*=max/sp;ship.vy*=max/sp;sp=max}
-  if(im>0.1)ship.a+=angDiff(ship.a,Math.atan2(iy,ix))*Math.min(1,dt*(hov?4:3));
+  if(im>0.1)ship.a+=angDiff(ship.a,Math.atan2(iy,ix))*Math.min(1,dt*(hov?HANDLING.turnH:HANDLING.turnB));
   ship.drilling=false;
   const dig=hov?null:(tx,ty)=>{const i=ty*MW+tx;if(map[i]===ROCK){thp[i]-=dt*0.72/Math.max(1,(sp<20?1.6:1));ship.drilling=true;
       if(Math.random()<0.6){const sp2=Math.random()<0.3;parts.push({x:ship.x+Math.cos(ship.a)*(14+14*ship.dp),y:ship.y+Math.sin(ship.a)*(14+14*ship.dp),vx:rnd(-90,90)-ship.vx*0.3,vy:rnd(-90,90)-ship.vy*0.3,life:sp2?0.35:0.7,max:sp2?0.35:0.7,c:sp2?'#ffd9a0':(Math.random()<0.5?'#8a8580':'#5c5852'),s:sp2?rnd(1,2):rnd(2,4.5),drag:sp2?3:4,g:sp2?1:0})}
       if(thp[i]<=0){breakTile(tx,ty);ship.en-=0.8}}
     else if(map[i]===BED&&Math.random()<0.1){parts.push({x:ship.x+Math.cos(ship.a)*(14+14*ship.dp),y:ship.y+Math.sin(ship.a)*(14+14*ship.dp),vx:rnd(-120,120),vy:rnd(-120,120),life:0.3,max:0.3,c:'#cbf',s:2,drag:2,g:1});if(Math.random()<0.2)toast('Bedrock — too hard to drill',null,null,'#b9f')}};
   const h=moveEnt(ship,ship.vx*dt,ship.vy*dt,11,dig);
-  if(h.hx)ship.vx*=hov?-0.35:0.2;if(h.hy)ship.vy*=hov?-0.35:0.2;
+  if(!hov||!HEAVY_HANDLING){if(h.hx)ship.vx*=hov?HANDLING.wallH:HANDLING.wallB;if(h.hy)ship.vy*=hov?HANDLING.wallH:HANDLING.wallB}
+  else if(h.hx||h.hy){// scrape and slide: settle flush against the wall, lose the normal speed, keep most of the slide
+    const ovx=ship.vx,ovy=ship.vy;
+    if(h.hx){const sx=Math.sign(ovx);for(const fr of[0.5,0.25,0.125]){const st=ovx*dt*fr;ship.x+=st;if(overlap(ship.x,ship.y,11,null))ship.x-=st}ship.vx=-ovx*HANDLING.wallH;ship.vy*=Math.exp(-HANDLING.wallFric*dt);wallScrape(sx,0,ovx,ovy)}
+    if(h.hy){const sy=Math.sign(ovy);for(const fr of[0.5,0.25,0.125]){const st=ovy*dt*fr;ship.y+=st;if(overlap(ship.x,ship.y,11,null))ship.y-=st}ship.vy=-ovy*HANDLING.wallH;ship.vx*=Math.exp(-HANDLING.wallFric*dt);wallScrape(0,sy,ovy,ovx)}}
   if(ship.drilling){SFX.drill();shake=Math.max(shake,1.6)}
   if(!hov){ship.en-=(sp>15?1.2:0.5)*dt+(ship.drilling?2*dt:0);if(ship.en<=0){ship.en=0;setMode('hover');toast('Energy depleted — drill offline',null,null,'#f96')}}
   else if(ship.en<40)ship.en=Math.min(40,ship.en+1.6*dt);
   // drill deploy (about 0.2s), spin, engine thrust
   ship.dp=clamp(ship.dp+(hov?-dt:dt)*5,0,1);ship.spin+=dt*(ship.drilling?42:ship.dp>0.9?16:6*ship.dp);ship.chomp=ship.drilling?Math.sin(gameT*30)*0.08:0;ship.thr=lerp(ship.thr,im,Math.min(1,dt*6));ship.mf=Math.max(0,ship.mf-dt);
   // faint mint engine trail from the ring
-  ship.trail+=dt;if(ship.trail>0.035&&sp>25){ship.trail=0;const ca=Math.cos(ship.a),sa=Math.sin(ship.a);parts.push({x:ship.x-ca*35+rnd(-1.5,1.5),y:ship.y-sa*35+rnd(-1.5,1.5),vx:-ca*40-ship.vx*0.1,vy:-sa*40-ship.vy*0.1,life:0.55,max:0.55,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1})}
+  ship.trail+=dt;if(ship.trail>0.035&&sp>25){ship.trail=0;const ca=Math.cos(ship.a),sa=Math.sin(ship.a);parts.push({x:ship.x-ca*35*HANDLING.vis+rnd(-1.5,1.5),y:ship.y-sa*35*HANDLING.vis+rnd(-1.5,1.5),vx:-ca*40-ship.vx*0.1,vy:-sa*40-ship.vy*0.1,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1})}
   // fire
   const firing=K.fire||mouse.down||tFire;
   // belly cannon on a limited gimbal (GIMBAL_V1): bolts leave the barrel tip under the nose
@@ -917,7 +922,7 @@ function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const
   const pulse=(0.62+0.18*Math.sin(t*4.2)+0.06*Math.sin(t*11.7)+0.4*thr)*(o.en!=null?enGlow(t,o.en):1);
   // mint exhaust plume
   ctx.globalCompositeOperation='lighter';
-  {const L=18+thr*18;ctx.save();ctx.translate(SHIP_RING-3,0);ctx.scale(1.7+thr*0.8,0.42);const g=ctx.createRadialGradient(-4,0,0,-4,0,L);g.addColorStop(0,`rgba(170,255,225,${0.5*pulse})`);g.addColorStop(0.35,`rgba(70,225,190,${0.22*pulse})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(-4,0,L,0,6.283);ctx.fill();ctx.restore()}
+  {const L=18+thr*18;ctx.save();ctx.translate(SHIP_RING-3,0);ctx.scale((1.7+thr*0.8)*(o.plume!=null?o.plume:1),0.42);const g=ctx.createRadialGradient(-4,0,0,-4,0,L);g.addColorStop(0,`rgba(170,255,225,${0.5*pulse})`);g.addColorStop(0.35,`rgba(70,225,190,${0.22*pulse})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(-4,0,L,0,6.283);ctx.fill();ctx.restore()}
   ctx.globalCompositeOperation='source-over';
   // belly cannon: short barrel under the nose, between the headlamps
   {const r=o.mf>0?-0.9:0;ctx.fillStyle='#1d1b1a';ctx.fillRect(8+r,-1.25,SHIP_GUN-8,2.5);const g=ctx.createLinearGradient(0,-1.2,0,1.2);g.addColorStop(0,'#8d8780');g.addColorStop(0.5,'#4a4643');g.addColorStop(1,'#252321');ctx.fillStyle=g;ctx.fillRect(8+r,-1,SHIP_GUN-8.4,2);
@@ -947,7 +952,7 @@ function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const
   ctx.globalCompositeOperation='source-over';
   ctx.restore()}
 // belly cannon muzzle in world space (fixed, fires along the heading)
-function shipMuzzle(){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);return[ship.x+ca*(SHIP_GUN+0.5),ship.y+sa*(SHIP_GUN+0.5)]}
+function shipMuzzle(){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);return[ship.x+ca*(SHIP_GUN+0.5)*HANDLING.vis,ship.y+sa*(SHIP_GUN+0.5)*HANDLING.vis]}
 // cached glow sprites (cheap additive glows / darkness cut-outs; no per-pixel work)
 const GLOWS={};function glowSprite(rgb){if(GLOWS[rgb])return GLOWS[rgb];const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');const gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,`rgba(${rgb},1)`);gr.addColorStop(0.25,`rgba(${rgb},0.55)`);gr.addColorStop(0.6,`rgba(${rgb},0.15)`);gr.addColorStop(1,`rgba(${rgb},0)`);g.fillStyle=gr;g.fillRect(0,0,64,64);return GLOWS[rgb]=c}
 const CUT=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');const gr=g.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(0.45,'rgba(0,0,0,0.75)');gr.addColorStop(0.75,'rgba(0,0,0,0.3)');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(0,0,128,128);return c})();
@@ -1037,7 +1042,7 @@ function drawWorld(t){
   for(const it of items)if(vis(it.x,it.y))drawItem(it,t);
   for(const mn of miners)if(vis(mn.x,mn.y))drawMiner(mn,t);
   for(const m of mobs)if(vis(m.x,m.y,120))drawMob(m,t);
-  if(state==='play'||state==='pause'||state==='levelDone'||state==='cockpitIn'||state==='docking'){if(!(ship.inv>0&&state==='play'&&!ship.arrProt&&((t*20)|0)%2&&ship.inv<2))drawShip(ship.x,ship.y,ship.a,ship.mode,t,1,{en:ship.en,drill:ship.dp,thr:ship.thr,spin:ship.spin,mf:ship.mf,chomp:ship.chomp,drilling:ship.drilling});if(COCKPIT_CINE)arrShimmer(t)}
+  if(state==='play'||state==='pause'||state==='levelDone'||state==='cockpitIn'||state==='docking'){if(!(ship.inv>0&&state==='play'&&!ship.arrProt&&((t*20)|0)%2&&ship.inv<2))drawShip(ship.x,ship.y,ship.a,ship.mode,t,HANDLING.vis,{plume:HANDLING.plume,en:ship.en,drill:ship.dp,thr:ship.thr,spin:ship.spin,mf:ship.mf,chomp:ship.chomp,drilling:ship.drilling});if(COCKPIT_CINE)arrShimmer(t)}
   ctx.globalCompositeOperation='lighter';
   for(const b of bolts){const a=Math.atan2(b.vy,b.vx);ctx.save();ctx.translate(b.x,b.y);ctx.rotate(a);const g=ctx.createLinearGradient(-16,0,4,0);g.addColorStop(0,'rgba(80,160,255,0)');g.addColorStop(1,'rgba(160,230,255,1)');ctx.fillStyle=g;ctx.fillRect(-16,-2,20,4);ctx.fillStyle='#fff';ctx.fillRect(-4,-1,6,2);ctx.restore()}
   for(const g of globs){const gr=ctx.createRadialGradient(g.x,g.y,0,g.x,g.y,g.r*2.2);gr.addColorStop(0,'rgba(220,255,120,1)');gr.addColorStop(0.4,'rgba(120,220,40,0.8)');gr.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(g.x,g.y,g.r*2.2,0,6.283);ctx.fill()}
@@ -1270,6 +1275,16 @@ const COCKPIT_CINE=true,PIT_HOLD=1.25,PIT_IN=3.0,PIT_DIE=2.0,PIT_DOCK=3.6;
 // ARRIVAL_V1: at level start the hauler physically flies in along the tunnel the cockpit was facing and brakes to a stop on the
 // unchanged spawn point (no blink-in). Spawn protection is kept but shown as a faint shield shimmer. ARRIVAL=false -> previous start
 const ARRIVAL=true,ARR_GO=0.75,ARR_MAX=4.5;let arr=null;
+// HANDLING_V1 (Justin: heavier, no haphazard wall bounce, shorter plume). HEAVY_HANDLING=false restores the old numbers exactly.
+const HEAVY_HANDLING=true;
+const HANDLING=HEAVY_HANDLING?{accH:330,accB:205,dragH:1.2,dragB:6,turnH:3.3,turnB:2.5,wallH:0.02,wallFric:1.4,wallB:0.2,plume:0.5,trailLife:0.33,vis:0.92,sparkMin:30,settle:true}
+ :{accH:400,accB:250,dragH:1.5,dragB:6,turnH:4,turnB:3,wallH:-0.35,wallFric:0,wallB:0.2,plume:1,trailLife:0.55,vis:1,sparkMin:1e9,settle:false};
+function wallScrape(nx,ny,vn,vt){// nx,ny: unit normal into the wall; vn: impact speed; vt: sliding speed along the wall
+  const hit=Math.abs(vn),slide=Math.abs(vt);if(hit<HANDLING.sparkMin&&slide<45)return;
+  const r=13*HANDLING.vis,cx=ship.x+nx*r,cy=ship.y+ny*r,n=Math.min(6,1+((hit+slide*0.4)/45)|0);
+  for(let k=0;k<n;k++){const back=rnd(30,110);parts.push({x:cx+rnd(-3,3),y:cy+rnd(-3,3),vx:-nx*back+(nx?0:Math.sign(-vt)*rnd(20,120))+rnd(-30,30),vy:-ny*back+(ny?0:Math.sign(-vt)*rnd(20,120))+rnd(-30,30),life:rnd(0.15,0.35),max:0.35,c:Math.random()<0.6?'#ffd9a0':'#ffb060',s:rnd(1,2),drag:3,g:1})}
+  if(Math.random()<0.3)parts.push({x:cx,y:cy,vx:rnd(-20,20),vy:rnd(-20,20),life:0.5,max:0.5,c:Math.random()<0.5?'#8a8070':'#5f574c',s:rnd(2,3.5),drag:3});
+  SFX.grind(Math.min(1,(hit+slide*0.5)/140));if(hit>=HANDLING.sparkMin)shake=Math.max(shake,Math.min(3,hit*0.02))}
 function arrOn(){return COCKPIT_CINE&&ARRIVAL}
 // clear straight run (px) from (x,y) along angle a, with a body half-width of hw, over floor/pad tiles only
 function arrClear(x,y,a,hw,cap){const ux=Math.cos(a),uy=Math.sin(a),px=-uy,py=ux;let d=0;
@@ -1292,7 +1307,7 @@ function arrPlace(T,dt){if(!arr)return;const v=arrV(T),r=arr.D*(1-v)*(1-v),sp=2*
   ship.thr=T<ARR_GO?0.55:(1-v)*0.45+0.6*Math.exp(-(((v-0.72)/0.16)**2));
   cam.x=ship.x-W/2;cam.y=ship.y-H/2;
   if(dt>0&&T>=ARR_GO){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);arr.dust+=dt;
-    if(sp>8&&Math.random()<dt*40)parts.push({x:ship.x-ca*30+rnd(-2,2),y:ship.y-sa*30+rnd(-2,2),vx:-ca*50+ship.vx*0.2,vy:-sa*50+ship.vy*0.2,life:0.55,max:0.55,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1});
+    if(sp>8&&Math.random()<dt*40)parts.push({x:ship.x-ca*30*HANDLING.vis+rnd(-2,2),y:ship.y-sa*30*HANDLING.vis+rnd(-2,2),vx:-ca*50+ship.vx*0.2,vy:-sa*50+ship.vy*0.2,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1});
     // thruster wash kicking up dust as it brakes and settles
     if(v>0.45&&v<0.995&&Math.random()<dt*60*ship.thr){const q=rnd(0,6.283),d=rnd(10,22);parts.push({x:ship.x+Math.cos(q)*d,y:ship.y+Math.sin(q)*d,vx:Math.cos(q)*rnd(30,90)+ca*40,vy:Math.sin(q)*rnd(30,90)+sa*40,life:rnd(0.5,0.9),max:0.9,c:Math.random()<0.5?'#8a8070':'#5f574c',s:rnd(1.5,3),drag:2.2,g:1})}}}
 function arrEnd(){if(!arr)return;ship.x=arr.sx;ship.y=arr.sy;ship.vx=ship.vy=0;ship.a=arr.h;ship.thr=0.05;cam.x=ship.x-W/2;cam.y=ship.y-H/2;arr=null}

@@ -273,6 +273,9 @@ const M6_POCKETS=true,M6_CAVEIN=true;
 const M7_V2=true;
 // VOSH_TUTOR: Survey Chief Vosh is the in-mission tutorial voice in M1/M2 until Brakka cuts him off at 75% quota. DEBRIEF_SHORT: the M4 Brakka->Sykes handover in 2 boxes.
 const VOSH_TUTOR=true,DEBRIEF_SHORT=true;
+// VT_ORDER (Justin: Vosh's tips arrived out of order): tutor lines play strictly in listed order. Each trigger is latched the moment it happens and the line waits its turn; a situational tip
+// (scrape/enemy/intel/tremor) whose trigger never happens is dropped after 40s at the head of the queue so later lines still come, never earlier ones. Revert: VT_ORDER=false
+const VT_ORDER=true,VT_CTX=new Set(['scrape','enemy','intel','quake']),VT_SKIP=40;
 // VOSH_ID: until the M6 reveal the agitator is '???' with only the red insignia (no face), and Vosh as himself wears Brakka's guild insignia/amber; red + portrait after the reveal
 const VOSH_ID=true;
 // EASE: enemy spawn rate and attack/fire rate x0.9 in every mission. EASE_MID: extra breathing room in M4-M7 (longer spawn gaps, alive cap, pause after kills, no double crawlers). Revert: EASE=1,EASE_MID=false
@@ -890,11 +893,14 @@ const VT_LINES={
 const VT_CUT={1:[['F','Survey Chief, clear the line. The kid needs quiet, not a lecture.'],['S','Of course, Foreman. I\u2019ll leave you to it.']],
  2:[['F','Vosh, get off my channel. The kid\u2019s got payloads to haul, not a lecture to sit through.'],['S','Naturally, Foreman. I was only trying to help.']]};
 function vtTick(dt){const L=VT_LINES[level];if(!L||!CAMPAIGN[level]){vt=null;return}
-  if(!vt||vt.lv!==level||gameT<vt.g){vt={lv:level,g:gameT,said:{},n:0,last:-99,idle:0,quiet:false};vtScr=0}vt.g=gameT;
-  if(vt.quiet)return;vt.idle=comm||commQ.length?0:vt.idle+dt;
+  if(!vt||vt.lv!==level||gameT<vt.g){vt={lv:level,g:gameT,said:{},n:0,last:-99,idle:0,quiet:false,seen:{},i:0,wt:gameT};vtScr=0}vt.g=gameT;
+  if(vt.quiet)return;
+  if(VT_ORDER)for(const[id,cond]of L){if(vt.seen[id])continue;let ok=false;try{ok=cond()}catch(e){}if(ok)vt.seen[id]=1}vt.idle=comm||commQ.length?0:vt.idle+dt;
   if(got>=Math.ceil(need*0.75)){vt.quiet=true;if(!vt.n)return;
     if(comm&&comm.who==='S')comm=null;commQ=commQ.filter(c=>c.who!=='S');for(const[w,tx]of VT_CUT[level])sayComm(w,tx);return}
   if(vt.idle<4||gameT-vt.last<12||banner>0)return;
+  if(VT_ORDER){const nx=L[vt.i];if(!nx)return;if(vt.seen[nx[0]]){vt.i++;vt.wt=gameT;vt.said[nx[0]]=1;vt.n++;vt.last=gameT;sayComm('S',nx[2]);return}
+    if(VT_CTX.has(nx[0])&&gameT-vt.wt>VT_SKIP){vt.i++;vt.wt=gameT}return}
   for(const[id,cond,text]of L){if(vt.said[id])continue;let ok=false;try{ok=cond()}catch(e){}if(ok){vt.said[id]=1;vt.n++;vt.last=gameT;sayComm('S',text);return}}}
 function updatePlay(dt){
   if(VOSH_TUTOR)vtTick(dt);

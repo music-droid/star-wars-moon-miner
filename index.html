@@ -284,6 +284,10 @@ const EASE_V2=true;
 const EASE=EASE_V2?0.95:0.9,EASE_MID=true;
 const MID_CAP=EASE_V2?{4:6,5:8,6:8,7:5}:{4:6,5:7,6:7,7:4},MID_SPAWN=EASE_V2?{4:1.4,5:1.25,6:1.25,7:1.25}:{4:1.4,5:1.4,6:1.4,7:1.4},MID_BREATHER=EASE_V2?{4:4,5:3,6:3,7:3}:{4:4,5:4,6:4,7:4};
 function midCalm(){return EASE_MID&&level>=4&&level<=7}
+// RACE_TUNNEL (Justin: the race felt empty and easy): M8 becomes one long switchback haul tunnel to the comm relay. 7 collapsed sections (amber-seamed soft rock,
+// like M6) must be burrowed through, 8 enemy blocker groups sit in the tunnel, 5 rockfall zones drop boulders (warning shadow, then 10 dmg), crystals line the walls
+// and each one adds RACE_CRY s. Timer = tunnel length at 105px/s + burrow + fight allowance, x RACE_SLACK (0.88: tight; old race was 150s); 10 blocker groups incl. a relay guard. Revert: RACE_TUNNEL=false (old open-maze race)
+const RACE_TUNNEL=true,RACE_CRY=1,RACE_SLACK=0.88,RACE_RF_DMG=10,RACE_SPAWN=1.6,RACE_CAP=4; // ambient spawns in the tunnel: interval x1.8, max 4 live within 14 tiles (blockers are placed on top)
 const CAMPAIGN={
 1:{moon:'OHMA-D\u2019UN',name:'Routine Shift',crystals:12,spawnMul:0.6,music:'explore',
   brief:[['F','Morning, kid. First shift on Ohma-D\u2019un. Theed runs on plasma, and the Guild runs on crystals. Try not to crash my drill.'],
@@ -341,10 +345,10 @@ const CAMPAIGN={
     ['F','The hive queen. An old miners\u2019 legend. Looks like she\u2019s real, and she\u2019s furious.'],
     ['R','Vosh\u2019s cell has sealed the lower lift. Kill that thing, or you\u2019re trapped down there with it.']],
   intel:[['datapad','V','Vosh\u2019s personal log: \u201cIf the queen wakes, the mine buries the evidence for us.\u201d'],['datapad','V','Vosh\u2019s itinerary: Senator Amidala\u2019s cruiser departs Theed at dawn.']]},
-8:{moon:'RORI',name:'Race to the Relay',crystals:0,spawnMul:1.4,timed:150,cells:15,music:'tension',pad:'COMM RELAY',
+8:{moon:'RORI',name:'Race to the Relay',crystals:0,spawnMul:1.4,timed:150,cells:15,music:'tension',pad:'COMM RELAY',tunnel:RACE_TUNNEL,
   brief:[['R','The Senator\u2019s departure was moved up. If that evidence isn\u2019t transmitted in the next few minutes, it won\u2019t matter.'],
     ['F','Vosh blew the support pillars. The whole mine is coming down. Forget the crystals, kid. Just GO.'],
-    ['D','The comm relay is at the far end of this sector. Burrowing is the shortest path. Go, go, GO!']],
+    ['D',RACE_TUNNEL?'The comm relay is at the far end of the old haul tunnel, and the tunnel has caved in along the way. Burrow through the amber rubble, keep moving under falling rock, and grab crystals: each one buys us time. Go, go, GO!':'The comm relay is at the far end of this sector. Burrowing is the shortest path. Go, go, GO!']],
   intel:[]}
 };
 // endless quota (old: min(34, boss?5+lv:6+lv*2))
@@ -464,6 +468,21 @@ function explorerRoute(gx,gy){const BW=Math.floor((MW-1)/2),bt=(bx,by,k)=>(1+2*b
     let best=null,bd=1e9;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=BW||ny>=BW||seen[ny*BW+nx]||!link(cx,cy,nx,ny))continue;const d=Math.hypot(nx-gb[0],ny-gb[1]);if(d<bd){bd=d;best=[nx,ny]}}
     if(best){seen[best[1]*BW+best[0]]=1;st.push(best);route.push(best);steps++;fwd=true}else{st.pop();if(fwd)rev++;fwd=false;if(st.length){route.push(st[st.length-1]);steps++}}}
   const est=steps*2*T/110+rev*0.8;return{steps,rev,est,route}}
+let tunPath=null,raceBlk=null,racePlugs=null,rockfalls=[],rfx=[];
+function raceTime(){const L=tunPath.length*T/105,pl=racePlugs.reduce((a,p)=>a+p.th*1.5+2.5,0),bl=(raceBlk?new Set(raceBlk.map(b=>b.g)).size:0)*3;return Math.ceil((L+pl+bl)*RACE_SLACK/5)*5}
+function rfTick(dt){for(const z of rockfalls){
+    if(Math.random()<dt*5){const p=tunPath[z.i0+((Math.random()*(z.i1-z.i0+1))|0)];if(Math.abs(p[0]*T-ship.x)<W&&Math.abs(p[1]*T-ship.y)<H)parts.push({x:(p[0]+Math.random())*T,y:(p[1]-1)*T,vx:rnd(-6,6),vy:rnd(40,90),life:0.7,max:0.7,c:'#a88866',s:rnd(1,2.4),drag:0})}
+    if(dist(ship.x,ship.y,z.x,z.y)>z.r+5*T)continue;if(!z.seen){z.seen=1;toast('ROCKFALL \u2014 KEEP MOVING',null,null,'#fb6')}
+    z.cd-=dt;if(z.cd<=0){z.cd=rnd(0.6,1.3);let x,y;
+      if(Math.random()<0.55&&dist(ship.x,ship.y,z.x,z.y)<z.r+T){x=ship.x+ship.vx*0.75+rnd(-18,18);y=ship.y+ship.vy*0.75+rnd(-18,18)}else{const p=tunPath[z.i0+((Math.random()*(z.i1-z.i0+1))|0)];x=(p[0]+0.5)*T+rnd(-14,14);y=(p[1]+0.5)*T+rnd(-20,20)}
+      if(!solidAt(Math.floor(x/T),Math.floor(y/T)))rfx.push({x,y,t:0,max:0.85})}}
+  for(const r of rfx){r.t+=dt;if(r.t>=r.max){r.dead=true;shake=Math.max(shake,5);SFX.crack();
+    for(let k=0;k<14;k++){const a=Math.random()*6.283,v=rnd(40,150);parts.push({x:r.x,y:r.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.3,0.7),max:0.7,c:Math.random()<0.5?'#8a7a66':'#5c5246',s:rnd(2,4.5),drag:3})}
+    if(dist(r.x,r.y,ship.x,ship.y)<24)hurtShip(RACE_RF_DMG)}}
+  rfx=rfx.filter(r=>!r.dead)}
+function rfDraw(t){for(const r of rfx){const p=r.t/r.max;ctx.save();ctx.fillStyle=`rgba(0,0,0,${0.25+0.4*p})`;ctx.beginPath();ctx.ellipse(r.x,r.y+2,6+13*p,4+8*p,0,0,6.283);ctx.fill();
+    ctx.strokeStyle=`rgba(255,${(90+80*Math.sin(t*20))|0},40,${0.35+0.5*p})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(r.x,r.y,20-6*p,0,6.283);ctx.stroke();
+    const ry=r.y-(1-p)*(1-p)*150;ctx.fillStyle='#6d6255';ctx.strokeStyle='#2a241e';ctx.lineWidth=1.5;ctx.beginPath();for(let k=0;k<7;k++){const a=k/7*6.283+r.x,q=8+3*Math.sin(k*2.1+r.y);ctx.lineTo(r.x+Math.cos(a)*q,ry+Math.sin(a)*q)}ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}}
 function genLevel(lv){
   const R=mulberry((Date.now()^Math.imul(lv,7919))>>>0);
   cfg=levelCfg(lv);const cells=cfg.cells||Math.min(24,7+lv*2);MW=MH=cells*4+3;
@@ -491,10 +510,22 @@ function genLevel(lv){
     const fx=x/gs,fy=y/gs,ix=fx|0,iy=fy|0,tx=fx-ix,ty=fy-iy;const s=a=>a*a*(3-2*a);
     const v=lerp(lerp(gv[iy*gw+ix],gv[iy*gw+ix+1],s(tx)),lerp(gv[(iy+1)*gw+ix],gv[(iy+1)*gw+ix+1],s(tx)),s(ty));
     if(v>thr)map[i]=BED}
+  // RACE_TUNNEL: one long switchback tunnel, 3 tiles tall, gently winding, soft-rock lining, bedrock between the lanes (no shortcuts)
+  tunPath=null;raceBlk=null;racePlugs=null;rockfalls=[];rfx=[];
+  if(cfg.tunnel){for(let y=2;y<MH-2;y++)for(let x=2;x<MW-2;x++)map[y*MW+x]=BED;
+    const lanes=[4,16,28,40,52].filter(y=>y+5<MH-2),x0=3,x1=MW-6,P=[];
+    const carve=(x,y)=>{if(x>=2&&y>=2&&x<MW-2&&y<MH-2)map[y*MW+x]=FLOOR};
+    for(let k=0;k<lanes.length;k++){const yc=lanes[k],east=k%2===0,a=R()*6,b=R()*6,w=x=>Math.round(Math.max(-1,Math.min(1,(Math.sin(x*0.21+a)+0.6*Math.sin(x*0.47+b))*Math.min(1,Math.min(x-x0,x1-x)/6))));
+      for(let q=0;q<=x1-x0;q++){const x=east?x0+q:x1-q,yy=yc+w(x);for(let y=yy-1;y<=yy+1;y++)carve(x,y);P.push([x,yy])}
+      if(k<lanes.length-1){const xe=east?x1:x0;for(let y=yc;y<=lanes[k+1];y++){for(let x=xe-1;x<=xe+1;x++)carve(x,y);if(y>yc+1&&y<lanes[k+1]-1)P.push([xe,y])}}}
+    const fl=[];for(let i=0;i<MW*MH;i++)if(map[i]===FLOOR)fl.push(i);
+    for(const i of fl){const x=i%MW,y=(i/MW)|0;for(let b=-2;b<=2;b++)for(let a=-2;a<=2;a++){const X=x+a,Y=y+b;if(X>=2&&Y>=2&&X<MW-2&&Y<MH-2&&map[Y*MW+X]===BED)map[Y*MW+X]=ROCK}}
+    tunPath=P}
   // extraction lift: farthest reachable point
   let d=bfs(4,4,9999),best=0,bi=0;for(let i=0;i<d.length;i++){if(d[i]<0)continue;const sc=d[i]+3*Math.hypot(i%MW-4,((i/MW)|0)-4);if(sc>best){best=sc;bi=i}}
   if(cfg.hall){const cx0=MW/2,cy0=(11+MH-3)/2;let bd=1e9;for(let i=0;i<d.length;i++){if(d[i]<0||map[i]!==FLOOR)continue;const x=i%MW,y=(i/MW)|0;if(y<14)continue;const q=Math.hypot(x-cx0,y-cy0);if(q<bd){bd=q;bi=i}}}
-  const ptx=bi%MW,pty=(bi/MW)|0;circ(ptx,pty,cfg.hall?4.6:3.2);
+  if(tunPath){const e=tunPath[tunPath.length-1];bi=e[1]*MW+e[0]}
+  const ptx=bi%MW,pty=(bi/MW)|0;circ(ptx,pty,cfg.hall?4.6:tunPath?2.6:3.2);
   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)set(ptx+a,pty+b,PAD);
   padX=(ptx+0.5)*T;padY=(pty+0.5)*T;
   // M6_V2 sealed pockets: a maze dead-end cell (2x2 floor) is sealed in a 2-thick bedrock shell; its one corridor becomes soft rock (the amber seam)
@@ -509,9 +540,15 @@ function genLevel(lv){
     for(const sp of[MW*0.22,MW*0.15,8])for(const c of C){if(pockets.length>=want)break;if(!pockets.every(p=>dist(p.x,p.y,c.x,c.y)>=sp))continue;pockets.push(c);
       for(let y=c.y-2;y<=c.y+3;y++)for(let x=c.x-2;x<=c.x+3;x++){const i=y*MW+x;if(map[i]===ROCK&&!c.lk.includes(i))map[i]=BED}
       for(const i of c.lk){map[i]=ROCK;weakSet.add(i)}}}
+  if(tunPath){const P=tunPath,N=P.length;weakSet=new Set();racePlugs=[];
+    [[0.13,2],[0.25,2],[0.38,3],[0.5,2],[0.62,3],[0.73,2],[0.86,3]].forEach(([f,th])=>{const i0=Math.floor(f*N);racePlugs.push({i:i0,th});
+      for(let j=0;j<th;j++){const[qx,qy]=P[i0+j],[nx,ny]=P[Math.min(N-1,i0+j+1)],vert=nx===qx&&ny!==qy;for(let o=-2;o<=2;o++){const X=vert?qx+o:qx,Y=vert?qy:qy+o,i=Y*MW+X;if(map[i]===FLOOR){map[i]=ROCK;weakSet.add(i)}}}});
+    const G=[['scorpion'],['spitter','spitter'],['crawler','crawler','crawler'],['scorpion','spitter'],['worm'],['spitter','crawler','crawler'],['scorpion','scorpion'],['spitter','spitter','crawler'],['crawler','crawler','spitter'],['scorpion','spitter']];
+    raceBlk=[];[0.08,0.18,0.31,0.44,0.55,0.67,0.79,0.92,0.34,0.97].forEach((f,g)=>G[g].forEach((t,k)=>{const p=P[Math.min(N-1,Math.floor(f*N)+k*2)];raceBlk.push({g,t,x:(p[0]+0.5)*T,y:(p[1]+0.5+(k%2?0.7:-0.4))*T})}));
+    rockfalls=[0.2,0.46,0.57,0.8,0.95].map(f=>{const i0=Math.floor(f*N),i1=Math.min(N-1,i0+10),a=P[i0],b=P[i1];return{i0,i1,x:(a[0]+b[0]+1)/2*T,y:(a[1]+b[1]+1)/2*T,r:dist(a[0],a[1],b[0],b[1])/2*T,cd:0,seen:0}})}
   for(let i=0;i<MW*MH;i++)thp[i]=0.32+hash(i,lv)*0.28;
   // items
-  d=bfs(4,4,9999);items=[];
+  d=tunPath?bfsDrill(4,4):bfs(4,4,9999);items=[];
   const floors=[],rocks=[],deep=[];
   for(let y=2;y<MH-2;y++)for(let x=2;x<MW-2;x++){const i=y*MW+x;
     if(map[i]===ROCK&&tileAt(x+1,y)===ROCK&&tileAt(x-1,y)===ROCK&&tileAt(x,y+1)===ROCK&&tileAt(x,y-1)===ROCK&&dist(x,y,4,4)>8)deep.push(i);
@@ -545,13 +582,14 @@ function genLevel(lv){
   for(let k=0;k<4+(lv>>1);k++)add(pick(floors),'energy');
   for(let k=0;k<2+(lv>>1);k++)add(pick(rocks),'energy');
   for(let k=0;k<3+(lv>>2);k++)add(pick(floors),'shield');
+  if(tunPath){const N=tunPath.length;for(let k=1;k<=18;k++){const p=tunPath[Math.floor(k/19*N)];add(p[1]*MW+p[0]+(k%3===0?0:0),'crystal')}}
   relayPath=d[pty*MW+ptx];
   // MECH_V1 timed missions: timer is sized to THIS map's route (old: L8 150s fixed, endless 70+cells*9).
   // decent first-time run = 3x the shortest tunnel route (explorer sims: median 1.9-2.7x, 75th pct ~3.3x) at a 110px/s cruise (measured: keyboard bot on real physics averages ~100-110px/s along winding tunnels), +20% for fights and debris,
   // plus ~4s per required crystal on timed sectors that have a quota (1.2s dig + drill deploy + braking + a short detour);
   // the timer leaves 25% on top of that, and never drops below the campaign's old value (L8: 150s) or 90s.
-  explorer=timed?explorerRoute(ptx,pty):null;
-  timeMax=timeLeft=timed?Math.max(cfg.timed>1?cfg.timed:90,Math.ceil((relayPath*T*3/110*1.2+need*4)/0.75/5)*5):0;
+  explorer=timed&&!tunPath?explorerRoute(ptx,pty):null;
+  timeMax=timeLeft=tunPath?raceTime():timed?Math.max(cfg.timed>1?cfg.timed:90,Math.ceil((relayPath*T*3/110*1.2+need*4)/0.75/5)*5):0;
   boss=null;bossWoke=false;bossDead=false;
   // canvases
   mapC=document.createElement('canvas');mapC.width=MW*T;mapC.height=MH*T;mctx=mapC.getContext('2d');
@@ -677,7 +715,7 @@ const MOB={crawler:{hp:2,r:9,sp:92,dmg:9,pts:50},spitter:{hp:4,r:10,sp:50,dmg:12
 function spawnMob(type,x,y){const d=MOB[type];const m={type,x,y,vx:0,vy:0,hp:d.hp+(type==='boss'?level*6:Math.floor((level-1)/3)),r:d.r,t:Math.random()*5,hf:0,cd:rnd(1,2),stun:0,seg:[],a:0,scd:5};m.max=m.hp;
   if(type==='worm')for(let k=0;k<7;k++)m.seg.push({x,y});mobs.push(m);if(type==='boss')boss=m;return m}
 function addCrack(tx,ty,type,dur){cracks.push({tx,ty,type,t:0,max:dur||1.4,seed:Math.random()*99});SFX.crack()}
-function trySpawn(){const maxM=midCalm()?MID_CAP[level]:(cfg.maxMobs||4+level*2);if(mobs.length+(midCalm()?cracks.length:0)>=maxM)return;
+function trySpawn(){if(tunPath){if(mobs.filter(m=>!(dist(m.x,m.y,ship.x,ship.y)>=T*14)).length+cracks.length>=RACE_CAP)return}else{const maxM=midCalm()?MID_CAP[level]:(cfg.maxMobs||4+level*2);if(mobs.length+(midCalm()?cracks.length:0)>=maxM)return}
   const stx=Math.floor(ship.x/T),sty=Math.floor(ship.y/T);
   for(let k=0;k<40;k++){const a=Math.random()*Math.PI*2,r=rnd(4,9);const tx=Math.round(stx+Math.cos(a)*r),ty=Math.round(sty+Math.sin(a)*r);
     if(tileAt(tx,ty)!==ROCK)continue;if(!(passable(tileAt(tx+1,ty))||passable(tileAt(tx-1,ty))||passable(tileAt(tx,ty+1))||passable(tileAt(tx,ty-1))))continue;
@@ -856,7 +894,7 @@ function startLevel(){padLast=null;genLevel(level);ship=newShip();mobs=[];bolts=
   cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(4,4,8);explored[Math.floor(padY/T)*MW+Math.floor(padX/T)]=1;updateMinimap();
   comm=null;commQ=[];intelLog=[];leaderRevealed=level>6&&level<=8;
   briefIdx=0;briefT=0;setState('briefing');Music.play(cfg.music);Music.battle(0);
-  lvStats={t0:gameT,kills0:kills,s0:score};laneQ=[];caveS=0;caveT0=0;m7=cfg.hall?{}:null;m7Collapse=false;if(cfg.hall){ship.x=5*T;ship.y=5.5*T;ship.a=0;if('ta'in ship)ship.ta=0;cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(6,5,8);for(let x=5;x<MW-2;x+=4)markExplored(x,5,3);updateMinimap();const q=spawnMob('boss',padX,padY);q.dormant=true;q.hp=q.max=90+level*3}if(pocketGuard)spawnMob('scorpion',pocketGuard.x,pocketGuard.y);if(leaderRevealed)unlockDossier('V');if(level>8&&level>PROG.deep){PROG.deep=level;saveProg()}}
+  lvStats={t0:gameT,kills0:kills,s0:score};laneQ=[];caveS=0;caveT0=0;m7=cfg.hall?{}:null;m7Collapse=false;if(cfg.hall){ship.x=5*T;ship.y=5.5*T;ship.a=0;if('ta'in ship)ship.ta=0;cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(6,5,8);for(let x=5;x<MW-2;x+=4)markExplored(x,5,3);updateMinimap();const q=spawnMob('boss',padX,padY);q.dormant=true;q.hp=q.max=90+level*3}if(pocketGuard)spawnMob('scorpion',pocketGuard.x,pocketGuard.y);if(raceBlk)for(const b of raceBlk)spawnMob(b.t,b.x,b.y);if(leaderRevealed)unlockDossier('V');if(level>8&&level>PROG.deep){PROG.deep=level;saveProg()}}
 let briefIdx=0,briefT=0,epiIdx=0,epiT=0;
 function briefLen(){return cfg.brief[briefIdx]?cfg.brief[briefIdx][1].length:0}
 function briefNext(){if(state!=='briefing')return;SFX.click();if(briefIdx<cfg.brief.length&&briefT*55<briefLen()){briefT=999;return}briefIdx++;briefT=0;if(briefIdx>cfg.brief.length)endBriefing(1)}
@@ -948,7 +986,7 @@ function updatePlay(dt){
   for(const it of items){it.ph+=dt;if(solidAt(Math.floor(it.x/T),Math.floor(it.y/T))){if(it.type==='crystal'&&Math.random()<dt*1.4&&dist(it.x,it.y,ship.x,ship.y)<560)parts.push({x:it.x+rnd(-9,9),y:it.y+rnd(-9,9),vx:rnd(-8,8),vy:rnd(-22,-6),life:0.7,max:0.7,c:Math.random()<0.5?'#bff':'#6ef',s:rnd(1.2,2.2),drag:1,g:1});continue}const d=dist(it.x,it.y,ship.x,ship.y);
     if(d<75){const p=(1-d/75)*500*dt;it.x+=(ship.x-it.x)/d*p;it.y+=(ship.y-it.y)/d*p}
     if(d<20){it.dead=true;SFX.pickup(it.type);
-      if(it.type==='crystal'){got++;score+=100;toast(need?`\u25c6 ${got}/${need}`:'\u25c6 +1',ship.x,ship.y-8,'#7ff');if(got===need)toast(padIsActive()?'Quota met! Return to the extraction lift':'Crystal quota met — finish your other objectives',null,null,'#8f8')}
+      if(it.type==='crystal'){got++;score+=100;if(tunPath&&timed){timeLeft+=RACE_CRY;toast('+'+RACE_CRY+'s',ship.x,ship.y-26,'#ffd27a')}toast(need?`\u25c6 ${got}/${need}`:'\u25c6 +1',ship.x,ship.y-8,'#7ff');if(got===need)toast(padIsActive()?'Quota met! Return to the extraction lift':'Crystal quota met — finish your other objectives',null,null,'#8f8')}
       else if(it.type==='intel'){intelGot++;score+=250;const e=cfg.intel[Math.min(intelGot,cfg.intel.length)-1]||['','I','Evidence recovered.'];
         if(/SURVEY CHIEF DELLAN VOSH/.test(e[2])){leaderRevealed=true;unlockDossier('V')}intelLog.push({who:e[1],text:e[2],lv:level});evidence.push({text:e[2],lv:level});sayComm(e[1],e[2]);toast('INTEL +250',it.x,it.y,'#ff9a3c');
         if(intelNeed&&intelGot===intelNeed)toast('Intel objective complete!',null,null,'#ffb060');
@@ -967,7 +1005,7 @@ function updatePlay(dt){
   laneTick();
   if(comm){comm.t+=dt;if(commQ.length&&comm.t>Math.max(comm.text.length/70+1.8,2.5)&&comm.max-comm.t>0.45)comm.max=comm.t+0.45;if(comm.t>comm.max){comm=commQ.shift()||null;if(comm)comm.t=0}}
   // cracks / spawning
-  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN[level]:1);trySpawn()}}
+  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN[level]:1)*(tunPath?RACE_SPAWN:1);trySpawn()}}
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
     if(c.type==='boss')shake=Math.max(shake,4+c.t*4);if(c.t>=c.max){c.done=true;burst(c)}}
   cracks=cracks.filter(c=>!c.done);
@@ -1022,6 +1060,7 @@ function updatePlay(dt){
   for(const g of globs){g.life-=dt;g.x+=g.vx*dt;g.y+=g.vy*dt;if(g.ign>0)g.ign-=dt;else if(solidAt(Math.floor(g.x/T),Math.floor(g.y/T))){g.dead=true;for(let k=0;k<5;k++)parts.push({x:g.x,y:g.y,vx:rnd(-60,60),vy:rnd(-60,60),life:0.4,max:0.4,c:'#9e3',s:2.5,drag:3,g:1})}
     if(dist(g.x,g.y,ship.x,ship.y)<g.r+10){g.dead=true;hurtShip(g.r>6?14:11)}if(g.life<=0)g.dead=true}
   globs=globs.filter(g=>!g.dead);
+  if(tunPath)rfTick(dt);
   // timed collapse
   if(timed||cfg.quakes){if(timed)timeLeft-=dt;quakeT-=dt;if(quakeT<=0){quakeT=timed?rnd(5,10)*(0.4+timeLeft/timeMax):m7Collapse?rnd(2.2,4):cfg.hall?rnd(6,11):rnd(8,14);shake=Math.max(shake,10);SFX.crack();
       for(let k=0;k<30;k++)parts.push({x:cam.x+Math.random()*W,y:cam.y+Math.random()*H,vx:0,vy:rnd(30,90),life:rnd(0.6,1.4),max:1.4,c:'#a88866',s:rnd(1,3),drag:0})}
@@ -1244,6 +1283,7 @@ function drawWorld(t){
   if(state==='play'||state==='pause'||state==='levelDone'||state==='cockpitIn'||state==='docking'||state==='caveIn'){if(!(ship.inv>0&&state==='play'&&!ship.arrProt&&((t*20)|0)%2&&ship.inv<2))drawShip(ship.x,ship.y,ship.a,ship.mode,t,HANDLING.vis,{plume:HANDLING.plume,en:ship.en,drill:ship.dp,thr:ship.thr,spin:ship.spin,mf:ship.mf,chomp:ship.chomp,drilling:ship.drilling});if(COCKPIT_CINE)arrShimmer(t)}
   ctx.globalCompositeOperation='lighter';
   for(const b of bolts){const a=Math.atan2(b.vy,b.vx);ctx.save();ctx.translate(b.x,b.y);ctx.rotate(a);const g=ctx.createLinearGradient(-16,0,4,0);g.addColorStop(0,'rgba(80,160,255,0)');g.addColorStop(1,'rgba(160,230,255,1)');ctx.fillStyle=g;ctx.fillRect(-16,-2,20,4);ctx.fillStyle='#fff';ctx.fillRect(-4,-1,6,2);ctx.restore()}
+  if(rfx.length)rfDraw(t);
   for(const g of globs){const gr=ctx.createRadialGradient(g.x,g.y,0,g.x,g.y,g.r*2.2);gr.addColorStop(0,'rgba(220,255,120,1)');gr.addColorStop(0.4,'rgba(120,220,40,0.8)');gr.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(g.x,g.y,g.r*2.2,0,6.283);ctx.fill()}
   for(const p of parts){if(!p.g)continue;const a=clamp(p.life/p.max,0,1);ctx.globalAlpha=a;ctx.fillStyle=p.c;if(p.flash){const r=p.s*(1.5-a);const fg=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);fg.addColorStop(0,'rgba(255,240,200,0.9)');fg.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=fg;ctx.beginPath();ctx.arc(p.x,p.y,r,0,6.283);ctx.fill()}else ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s)}
   ctx.globalCompositeOperation='source-over';
@@ -1264,7 +1304,7 @@ function drawWorld(t){
     light(ex,ey,70,0.45+ship.thr*0.2);
     for(const s of[-1,1])light(ship.x+ca*SHIP_WING[0]-sa*s*SHIP_WING[1],ship.y+sa*SHIP_WING[0]+ca*s*SHIP_WING[1],26,0.28)}
   const act=padIsActive();light(padX,padY,act?(level===8?260:190):125,0.85);
-  for(const b of bolts)light(b.x,b.y,78,0.7);for(const g of globs)light(g.x,g.y,48,0.55);
+  for(const b of bolts)light(b.x,b.y,78,0.7);for(const g of globs)light(g.x,g.y,48,0.55);for(const r of rfx)light(r.x,r.y,44,0.45*r.t/r.max);
   for(const it of items)if(vis(it.x,it.y))light(it.x,it.y,it.type==='intel'||it.type==='baradium'?52:it.type==='crystal'?40:30,it.type==='crystal'||it.type==='intel'||it.type==='baradium'?0.5:0.35);
   for(const mn of miners)if(!mn.done)light(mn.x,mn.y,85,0.7);
   if(weakSet)for(const i of weakSet)if(map[i]===ROCK){const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(vis(x,y))light(x,y,34,0.4)}

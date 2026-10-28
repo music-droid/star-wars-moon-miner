@@ -722,6 +722,7 @@ function aimUpdate(dt){if(ship.gim==null){ship.gim=0;ship.tgt=null;ship.lk=0;shi
   else if(ship.tgt&&valid(ship.tgt)>=1e9)ship.tgt=null;
   // desktop: a recently moved mouse steers the gimbal inside the cone
   if(!touchMode&&mouse.mt&&performance.now()-mouse.mt<1500){const off=angDiff(ship.a,Math.atan2(mouse.y+lastCam.y-ship.y,mouse.x+lastCam.x-ship.x));if(Math.abs(off)<=GIM_MAX){want=off;manual=true}}
+  if(GAMEPAD_V1&&!manual&&gpAimT&&performance.now()-gpAimT<1500){const off=angDiff(ship.a,gpAim);if(Math.abs(off)<=GIM_MAX){want=off;manual=true}}
   if(!manual&&ship.tgt){const m=ship.tgt,d=dist(m.x,m.y,ship.x,ship.y),lt=d/680*0.6;want=clamp(angDiff(ship.a,Math.atan2(m.y+m.vy*lt-ship.y,m.x+m.vx*lt-ship.x)),-GIM_MAX,GIM_MAX)}
   ship.aimM=manual;ship.gim+=clamp(want-ship.gim,-GIM_RATE*dt,GIM_RATE*dt);ship.lk=clamp(ship.lk+(ship.tgt&&!manual?dt*4:-dt*5),0,1)}
 function drawReticle(t){const m=ship.tgt;if(!m||ship.lk<=0.02||ship.aimM)return;const x=m.x-lastCam.x,y=m.y-lastCam.y,on=Math.abs(angDiff(ship.a+ship.gim,Math.atan2(m.y-ship.y,m.x-ship.x)))<0.08;
@@ -732,7 +733,8 @@ function drawReticle(t){const m=ship.tgt;if(!m||ship.lk<=0.02||ship.aimM)return;
 const K={};let mouse={x:0,y:0,down:false},touchMode=!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches),joy={id:null,ox:0,oy:0,x:0,y:0},tFire=false,fireId=null;
 const KEYMAP={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right',j:'fire',z:'fire'};
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright','tab','backspace'].includes(k))e.preventDefault();
-  unlockAudio();if(KEYMAP[k])K[KEYMAP[k]]=true;if(e.repeat)return;
+  unlockAudio();if(KEYMAP[k])K[KEYMAP[k]]=true;if(e.repeat)return;onKey(k)});
+function onKey(k){
   if(k==='m'){toggleMute();return}
   if(state==='gate'){setState('crawl');return}
   if(state==='crawl'){setState('menu');return}
@@ -745,7 +747,7 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','ar
   if(state==='debrief'){if(k==='escape'||k==='s'||k==='tab')endDebrief();else if(k==='enter'||k===' ')debNext();return}
   if(state==='epilogue'&&(k==='escape'||k==='s')){epiIdx=EPILOGUE.length-1;epiT=0;return}
   if(state==='levelDone'&&COMPLETE_DATAPAD){doneKey(k);return}
-  if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8&&(k==='enter'||k===' '))advance()});
+  if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8&&(k==='enter'||k===' '))advance()}
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(KEYMAP[k])K[KEYMAP[k]]=false});
 addEventListener('blur',()=>{for(const k in K)K[k]=false;mouse.down=false;if(state==='play')setState('pause')});
 function screenTap(x,y){unlockAudio();if(COCKPIT_CINE&&pitShot()){pitSkip();return}if(state==='gate')setState('crawl');else if(state==='crawl'||state==='pan')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='debrief')debNext();else if(state==='pause')pauseTap(x,y);
@@ -769,6 +771,57 @@ cv.addEventListener('touchstart',e=>{e.preventDefault();touchMode=true;unlockAud
 cv.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===joy.id){joy.x=(t.clientX-OX);joy.y=(t.clientY-OY)}},{passive:false});
 const tEnd=e=>{for(const t of e.changedTouches){if(t.identifier===joy.id)joy.id=null;if(t.identifier===fireId){tFire=false;fireId=null}}};
 cv.addEventListener('touchend',tEnd);cv.addEventListener('touchcancel',tEnd);
+// GAMEPAD_V1: Bluetooth/USB controllers through the Gamepad API (standard mapping only). Revert: GAMEPAD_V1=false
+const GAMEPAD_V1=true;
+let padMode=false,gpIdx=-1,gpName='',gpId='',gpPrev=[],gpAx={x:0,y:0},gpAim=0,gpAimT=0,gpFire=false,gpDir=null,gpDirT=0,gpNote=null,gpHurt=0,gpShake=0;
+function gpDZ(x,y){const m=Math.hypot(x||0,y||0);if(m<0.18)return[0,0];const s=Math.min(1,(m-0.18)/0.82)/m;return[x*s,y*s]}
+// button glyphs: generic A/B/START unless the controller id says otherwise (text only, no logos)
+function gpGlyph(w){const id=gpId.toLowerCase();if(/054c|playstation|dualshock|dualsense/.test(id))return{a:'\u2715',b:'\u25ef',start:'OPTIONS'}[w];
+  if(/057e|nintendo|pro controller|joy-con/.test(id))return{a:'\u24b7',b:'\u24b6',start:'+'}[w];return{a:'\u24b6',b:'\u24b7',start:'START'}[w]}
+function KH(s){if(!padMode)return s;const A=gpGlyph('a'),B=gpGlyph('b'),S=gpGlyph('start');
+  return s.replace('Click or press any key',`Press ${A}`).replace('press any key',`press ${A} / ${S}`).replace(' \u00b7 Q to quit to title','').replace('P / Esc',S).replace('\u25b2 \u25bc','D-PAD').replace(/ENTER/g,A).replace(/ESC/g,B)}
+function gpNoteShow(text,c){gpNote={text,c,t:0}}
+function gpRumble(ms,mag){try{const g=gpIdx>=0&&navigator.getGamepads()[gpIdx],va=g&&g.vibrationActuator;if(va&&va.playEffect)va.playEffect('dual-rumble',{duration:ms,strongMagnitude:mag,weakMagnitude:Math.min(1,mag*0.7)}).catch(()=>{})}catch(e){}}
+function gpShortName(id){return (id||'Controller').replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim().slice(0,30)||'Controller'}
+function gpAttach(g){gpIdx=g.index;gpId=g.id||'';gpName=gpShortName(g.id);gpPrev=g.buttons.map(b=>b.pressed);padMode=true;gpNoteShow('CONTROLLER CONNECTED \u00b7 '+gpName.toUpperCase(),'#9ff5cf')}
+if(GAMEPAD_V1){
+  addEventListener('gamepadconnected',e=>{const g=e.gamepad;if(g&&g.mapping==='standard'&&gpIdx<0)gpAttach(g)});
+  addEventListener('gamepaddisconnected',e=>{const g=e.gamepad;if(!g||g.index!==gpIdx)return;gpIdx=-1;gpAx={x:0,y:0};gpFire=false;gpPrev=[];padMode=false;
+    gpNoteShow('CONTROLLER LOST','#ff8f7a');if(state==='play')setState('pause')});
+  cv.addEventListener('touchstart',()=>{padMode=false},{passive:true})}
+function gpPoll(dt){if(!navigator.getGamepads)return;let pads;try{pads=navigator.getGamepads()}catch(e){return}
+  let g=gpIdx>=0?pads[gpIdx]:null;
+  if(!g||!g.connected){g=null;for(const q of pads)if(q&&q.connected&&q.mapping==='standard'){gpAttach(q);g=q;break}}
+  if(!g){gpAx={x:0,y:0};gpFire=false;return}
+  const B=g.buttons,ax=g.axes,pr=i=>!!B[i]&&(B[i].pressed||B[i].value>0.3),b=B.map((_,i)=>pr(i)),ed=i=>b[i]&&!gpPrev[i];
+  let [lx,ly]=gpDZ(ax[0],ax[1]);lx+=(b[15]?1:0)-(b[14]?1:0);ly+=(b[13]?1:0)-(b[12]?1:0);
+  const [rx,ry]=gpDZ(ax[2],ax[3]);
+  const anyEdge=b.some((v,i)=>v&&!gpPrev[i]&&i!==16);
+  if((anyEdge||Math.hypot(lx,ly)>0.5)&&!padMode)padMode=true;
+  if(anyEdge)unlockAudio();
+  if(Math.hypot(rx,ry)>0.5){gpAim=Math.atan2(ry,rx);gpAimT=performance.now()}
+  // rumble on hits and big quakes (feature-detected; no-op on iOS)
+  if(hurtFlash>gpHurt+0.05)gpRumble(140,0.7);gpHurt=hurtFlash;if(shake>14&&gpShake<=14)gpRumble(260,0.5);gpShake=shake;
+  if(ed(8))onKey('m');
+  const cine=COCKPIT_CINE&&pitShot();
+  if(state==='play'&&!cine){gpAx={x:lx,y:ly};gpFire=b[7]||b[0];
+    if(ed(1)||ed(6))setMode(ship.mode==='hover'?'burrow':'hover');
+    if(ed(9))setState('pause');gpDir=null}
+  else{gpAx={x:0,y:0};gpFire=false;
+    if(cine){if(ed(0)||ed(9))onKey('enter')}
+    else{if(ed(0))onKey('enter');else if(ed(1))onKey('escape');else if(ed(4)||ed(5))onKey('tab');else if(ed(9))onKey(state==='pause'?'p':'enter');
+      // d-pad / left stick -> arrow keys with repeat (350 ms, then every 120 ms)
+      const d=Math.hypot(lx,ly)<0.5?null:Math.abs(lx)>Math.abs(ly)?(lx>0?'arrowright':'arrowleft'):(ly>0?'arrowdown':'arrowup');
+      if(d!==gpDir){gpDir=d;gpDirT=0.35;if(d)onKey(d)}else if(d){gpDirT-=dt;if(gpDirT<=0){gpDirT=0.12;onKey(d)}}
+      // right stick scrolls the messages log
+      if((state==='pause'||state==='levelDone')&&pausePage==='archive'&&aboutTab==='msgs'&&Math.abs(ry)>0.05)msgScroll=clamp(msgScroll+ry*700*dt,0,msgMax)}}
+  gpPrev=b}
+function gpDraw(t){if(gpNote){gpNote.t+=1/60;const a=Math.min(1,gpNote.t*5,(2.8-gpNote.t)*3);if(a<=0)gpNote=null;else{ctx.save();ctx.globalAlpha=a;const sm=W<700;ctx.font=`bold ${sm?10:12}px ${FB}`;const tw=ctx.measureText(gpNote.text).width+28,x=W/2-tw/2,y=(state==='pause'||state==='paused')?6:Math.round(H*0.7);
+    ctx.fillStyle='rgba(6,14,16,0.88)';ctx.strokeStyle=gpNote.c;ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,tw,26,13):ctx.rect(x,y,tw,26);ctx.fill();ctx.stroke();ctx.fillStyle=gpNote.c;ctx.textAlign='center';ctx.fillText(gpNote.text,W/2,y+17);ctx.restore()}}
+  // small HUD icon while a controller is driving
+  if(padMode&&gpIdx>=0&&state==='play'&&!(COCKPIT_CINE&&pitShot())&&!comm){const x=W/2+(W<700?96:128),y=14;ctx.save();ctx.globalAlpha=0.75;ctx.strokeStyle='#9ff5cf';ctx.lineWidth=1.5;ctx.beginPath();
+    ctx.moveTo(x-11,y-4);ctx.lineTo(x+11,y-4);ctx.quadraticCurveTo(x+16,y-4,x+15,y+5);ctx.quadraticCurveTo(x+14,y+10,x+9,y+6);ctx.lineTo(x-9,y+6);ctx.quadraticCurveTo(x-14,y+10,x-15,y+5);ctx.quadraticCurveTo(x-16,y-4,x-11,y-4);ctx.stroke();
+    ctx.fillStyle='#9ff5cf';ctx.fillRect(x-9,y-0.5,5,1.5);ctx.fillRect(x-7.2,y-2.3,1.5,5);ctx.beginPath();ctx.arc(x+7,y-1,1.3,0,6.283);ctx.arc(x+9.5,y+1.5,1.3,0,6.283);ctx.fill();ctx.restore()}}
 // audio panel
 const ap=document.getElementById('ap'),mv=document.getElementById('mv'),sv=document.getElementById('sv'),mb=document.getElementById('mb');
 mv.value=musicVol;sv.value=sfxVol;
@@ -842,6 +895,7 @@ function updatePlay(dt){
   gameT+=dt;banner=Math.max(0,banner-dt);hurtFlash=Math.max(0,hurtFlash-dt);ship.inv=Math.max(0,ship.inv-dt);ship.shf=Math.max(0,(ship.shf||0)-dt);ship.fcd-=dt;
   let ix=(K.right?1:0)-(K.left?1:0),iy=(K.down?1:0)-(K.up?1:0);
   if(joy.id!==null){const dx=joy.x-joy.ox,dy=joy.y-joy.oy,d=Math.hypot(dx,dy);if(d>8){ix+=dx/Math.max(d,50);iy+=dy/Math.max(d,50)}}
+  if(GAMEPAD_V1){ix+=gpAx.x;iy+=gpAx.y}
   const im=Math.hypot(ix,iy);if(im>1){ix/=im;iy/=im}
   // MECH_V1 heavy mining vessel: slow top speed, sluggish thrust, coasting drift, slow hull turn (old: acc 1050/600, max 285/118, drag 2.2/7, turn 10)
   const hov=ship.mode==='hover',acc=hov?HANDLING.accH:HANDLING.accB,max=hov?160:60,drag=hov?HANDLING.dragH:HANDLING.dragB;
@@ -867,7 +921,7 @@ function updatePlay(dt){
   // faint mint engine trail from the ring
   ship.trail+=dt;if(ship.trail>0.035&&sp>25){ship.trail=0;const ca=Math.cos(ship.a),sa=Math.sin(ship.a);parts.push({x:ship.x-ca*35*HANDLING.vis+rnd(-1.5,1.5),y:ship.y-sa*35*HANDLING.vis+rnd(-1.5,1.5),vx:-ca*40-ship.vx*0.1,vy:-sa*40-ship.vy*0.1,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1})}
   // fire
-  const firing=K.fire||mouse.down||tFire;
+  const firing=K.fire||mouse.down||tFire||(GAMEPAD_V1&&gpFire);
   // belly cannon on a limited gimbal (GIMBAL_V1): bolts leave the barrel tip under the nose
   aimUpdate(dt);const a=ship.a+ship.gim;
   if(firing&&ship.fcd<=0){
@@ -1354,7 +1408,7 @@ function drawHUD(t){if(cfg&&cfg.static&&state==='play')drawStatic(t);if(HUD.ship
     const h=dlgH(comm.text,w);dialogBox(comm.who,comm.text,x,yb-h,w,Math.floor(comm.t*70),t);
     if(commQ.length){ctx.textAlign='right';ctx.font=`${sm?8:9}px ${FW}`;ctx.fillStyle='rgba(200,230,225,0.7)';ctx.fillText(`+${commQ.length} INCOMING`,x+w-10,yb-h-5)}ctx.globalAlpha=1}
   // touch controls
-  if(touchMode){ctx.globalAlpha=0.5;const b1=TB.fire(),b2=TB.mode(),b3=TB.pause();
+  if(touchMode&&!(GAMEPAD_V1&&padMode)){ctx.globalAlpha=0.5;const b1=TB.fire(),b2=TB.mode(),b3=TB.pause();
     ctx.fillStyle='#38a';ctx.beginPath();ctx.arc(b1.x,b1.y,b1.r,0,6.283);ctx.fill();ctx.fillStyle=hov?'#a74':'#48c';ctx.beginPath();ctx.arc(b2.x,b2.y,b2.r,0,6.283);ctx.fill();ctx.fillStyle='#555';ctx.beginPath();ctx.arc(b3.x,b3.y,b3.r,0,6.283);ctx.fill();
     ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.font='bold 14px '+FB;ctx.textAlign='center';ctx.fillText('FIRE',b1.x,b1.y+5);ctx.font='bold 12px '+FB;ctx.fillText(hov?'BURROW':'HOVER',b2.x,b2.y+4);ctx.fillText('II',b3.x,b3.y+4);
     if(joy.id!==null){ctx.globalAlpha=0.35;ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(joy.ox,joy.oy,50,0,6.283);ctx.stroke();ctx.fillStyle='#fff';const dx=joy.x-joy.ox,dy=joy.y-joy.oy,d=Math.hypot(dx,dy),s=Math.min(1,50/(d||1));ctx.beginPath();ctx.arc(joy.ox+dx*s,joy.oy+dy*s,20,0,6.283);ctx.fill();ctx.globalAlpha=1}
@@ -1405,7 +1459,7 @@ function drawPan(t){const T=stateT,g=panGeom(),off=g.cam*H*0.55;
   // cinematic letterbox + film fade
   const lb=Math.min(H*0.09,60)*ease(T/1.2);ctx.fillStyle='#000';ctx.fillRect(0,0,W,lb);ctx.fillRect(0,H-lb,W,lb);
   const f=clamp((T-(PAN_DUR-1.6))/1.4,0,1);if(f>0){ctx.fillStyle=`rgba(0,0,0,${f})`;ctx.fillRect(0,0,W,H)}
-  if(f<0.5){ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px '+FB;ctx.textAlign='right';ctx.fillText(touchMode?'tap to skip':'press any key to skip',W-16,H-14-lb)}
+  if(f<0.5){ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px '+FB;ctx.textAlign='right';ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'tap to skip':KH('press any key to skip'),W-16,H-14-lb)}
   if(T>=PAN_DUR){panFade=1;setState('menu')}}
 // COCKPIT_V1: three in-game cockpit shots, all behind one flag. Set COCKPIT_CINE=false for the exact previous flow
 // (briefing -> play, 1.8s death -> MISSION FAILED, extraction pad -> score screen). No Music calls in here at all.
@@ -1585,16 +1639,16 @@ function pitFrame(t){const T=stateT,L=pitGeom();let zw=1,rot=0,ca=1,cs=1;const a
   if(state==='docking'&&T>PIT_DOCK-0.6){ctx.fillStyle=`rgba(255,255,255,${ease((T-PIT_DOCK+0.6)/0.6).toFixed(3)})`;ctx.fillRect(0,0,W,H)}}
 function drawTitle(t){if(state==='pan'){drawPan(t);return}drawStars(t);
   if(state==='gate'){chromeText('STAR WARS',W/2,H*0.4,Math.min(64,W/9));chromeText('MOON MINER',W/2,H*0.4+Math.min(70,W/9),Math.min(64,W/10));
-    ctx.fillStyle=`rgba(255,255,255,${0.5+0.5*Math.sin(t*3)})`;ctx.font='16px '+FB;ctx.textAlign='center';ctx.fillText(touchMode?'Tap to begin':'Click or press any key to begin',W/2,H*0.72);return}
+    ctx.fillStyle=`rgba(255,255,255,${0.5+0.5*Math.sin(t*3)})`;ctx.font='16px '+FB;ctx.textAlign='center';ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to begin':KH('Click or press any key to begin'),W/2,H*0.72);return}
   if(state==='crawl'){const ct=stateT;
     if(ct>=5.35&&!crawlMusic){crawlMusic=true;Music.play('title')} // first downbeat lands ~5.5s with the logo
     if(ct<5.5){const a=clamp(Math.min(ct-0.4,5.2-ct)*1.5,0,1);ctx.globalAlpha=a;ctx.fillStyle='#4bd5ee';ctx.textAlign='left';const fs=Math.min(30,W/22);ctx.font=`${fs}px ${FB}`;const x0=W/2-fs*7.5;ctx.fillText('A long time ago in a galaxy far,',x0,H*0.45);ctx.fillText('far away....',x0,H*0.45+fs*1.3);ctx.globalAlpha=1;
-      ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px '+FB;ctx.textAlign='right';ctx.fillText(touchMode?'tap to skip':'press any key to skip',W-16,H-14);return}
+      ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px '+FB;ctx.textAlign='right';ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'tap to skip':KH('press any key to skip'),W-16,H-14);return}
     if(!crawlMusic){crawlMusic=true;Music.play('title')}
     crawlY+=1/60*50;const yh=H*0.18,D=1.0;
     for(let y=Math.ceil(yh);y<H;y+=2){const s=(y-yh)/(H-yh);if(s<0.02)continue;const dd=D*(1/s-1)*H*0.55;const srcY=crawlY-dd-60;const nY=crawlY-D*(1/((y+2-yh)/(H-yh))-1)*H*0.55-60;const sh=Math.max(0.5,nY-srcY);
       if(srcY+sh<0||srcY>crawlC.height)continue;const w=Math.min(W*1.15,900)*s*1.15;ctx.globalAlpha=Math.min(1,s*4);ctx.drawImage(crawlC,0,Math.max(0,srcY),720,sh,W/2-w/2,y,w,2.2)}
-    ctx.globalAlpha=1;ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px '+FB;ctx.textAlign='right';ctx.fillText(touchMode?'tap to skip':'press any key to skip',W-16,H-14);
+    ctx.globalAlpha=1;ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='13px '+FB;ctx.textAlign='right';ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'tap to skip':KH('press any key to skip'),W-16,H-14);
     if(crawlY>crawlC.height+H*0.55*5)setState(CINE_PAN?'pan':'menu');return}
   drawMenu(t);if(menuPage==='about'&&artView>=0)drawArtView(t);if(panFade>0){ctx.fillStyle=`rgba(0,0,0,${panFade})`;ctx.fillRect(0,0,W,H);panFade=Math.max(0,panFade-1/60/0.7)}}
 // ================= BOX-ART MENU (MENU_V3_BOXART) =================
@@ -1738,7 +1792,7 @@ function drawDossierPage(list,sel,setSel,cardFn,word,hk,cx,y,cw,avail,t){const n
     if(list[i].locked)lockIcon(x+tw-13,y+4,9,'rgba(255,210,31,0.8)');
     const ii=i;menuHits.push({x,y,w:tw,h:th2,[hk]:ii,act:()=>{SFX.click();setSel(ii)}});x+=tw+8}
   const un=list.filter(e=>!e.locked).length;
-  if(cw>tw*n+8*(n-1)+90){ctx.font=`12px ${FB}`;ctx.textAlign='right';ctx.fillStyle='#ffd21f';ctx.fillText(`${un} / ${n} ${word}`,cx+cw,y+th2-20);ctx.fillStyle='rgba(240,228,204,0.55)';ctx.fillText(touchMode?'tap to open':'\u25c0 \u25b6 to browse',cx+cw,y+th2-4);ctx.textAlign='left'}
+  if(cw>tw*n+8*(n-1)+90){ctx.font=`12px ${FB}`;ctx.textAlign='right';ctx.fillStyle='#ffd21f';ctx.fillText(`${un} / ${n} ${word}`,cx+cw,y+th2-20);ctx.fillStyle='rgba(240,228,204,0.55)';ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'tap to open':KH('\u25c0 \u25b6 to browse'),cx+cw,y+th2-4);ctx.textAlign='left'}
   let yy=y+th2+14;const rest=avail-(th2+14),d=list[sel];
   const narrow=cw<520;const pw=narrow?Math.min(cw*0.36,rest*0.42/1.45):Math.min(cw*0.3,rest/1.45),ph=pw*1.45;
   cardFn(d,cx,yy,pw,ph,t,!!d.locked);if(d.locked)lockIcon(cx+pw-24,yy+8,15,'rgba(255,210,31,0.85)');
@@ -1766,7 +1820,7 @@ function drawStageList(X,y,W0,h,t,hits,onPick){const n=9,gap=clamp(h/90,3,7);
       const sub=info.moon+(info.tags?'  \u00b7  '+info.tags:'');if(bx+nmw+16+ctx.measureText(sub).width<x+w-rightW)ctx.fillText(sub,bx+nmw+16,ry+rh/2+1);
       ctx.textAlign='right';ctx.font=`bold ${Math.max(10,nf*0.72)}px ${FB}`;ctx.fillStyle=on?'#3a0a04':(info.best.startsWith('NO')?'rgba(240,228,204,0.45)':'#f0e4cc');ctx.fillText(info.best,x+w-12,ry+rh/2+1)}
     ctx.textBaseline='alphabetic';ctx.textAlign='left';const ii=i;hits.push({x,y:ry,w,h:rh,st:ii,act:()=>{stageSel=ii;onPick(lv)}})}
-  const hy=y+per*(rh+gap)+(narrow?10:12);ctx.font=`12px ${FB}`;ctx.fillStyle='rgba(240,228,204,0.55)';ctx.textAlign='center';ctx.fillText(touchMode?'Tap a mission to launch \u00b7 best = mission score':'\u25b2 \u25bc select   \u00b7   ENTER launch   \u00b7   best = mission score',X+W0/2,hy);ctx.textAlign='left'}
+  const hy=y+per*(rh+gap)+(narrow?10:12);ctx.font=`12px ${FB}`;ctx.fillStyle='rgba(240,228,204,0.55)';ctx.textAlign='center';ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap a mission to launch \u00b7 best = mission score':KH('\u25b2 \u25bc select   \u00b7   ENTER launch   \u00b7   best = mission score'),X+W0/2,hy);ctx.textAlign='left'}
 function stageButton(x,y,w,h,sel,t){const lockedB=!gameBeaten,sh=performance.now()/1000-lockFlash,dx=sh<0.45?Math.sin(sh*48)*5*(1-sh/0.45):0;
   if(!lockedB){menuButton(x,y,w,h,'STAGE SELECT',sel,t,false);return}
   ctx.save();ctx.translate(dx,0);rrect(x,y,w,h,h*0.22);ctx.fillStyle='rgba(8,14,28,0.55)';ctx.fill();ctx.setLineDash([5,4]);ctx.lineWidth=sel?2:1.3;ctx.strokeStyle=sel?'rgba(255,215,122,0.75)':'rgba(160,200,235,0.35)';ctx.stroke();ctx.setLineDash([]);
@@ -1992,7 +2046,7 @@ function drawDatapad(t){const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.78)';ctx
   const land=sw>=560,tf=clamp(Math.min(sw/(sw<560?9:14),sh/9),22,48),bh=Math.max(touchMode?44:34,Math.min(48,sh*0.09));let y=sy+ip;
   // top bar
   const bs=padBtnRow(L);padChrome('PAUSED',cx,y+tf*0.85,tf,'left');ctx.font=`${clamp(tf*0.36,11,15)}px ${FB}`;ctx.textAlign='left';ctx.fillStyle=`rgba(159,245,207,${0.6+0.3*Math.sin(t*4)})`;
-  ctx.fillText(touchMode?'Tap to resume':'P / Esc to resume',cx,y+tf*0.85+clamp(tf*0.5,14,22));
+  ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to resume':KH('P / Esc to resume'),cx,y+tf*0.85+clamp(tf*0.5,14,22));
   const hdr=tf*0.85+clamp(tf*0.5,14,22)+6;let byy,bx0,bw;
   if(land&&cw-tf*4.2>=3*110){bw=Math.min(170,(cw-tf*4.6-16)/3);bx0=cx+cw-(bw*3+16);byy=y+Math.max(0,(hdr-bh)/2);y+=Math.max(hdr,bh)+ip*0.7}else{bw=(cw-16)/3;bx0=cx;byy=y+hdr+6;y=byy+bh+ip*0.7}
   bs.forEach(([lb,o,act],i)=>padBtn(bx0+i*(bw+8),byy,bw,bh,lb,{...o,sel:padSel===i},act));
@@ -2105,7 +2159,7 @@ function doneKey(k){if(pausePage==='archive'){padKey(k);return}
 
 // pause screen (UNLOCKS_V1): resume / quit, STAGE SELECT (locked until the campaign is beaten), evidence log
 function drawPause(t){pauseHits=[];if(PAUSE_DATAPAD&&(pausePage==='main'||pausePage==='quit'||pausePage==='archive')){drawDatapad(t);return}
-  if(pausePage==='main'){const L=pauseLines();overlay('PAUSED',touchMode?'Tap to resume':'Press P / Esc to resume \u00b7 Q to quit to title'+(gameBeaten?' \u00b7 S stage select':''),L,'chrome');
+  if(pausePage==='main'){const L=pauseLines();overlay('PAUSED',(touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to resume':KH('Press P / Esc to resume \u00b7 Q to quit to title')+(gameBeaten?' \u00b7 S stage select':''),L,'chrome');
     const bw=Math.min(280,W-40),bh=H<480?36:42,bx=(W-bw)/2,by=H*0.3+80+(L.length-1)*24+16;stageButton(bx,by,bw,bh,true,t);pauseHits.push({x:bx-6,y:by-6,w:bw+12,h:bh+12,act:()=>{if(!gameBeaten){lockFlash=performance.now()/1000;SFX.click();return}SFX.click();pausePage='stages';stageSel=clamp(level<=8?level-1:8,0,8)}});
     if(evidence.length){ctx.textAlign='left';ctx.font='bold 13px '+FB;ctx.fillStyle='#ff9a3c';const x=Math.max(16,W/2-300);let y=by+bh+26;if(y<H-80){ctx.fillText('EVIDENCE LOG',x,y);y+=20;ctx.font='13px '+FB;ctx.fillStyle='#f0d8b8';
       for(const e of evidence.slice(-7).reverse()){for(const l of wrapLines(`[M${e.lv}] ${e.text}`,Math.min(600,W-32))){if(y>H-72)break;ctx.fillText(l,x,y);y+=16}}}}return}
@@ -2133,7 +2187,7 @@ function overlay(title,sub,lines,col){ctx.fillStyle='rgba(2,4,10,0.72)';ctx.fill
   if(col==='chrome')chromeText(title,W/2,H*0.3,Math.min(54,W/12));else{ctx.fillStyle=col;ctx.font=`bold ${Math.min(50,W/12)}px ${FT}`;ctx.shadowColor=col;ctx.shadowBlur=20;ctx.fillText(title,W/2,H*0.3);ctx.shadowBlur=0}
   ctx.fillStyle='#dde6f0';ctx.font='16px '+FB;ctx.fillText(sub,W/2,H*0.3+40);
   ctx.font='15px '+FW;ctx.fillStyle='#ffd98a';lines.forEach((l,i)=>ctx.fillText(l,W/2,H*0.3+80+i*24));
-  if(stateT>0.8&&title!=='PAUSED'){ctx.fillStyle=`rgba(140,255,200,${0.6+0.4*Math.sin(stateT*4)})`;ctx.font='bold 17px '+FB;ctx.fillText(touchMode?'Tap to continue':'Press ENTER to continue',W/2,H*0.3+90+lines.length*24+20)}}
+  if(stateT>0.8&&title!=='PAUSED'){ctx.fillStyle=`rgba(140,255,200,${0.6+0.4*Math.sin(stateT*4)})`;ctx.font='bold 17px '+FB;ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to continue':KH('Press ENTER to continue'),W/2,H*0.3+90+lines.length*24+20)}}
 const EPI=['The Hive Mother is fallen. The deep moons fall silent.','Your lift rises through the dark, its hold glowing with crystals —','enough plasma to light every lantern in the cities above.','','But the rock remembers. Deeper sectors are calling…'];
 
 function drawBriefing(t){briefT+=1/60;ctx.fillStyle='rgba(2,4,10,0.82)';ctx.fillRect(0,0,W,H);const sm=W<640;
@@ -2154,19 +2208,20 @@ function drawDebrief(t){debT+=1/60;ctx.fillStyle='rgba(2,4,10,0.84)';ctx.fillRec
   chromeText(cfg.name.toUpperCase(),W/2,H*0.12+(sm?34:48),Math.min(44,W/14));
   const w=Math.min(720,W-24),x=W/2-w/2,y=H*0.12+(sm?54:76);dialogBox(L[i][0],L[i][1],x,y,w,Math.floor(debT*55),t);
   ctx.fillStyle='#667';ctx.font='12px '+FB;ctx.textAlign='right';ctx.fillText(`${i+1}/${L.length}`,x+w-12,y+20);
-  ctx.textAlign='center';ctx.fillStyle=`rgba(140,255,200,${0.6+0.4*Math.sin(t*4)})`;ctx.font='bold 14px '+FB;ctx.fillText(touchMode?'Tap to continue':'ENTER: next   ·   ESC: skip debrief',W/2,H-28)}
+  ctx.textAlign='center';ctx.fillStyle=`rgba(140,255,200,${0.6+0.4*Math.sin(t*4)})`;ctx.font='bold 14px '+FB;ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to continue':KH('ENTER: next   ·   ESC: skip debrief'),W/2,H-28)}
 function drawEpilogue(t){epiT+=1/60;drawStars(t);drawMoon(t);ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fillRect(0,0,W,H);const e=EPILOGUE[epiIdx];
   if(e[0]!=='END'){chromeText('EPILOGUE',W/2,H*0.18,Math.min(46,W/12));const w=Math.min(720,W-24);dialogBox(e[0],e[1],W/2-w/2,H*0.26,w,Math.floor(epiT*55),t);
-    ctx.textAlign='center';ctx.fillStyle='#8fc';ctx.font='bold 14px '+FB;ctx.fillText(touchMode?'Tap to continue':'ENTER: continue   ·   ESC: skip',W/2,H*0.84);return}
+    ctx.textAlign='center';ctx.fillStyle='#8fc';ctx.font='bold 14px '+FB;ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to continue':KH('ENTER: continue   ·   ESC: skip'),W/2,H*0.84);return}
   ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);ctx.textAlign='center';const fs=Math.min(20,W/34);ctx.font=`${fs}px ${FB}`;
   const L=['Days later, the royal cruiser touched down on a landing platform on Coruscant.','It exploded moments after landing. The decoy handmaiden aboard was lost.','But the Senator was not aboard. She had flown in safely with the starfighter escort.','','The agitators had failed. Their war was only beginning.'];
   L.forEach((l,i)=>{ctx.globalAlpha=clamp(epiT*0.7-i*0.5,0,1);ctx.fillStyle='#e8dcb0';ctx.fillText(l,W/2,H*0.25+i*fs*1.6)});ctx.globalAlpha=clamp(epiT*0.8-2.5,0,1);
   ctx.fillStyle='#4bd5ee';ctx.font=`italic ${fs*1.2}px ${FB}`;ctx.fillText('What happened next...',W/2,H*0.62);ctx.fillStyle='#f3d27a';ctx.font=`bold ${fs*1.5}px ${FB}`;ctx.fillText('watch Star Wars: Episode II.',W/2,H*0.62+fs*2.4);ctx.globalAlpha=1;
-  if(epiT>5){ctx.fillStyle='#8fc';ctx.font='bold 14px '+FB;ctx.fillText(touchMode?'Tap to continue into endless sectors':'Press ENTER to continue into endless sectors',W/2,H*0.84)}}
+  if(epiT>5){ctx.fillStyle='#8fc';ctx.font='bold 14px '+FB;ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to continue into endless sectors':KH('Press ENTER to continue into endless sectors'),W/2,H*0.84)}}
 // ================= MAIN LOOP =================
 let lastT=performance.now();
 function frame(now){const dt=Math.min(0.033,(now-lastT)/1000);lastT=now;const t=now/1000;stateT+=dt;
   try{
+    if(GAMEPAD_V1)gpPoll(dt);
     ctx.setTransform(DPR,0,0,DPR,0,0);
     if(state==='gate'||state==='crawl'||state==='pan'||state==='menu'){drawTitle(t)}
     else{
@@ -2187,6 +2242,7 @@ function frame(now){const dt=Math.min(0.033,(now-lastT)/1000);lastT=now;const t=
       if(state==='debrief')drawDebrief(t);
       if(COCKPIT_CINE)pitAfter(dt);
     }
+    if(GAMEPAD_V1)gpDraw(t);
   }catch(e){console.error(e)}
   requestAnimationFrame(frame)}
 resize();
@@ -2194,5 +2250,5 @@ const fontsReady=(document.fonts&&document.fonts.load)?Promise.race([Promise.all
 fontsReady.then(()=>{renderCrawl();lastT=performance.now();requestAnimationFrame(frame)});
 // test hooks
 window.NM={get state(){return state},get ship(){return ship},get mobs(){return mobs},get items(){return items},get cracks(){return cracks},get map(){return map},get MW(){return MW},get got(){return got},get need(){return need},get crystalPlan(){return crystalPlan},get relayPath(){return relayPath},get explorer(){return explorer},get timeMax(){return timeMax},get timeMax(){return timeMax},get pad(){return[padX,padY]},get level(){return level},get score(){return score},
-  setLevel(l){level=l},startGame,startLevel,trySpawn,setState,T,setMode,giveCrystals(n){got+=n},get intel(){return[intelGot,intelTotal,intelNeed]},get rescue(){return[rescued,rescueNeed]},get miners(){return miners},get brief(){return[briefIdx,cfg&&cfg.brief.length]},get epi(){return epiIdx},get comm(){return comm},get leader(){return leaderRevealed},get timeLeft(){return timeLeft},get music(){return Music.cur&&Music.cur.name},get ac(){return ac&&ac.state},get lightFrames(){return lightFrames},get cam(){return lastCam},lightC,get boss(){return boss},get prog(){return PROG},launchStage,get crates(){return[cratesGot,cratesNeed,cratesTotal]},get debrief(){return[debIdx,cfg&&cfg.debrief?cfg.debrief.length:0]}};
+  setLevel(l){level=l},startGame,startLevel,trySpawn,setState,T,setMode,giveCrystals(n){got+=n},get intel(){return[intelGot,intelTotal,intelNeed]},get rescue(){return[rescued,rescueNeed]},get miners(){return miners},get brief(){return[briefIdx,cfg&&cfg.brief.length]},get epi(){return epiIdx},get comm(){return comm},get leader(){return leaderRevealed},get timeLeft(){return timeLeft},get padMode(){return typeof padMode!=='undefined'&&padMode},get music(){return Music.cur&&Music.cur.name},get ac(){return ac&&ac.state},get lightFrames(){return lightFrames},get cam(){return lastCam},lightC,get boss(){return boss},get prog(){return PROG},launchStage,get crates(){return[cratesGot,cratesNeed,cratesTotal]},get debrief(){return[debIdx,cfg&&cfg.debrief?cfg.debrief.length:0]}};
 </script></body></html>

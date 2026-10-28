@@ -276,8 +276,10 @@ const VOSH_TUTOR=true,DEBRIEF_SHORT=true;
 // VOSH_ID: until the M6 reveal the agitator is '???' with only the red insignia (no face), and Vosh as himself wears Brakka's guild insignia/amber; red + portrait after the reveal
 const VOSH_ID=true;
 // EASE: enemy spawn rate and attack/fire rate x0.9 in every mission. EASE_MID: extra breathing room in M4-M7 (longer spawn gaps, alive cap, pause after kills, no double crawlers). Revert: EASE=1,EASE_MID=false
-const EASE=0.9,EASE_MID=true;
-const MID_CAP={4:6,5:7,6:7,7:4},MID_SPAWN=1.4,MID_BREATHER=4;
+// EASE_V2 (Justin finished the campaign, wants ~5% more bite, mostly M5-M7): global x0.95 instead of x0.9; M5-M7 spacing 1.4->1.25, caps +1, post-kill grace 4s->3s. Revert: EASE_V2=false (EASE v1 numbers)
+const EASE_V2=true;
+const EASE=EASE_V2?0.95:0.9,EASE_MID=true;
+const MID_CAP=EASE_V2?{4:6,5:8,6:8,7:5}:{4:6,5:7,6:7,7:4},MID_SPAWN=EASE_V2?{4:1.4,5:1.25,6:1.25,7:1.25}:{4:1.4,5:1.4,6:1.4,7:1.4},MID_BREATHER=EASE_V2?{4:4,5:3,6:3,7:3}:{4:4,5:4,6:4,7:4};
 function midCalm(){return EASE_MID&&level>=4&&level<=7}
 const CAMPAIGN={
 1:{moon:'OHMA-D\u2019UN',name:'Routine Shift',crystals:12,spawnMul:0.6,music:'explore',
@@ -688,7 +690,7 @@ function burst(c){const tx=c.tx,ty=c.ty,cx=(tx+0.5)*T,cy=(ty+0.5)*T;
   const n=c.type==='crawler'&&level>2&&!midCalm()&&Math.random()<0.4?2:1;for(let k=0;k<n;k++)spawnMob(c.type,cx+rnd(-4,4),cy+rnd(-4,4))}
 function boom(x,y,sz,col){for(let k=0;k<14*sz+6;k++){const a=Math.random()*6.283,s=rnd(40,260)*Math.sqrt(sz);parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rnd(0.3,0.8)*(0.7+sz*0.3),max:0.8,c:col||'#fa4',s:rnd(2,4)*Math.min(2,sz+0.4),drag:2.5,g:1})}
   parts.push({x,y,vx:0,vy:0,life:0.25,max:0.25,c:'#fff',s:22*sz,drag:0,g:1,flash:1});SFX.boom(sz)}
-function kill(m){logCreature(m.type);if(midCalm()&&m.type!=='boss')spawnT=Math.max(spawnT,MID_BREATHER);const p=MOB[m.type].pts;score+=p;kills++;boom(m.x,m.y,m.type==='boss'?4:m.type==='worm'?1.3:0.8,m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':m.type==='boss'?'#e5f':'#f84');
+function kill(m){logCreature(m.type);if(midCalm()&&m.type!=='boss')spawnT=Math.max(spawnT,MID_BREATHER[level]);const p=MOB[m.type].pts;score+=p;kills++;boom(m.x,m.y,m.type==='boss'?4:m.type==='worm'?1.3:0.8,m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':m.type==='boss'?'#e5f':'#f84');
   if(m.type==='worm')for(const s of m.seg)boom(s.x,s.y,0.3,'#c88');
   toast('+'+p,m.x,m.y,'#ffd27a');
   const r=Math.random();
@@ -959,7 +961,7 @@ function updatePlay(dt){
   laneTick();
   if(comm){comm.t+=dt;if(commQ.length&&comm.t>Math.max(comm.text.length/70+1.8,2.5)&&comm.max-comm.t>0.45)comm.max=comm.t+0.45;if(comm.t>comm.max){comm=commQ.shift()||null;if(comm)comm.t=0}}
   // cracks / spawning
-  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN:1);trySpawn()}}
+  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN[level]:1);trySpawn()}}
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
     if(c.type==='boss')shake=Math.max(shake,4+c.t*4);if(c.t>=c.max){c.done=true;burst(c)}}
   cracks=cracks.filter(c=>!c.done);

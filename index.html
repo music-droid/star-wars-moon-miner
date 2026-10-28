@@ -373,17 +373,24 @@ const DLG_COL={guild:['#e0a050','#a08a70','#efe6d8'],droid:['#62ff98','#3fa86a',
 function speakerName(who){if(who==='V'&&leaderRevealed)return'SURVEY CHIEF DELLAN VOSH';return(CHARS[who]||CHARS.I).name}
 function speakerSub(who){if((who==='V'||who==='I')&&leaderRevealed)return who==='V'?'Survey Office \u2014 encrypted channel':'decrypted evidence log';return(CHARS[who]||CHARS.I).sub}
 let dlgLast='';
+// SPEAKER_CLEAR_V1: obvious speaker in comm boxes: bold name in the speaker's colour + role line, accent frame on the portrait, steadier ghost, and the face comes through clear for ~1 s at each new line then flickers clear every ~4.5 s. Revert: SPEAKER_CLEAR=false.
+const SPEAKER_CLEAR=true;let dlgT0=-99;
+function dlgTY(cp){return SPEAKER_CLEAR?(cp?56:70):(cp?44:66)}
+function speakerClear(t){const d=t-dlgT0;if(d<0)return 0;if(d<1.1)return 1;if(d<1.4)return(1.4-d)/0.3;const p=(d-1.4)%4.5;return p>4.2?0.85:0}
 // COMM_TOP_V1: on touch screens the comm box sits at the top of the screen (compact), covering the HUD while it talks; the HUD returns when it closes. Revert: COMM_TOP=false.
 const COMM_TOP=true;
 function commTop(){return COMM_TOP&&touchMode}
 function dlgPS(w,cp){return cp?Math.min(64,w*0.16):Math.min(96,w*0.19)}
-function dlgH(text,w,cp){const ps=dlgPS(w,cp),sm=w<500;ctx.font=`${sm?13:16}px ${FB}`;const n=wrapLines(text,w-ps-(cp?36:48)).length;return cp?Math.max(ps+20,44+n*(sm?17:20)+10):Math.max(ps+26,62+n*(sm?17:21)+14)}
-function dialogBox(who,text,x,y,w,shown,t,cp){const st=dlgStyle(who),col=DLG_COL[st];const ps=dlgPS(w,cp),sm=w<500,pp=cp?10:13,ty0=cp?44:66;
-  const key=who+'|'+text;if(key!==dlgLast){dlgLast=key;SFX.blip(st);noteLine(who,text)}
-  const bodyF=`${sm?13:16}px ${FB}`;ctx.font=bodyF;const lines=wrapLines(text,w-ps-(cp?36:48)),lh=cp?(sm?17:20):(sm?17:21);const h=cp?Math.max(ps+20,44+lines.length*lh+10):Math.max(ps+26,62+lines.length*lh+14);
+function dlgH(text,w,cp){const ps=dlgPS(w,cp),sm=w<500;ctx.font=`${sm?13:16}px ${FB}`;const n=wrapLines(text,w-ps-(cp?36:48)).length;return cp?Math.max(ps+20,dlgTY(1)+n*(sm?17:20)+10):Math.max(ps+26,dlgTY(0)+n*(sm?17:21)+10)}
+function dialogBox(who,text,x,y,w,shown,t,cp){const st=dlgStyle(who),col=DLG_COL[st];const ps=dlgPS(w,cp),sm=w<500,pp=cp?10:13,ty0=dlgTY(cp);
+  const key=who+'|'+text;if(key!==dlgLast){dlgLast=key;dlgT0=t;SFX.blip(st);noteLine(who,text)}
+  const bodyF=`${sm?13:16}px ${FB}`;ctx.font=bodyF;const lines=wrapLines(text,w-ps-(cp?36:48)),lh=cp?(sm?17:20):(sm?17:21);const h=cp?Math.max(ps+20,ty0+lines.length*lh+10):Math.max(ps+26,ty0+lines.length*lh+10);
   dlgFrame(st,x,y,w,h,t);if(HEADSHOTS)drawHeadGhost(who,st,x+pp,y+pp,ps,t);drawInsignia(st,x+pp,y+pp,ps,t);if(HEADSHOTS)drawHeadGhost(who,st,x+pp,y+pp,ps,t,true);
-  const tx=x+ps+pp+(cp?12:15);ctx.textAlign='left';ctx.fillStyle=col[0];ctx.font=`${sm?11:13}px ${FW}`;const nm=speakerName(who);ctx.fillText(nm,tx,y+(cp?22:28));
-  ctx.fillStyle=col[1];ctx.font='12px '+FB;if(cp){const nw=ctx.measureText(nm).width;ctx.font=`${sm?11:13}px ${FW}`;const nw2=ctx.measureText(nm).width;ctx.font='12px '+FB;if(tx+nw2+14+ctx.measureText(speakerSub(who)).width<x+w-12)ctx.fillText('\u00b7  '+speakerSub(who),tx+nw2+8,y+22)}else ctx.fillText(speakerSub(who),tx,y+43);
+  if(SPEAKER_CLEAR){ctx.save();ctx.strokeStyle=col[0];ctx.lineWidth=2;ctx.globalAlpha=0.85;ctx.strokeRect(x+pp-1.5,y+pp-1.5,ps+3,ps+3);ctx.fillStyle=col[0];ctx.globalAlpha=0.9;ctx.fillRect(x+pp-1.5,y+pp+ps+3,ps+3,3);ctx.restore()}
+  const tx=x+ps+pp+(cp?12:15);ctx.textAlign='left';ctx.fillStyle=col[0];const nm=speakerName(who);
+  if(SPEAKER_CLEAR){let nf=cp||sm?13:15;ctx.font=`bold ${nf}px ${FW}`;while(nf>9&&ctx.measureText(nm).width>x+w-14-tx){nf--;ctx.font=`bold ${nf}px ${FW}`}ctx.fillText(nm,tx,y+(cp?21:28));ctx.fillStyle=col[1];ctx.font=`${cp||sm?11:12}px ${FB}`;let sb=speakerSub(who).toUpperCase();while(sb.length>8&&ctx.measureText(sb).width>x+w-14-tx)sb=sb.slice(0,-2)+'…';ctx.fillText(sb,tx,y+(cp?37:46));ctx.fillStyle=col[0];ctx.globalAlpha*=0.5;ctx.fillRect(tx,y+(cp?43:53),Math.min(w-ps-40,cp?140:180),1);ctx.globalAlpha=Math.min(1,ctx.globalAlpha*2)}
+  else{ctx.font=`${sm?11:13}px ${FW}`;ctx.fillText(nm,tx,y+(cp?22:28));
+  ctx.fillStyle=col[1];ctx.font='12px '+FB;if(cp){const nw=ctx.measureText(nm).width;ctx.font=`${sm?11:13}px ${FW}`;const nw2=ctx.measureText(nm).width;ctx.font='12px '+FB;if(tx+nw2+14+ctx.measureText(speakerSub(who)).width<x+w-12)ctx.fillText('\u00b7  '+speakerSub(who),tx+nw2+8,y+22)}else ctx.fillText(speakerSub(who),tx,y+43)}
   ctx.font=bodyF;let left=shown,cx=tx,cy=y+ty0;const typing=shown<text.length;
   lines.forEach((l,i)=>{if(left<=0)return;let s=l.slice(0,left);
     if(st==='vosh'&&typing&&left<=l.length)s=s.replace(/.{1,3}$/,m=>m.replace(/./g,()=>'\u2591\u2592\u2593#%'[Math.floor(Math.random()*5)]));
@@ -920,9 +927,10 @@ function ghostNoise(){if(GNOISE)return GNOISE;GNOISE=[];let sd=4242;const R=()=>
     for(let i=0;i<3;i++){g.fillStyle=`rgba(255,255,255,${0.05+R()*0.1})`;g.fillRect(0,R()*96|0,96,1)}GNOISE.push(c)}return GNOISE}
 function drawHeadGhost(who,st,x,y,s,t,over){const k=headFor(who);if(!k)return;const gh=ghostOf(k,st);if(!gh)return;const tn=HEAD_TINT[st]||HEAD_TINT.survey;
   const ph=Math.floor(t*10),r=f=>{const v=Math.sin(ph*12.9898+f*78.233)*43758.5453;return v-Math.floor(v)},q=r(1);
-  let a=0.3+0.06*Math.sin(t*7.3)+0.04*Math.sin(t*23.1);if(q<0.12)a*=0.2;else if(q>0.95)a=0.5;
-  ctx.save();ctx.beginPath();ctx.rect(x,y,s,s);ctx.clip();if(over){a*=1.25;if((t%5.3)<0.35)a=0.62;if(headForce)a=headForce}ctx.globalAlpha=a;
-  const torn=q>0.72,bands=torn?5:2;for(let i=0;i<bands;i++){const off=(r(i+2)-0.5)*(torn?s*0.2:s*0.03);ctx.save();ctx.beginPath();ctx.rect(x,y+s*i/bands,s,s/bands+0.5);ctx.clip();ctx.drawImage(gh,x+off,y,s,s);ctx.restore()}
+  let a=(SPEAKER_CLEAR?0.5:0.3)+0.06*Math.sin(t*7.3)+0.04*Math.sin(t*23.1);if(q<(SPEAKER_CLEAR?0.05:0.12))a*=SPEAKER_CLEAR?0.5:0.2;else if(q>0.95)a=0.5;
+  ctx.save();ctx.beginPath();ctx.rect(x,y,s,s);ctx.clip();if(over){a*=1.25;if((t%5.3)<0.35)a=0.62;if(headForce)a=headForce;
+    const cl=SPEAKER_CLEAR&&!headForce?speakerClear(t):0;if(cl>0&&headOK(k)){ctx.globalAlpha=Math.min(1,cl);ctx.drawImage(HEAD[k],x,y,s,s);ctx.fillStyle=`rgb(${tn[0]},${tn[1]},${tn[2]})`;ctx.globalAlpha=0.12*cl;ctx.fillRect(x,y,s,s);ctx.globalAlpha=0.5*cl;ctx.fillStyle=headScan();ctx.fillRect(x,y,s,s);ctx.restore();return}}ctx.globalAlpha=a;
+  const torn=q>(SPEAKER_CLEAR?0.86:0.72),bands=torn?5:2;for(let i=0;i<bands;i++){const off=(r(i+2)-0.5)*(torn?s*(SPEAKER_CLEAR?0.1:0.2):s*0.03);ctx.save();ctx.beginPath();ctx.rect(x,y+s*i/bands,s,s/bands+0.5);ctx.clip();ctx.drawImage(gh,x+off,y,s,s);ctx.restore()}
   if(over){ctx.restore();return}
   const by=y+(((t*0.37)%1.3)-0.15)*s;ctx.globalAlpha=0.16;ctx.fillStyle=`rgb(${tn[0]},${tn[1]},${tn[2]})`;ctx.fillRect(x,by,s,s*0.07);
   ctx.globalAlpha=0.2+0.12*r(9);ctx.drawImage(ghostNoise()[ph&3],x,y,s,s);ctx.restore()}

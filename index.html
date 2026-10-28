@@ -373,18 +373,22 @@ const DLG_COL={guild:['#e0a050','#a08a70','#efe6d8'],droid:['#62ff98','#3fa86a',
 function speakerName(who){if(who==='V'&&leaderRevealed)return'SURVEY CHIEF DELLAN VOSH';return(CHARS[who]||CHARS.I).name}
 function speakerSub(who){if((who==='V'||who==='I')&&leaderRevealed)return who==='V'?'Survey Office \u2014 encrypted channel':'decrypted evidence log';return(CHARS[who]||CHARS.I).sub}
 let dlgLast='';
-function dlgH(text,w){const ps=Math.min(96,w*0.19),sm=w<500;ctx.font=`${sm?13:16}px ${FB}`;const n=wrapLines(text,w-ps-48).length;return Math.max(ps+26,62+n*(sm?17:21)+14)}
-function dialogBox(who,text,x,y,w,shown,t){const st=dlgStyle(who),col=DLG_COL[st];const ps=Math.min(96,w*0.19),sm=w<500;
+// COMM_TOP_V1: on touch screens the comm box sits at the top of the screen (compact), covering the HUD while it talks; the HUD returns when it closes. Revert: COMM_TOP=false.
+const COMM_TOP=true;
+function commTop(){return COMM_TOP&&touchMode}
+function dlgPS(w,cp){return cp?Math.min(64,w*0.16):Math.min(96,w*0.19)}
+function dlgH(text,w,cp){const ps=dlgPS(w,cp),sm=w<500;ctx.font=`${sm?13:16}px ${FB}`;const n=wrapLines(text,w-ps-(cp?36:48)).length;return cp?Math.max(ps+20,44+n*(sm?17:20)+10):Math.max(ps+26,62+n*(sm?17:21)+14)}
+function dialogBox(who,text,x,y,w,shown,t,cp){const st=dlgStyle(who),col=DLG_COL[st];const ps=dlgPS(w,cp),sm=w<500,pp=cp?10:13,ty0=cp?44:66;
   const key=who+'|'+text;if(key!==dlgLast){dlgLast=key;SFX.blip(st);noteLine(who,text)}
-  const bodyF=`${sm?13:16}px ${FB}`;ctx.font=bodyF;const lines=wrapLines(text,w-ps-48),lh=sm?17:21;const h=Math.max(ps+26,62+lines.length*lh+14);
-  dlgFrame(st,x,y,w,h,t);if(HEADSHOTS)drawHeadGhost(who,st,x+13,y+13,ps,t);drawInsignia(st,x+13,y+13,ps,t);if(HEADSHOTS)drawHeadGhost(who,st,x+13,y+13,ps,t,true);
-  const tx=x+ps+28;ctx.textAlign='left';ctx.fillStyle=col[0];ctx.font=`${sm?11:13}px ${FW}`;ctx.fillText(speakerName(who),tx,y+28);
-  ctx.fillStyle=col[1];ctx.font='12px '+FB;ctx.fillText(speakerSub(who),tx,y+43);
-  ctx.font=bodyF;let left=shown,cx=tx,cy=y+66;const typing=shown<text.length;
+  const bodyF=`${sm?13:16}px ${FB}`;ctx.font=bodyF;const lines=wrapLines(text,w-ps-(cp?36:48)),lh=cp?(sm?17:20):(sm?17:21);const h=cp?Math.max(ps+20,44+lines.length*lh+10):Math.max(ps+26,62+lines.length*lh+14);
+  dlgFrame(st,x,y,w,h,t);if(HEADSHOTS)drawHeadGhost(who,st,x+pp,y+pp,ps,t);drawInsignia(st,x+pp,y+pp,ps,t);if(HEADSHOTS)drawHeadGhost(who,st,x+pp,y+pp,ps,t,true);
+  const tx=x+ps+pp+(cp?12:15);ctx.textAlign='left';ctx.fillStyle=col[0];ctx.font=`${sm?11:13}px ${FW}`;const nm=speakerName(who);ctx.fillText(nm,tx,y+(cp?22:28));
+  ctx.fillStyle=col[1];ctx.font='12px '+FB;if(cp){const nw=ctx.measureText(nm).width;ctx.font=`${sm?11:13}px ${FW}`;const nw2=ctx.measureText(nm).width;ctx.font='12px '+FB;if(tx+nw2+14+ctx.measureText(speakerSub(who)).width<x+w-12)ctx.fillText('\u00b7  '+speakerSub(who),tx+nw2+8,y+22)}else ctx.fillText(speakerSub(who),tx,y+43);
+  ctx.font=bodyF;let left=shown,cx=tx,cy=y+ty0;const typing=shown<text.length;
   lines.forEach((l,i)=>{if(left<=0)return;let s=l.slice(0,left);
     if(st==='vosh'&&typing&&left<=l.length)s=s.replace(/.{1,3}$/,m=>m.replace(/./g,()=>'\u2591\u2592\u2593#%'[Math.floor(Math.random()*5)]));
-    if(st==='vosh'){ctx.fillStyle='rgba(80,220,255,0.25)';ctx.fillText(s,tx-1,y+66+i*lh);ctx.fillStyle='rgba(255,40,60,0.35)';ctx.fillText(s,tx+1.2,y+66+i*lh)}
-    ctx.fillStyle=col[2];ctx.fillText(s,tx,y+66+i*lh);cx=tx+ctx.measureText(s).width;cy=y+66+i*lh;left-=l.length+1});
+    if(st==='vosh'){ctx.fillStyle='rgba(80,220,255,0.25)';ctx.fillText(s,tx-1,y+ty0+i*lh);ctx.fillStyle='rgba(255,40,60,0.35)';ctx.fillText(s,tx+1.2,y+ty0+i*lh)}
+    ctx.fillStyle=col[2];ctx.fillText(s,tx,y+ty0+i*lh);cx=tx+ctx.measureText(s).width;cy=y+ty0+i*lh;left-=l.length+1});
   if(typing||Math.sin(t*6)>0){ctx.fillStyle=col[0];ctx.fillRect(cx+2,cy-(sm?10:12),st==='droid'?7:2,sm?12:14)}
   return h}
 // ================= WORLD =================
@@ -1132,6 +1136,7 @@ const HC={crate:'255,90,215',cry:'95,227,255',intel:'255,154,60',surv:'255,220,6
 const HUD={sh:100,en:100,shG:100,enG:100,shA:0,enA:0,sc:0,scT:0,scGain:0,obj:'',objT:0,lt:0};
 function hudReset(){if(!ship)return;Object.assign(HUD,{sh:ship.sh,en:ship.en,shG:ship.sh,enG:ship.en,shA:1,enA:1,sc:score,scT:0,scGain:0,obj:'',objT:0})}
 function enGlow(t,en){en=en==null?(ship?ship.en:100):en;let k=clamp(0.28+en/40,0.28,1);if(en<15)k*=0.75+0.25*Math.sin(t*23)*Math.sin(t*7.3);return k}
+function commRect(L){const w=L.port?W-12:Math.min(640,W-24),x=(W-w)/2,y=L.port?6:4;return{x,y,w,h:dlgH(comm.text,w,1)}}
 function hudLayout(){const land=W>H&&H<520,port=H>=W,sm=W<640||land;const top=8,sh=sm?26:30;
   const vw=port?94:sm?118:196,mm=port?64:land?78:128;
   const left=10+vw+10,right=W-10-mm-10;return{land,port,sm,top,sh,vw,mm,left,right,mid:port?(left+right)/2:W/2}}
@@ -1158,6 +1163,7 @@ function hudChips(){const c=[];
   if(timed){const m=Math.floor(timeLeft/60),s2=Math.floor(timeLeft%60);c.push({k:'time',rgb:timeLeft<20?HC.danger:'255,190,120',txt:`${m}:${String(s2).padStart(2,'0')}`,urgent:timeLeft<20,lab:level===8?'SENATOR':'COLLAPSE'})}
   return c}
 function drawHUD(t){if(HUD.ship!==ship){HUD.ship=ship;hudReset()}const L=hudLayout(),sm=L.sm,dt=clamp(t-(HUD.lt||t),0,0.1);HUD.lt=t;const hov=ship.mode==='hover';
+  const CR=comm&&commTop()?commRect(L):null;if(CR){ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.rect(CR.x-6,0,CR.w+12,CR.y+CR.h+6);ctx.clip('evenodd')}
   // ---- change detection (show change, not state)
   if(ship.sh<HUD.sh-0.01){HUD.shA=1.6}else if(ship.sh>HUD.sh+0.01){HUD.shA=Math.max(HUD.shA,1.2);HUD.shG=ship.sh}
   if(Math.abs(ship.en-HUD.en)>0.6*dt+0.01&&(ship.en>HUD.en||!hov)){HUD.enA=Math.max(HUD.enA,ship.en<HUD.en?0.9:1.2)}if(ship.en>HUD.en)HUD.enG=ship.en;
@@ -1220,10 +1226,13 @@ function drawHUD(t){if(HUD.ship!==ship){HUD.ship=ship;hudReset()}const L=hudLayo
     if(bossLevel){ctx.fillStyle='#e9f';for(const l of wrapLines('Deep scans show a massive life-form nesting near the lift\u2026',W-40)){ctx.fillText(l,W/2,yy);yy+=17}}
     ctx.restore()}
   // ---- screen messages: one lane under the strip, never behind the comm box
-  {let ty=stripB+(sm?20:24);const list=toasts.filter(q=>q.x==null).slice(-3);for(const tt of list){const a=Math.min(1,(tt.max-tt.t)*2,tt.t*8);ctx.globalAlpha=a;ctx.font=`bold ${sm?12:14}px ${FB}`;ctx.textAlign='center';
+  {let ty=(CR?Math.max(stripB,CR.y+CR.h+4):stripB)+(sm?20:24);const list=toasts.filter(q=>q.x==null).slice(-3);for(const tt of list){const a=Math.min(1,(tt.max-tt.t)*2,tt.t*8);ctx.globalAlpha=a;ctx.font=`bold ${sm?12:14}px ${FB}`;ctx.textAlign='center';
      const ls=wrapLines(tt.text,Math.min(W-30,560));for(const l of ls){const tw=ctx.measureText(l).width+22;glass(W/2-tw/2,ty-(sm?14:16),tw,sm?20:23,10,0.5,'rgba(255,255,255,0.12)');ctx.fillStyle=tt.c;ctx.fillText(l,W/2,ty);ty+=sm?23:26}}ctx.globalAlpha=1}
-  // ---- comm channel: bottom, above the thumbs on touch
-  if(comm){const a=Math.min(1,comm.t*4,(comm.max-comm.t)*2);ctx.globalAlpha=a;let w,x,yb;
+  if(CR)ctx.restore();
+  // ---- comm channel: COMM_TOP on touch -> top band; else bottom
+  if(comm&&CR){const a=Math.min(1,comm.t*4,(comm.max-comm.t)*2);ctx.globalAlpha=a;dialogBox(comm.who,comm.text,CR.x,CR.y,CR.w,Math.floor(comm.t*70),t,1);
+    if(commQ.length){ctx.textAlign='right';ctx.font=`${sm?8:9}px ${FW}`;ctx.fillStyle='rgba(200,230,225,0.8)';ctx.fillText(`+${commQ.length} INCOMING`,CR.x+CR.w-10,CR.y+CR.h+12)}ctx.globalAlpha=1}
+  else if(comm){const a=Math.min(1,comm.t*4,(comm.max-comm.t)*2);ctx.globalAlpha=a;let w,x,yb;
     if(touchMode&&L.land){w=Math.min(520,W-420);x=(W-w)/2-10;yb=H-8}else if(touchMode){w=Math.min(560,W-20);x=(W-w)/2;yb=Math.min(TB.fire().y-TB.fire().r,H-160-50)-14}else{w=Math.min(560,W-24);x=12;yb=H-14}
     const h=dlgH(comm.text,w);dialogBox(comm.who,comm.text,x,yb-h,w,Math.floor(comm.t*70),t);
     if(commQ.length){ctx.textAlign='right';ctx.font=`${sm?8:9}px ${FW}`;ctx.fillStyle='rgba(200,230,225,0.7)';ctx.fillText(`+${commQ.length} INCOMING`,x+w-10,yb-h-5)}ctx.globalAlpha=1}

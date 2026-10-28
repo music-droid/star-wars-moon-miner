@@ -275,6 +275,10 @@ const M7_V2=true;
 const VOSH_TUTOR=true,DEBRIEF_SHORT=true;
 // VOSH_ID: until the M6 reveal the agitator is '???' with only the red insignia (no face), and Vosh as himself wears Brakka's guild insignia/amber; red + portrait after the reveal
 const VOSH_ID=true;
+// EASE: enemy spawn rate and attack/fire rate x0.9 in every mission. EASE_MID: extra breathing room in M4-M7 (longer spawn gaps, alive cap, pause after kills, no double crawlers). Revert: EASE=1,EASE_MID=false
+const EASE=0.9,EASE_MID=true;
+const MID_CAP={4:6,5:7,6:7,7:4},MID_SPAWN=1.4,MID_BREATHER=4;
+function midCalm(){return EASE_MID&&level>=4&&level<=7}
 const CAMPAIGN={
 1:{moon:'OHMA-D\u2019UN',name:'Routine Shift',crystals:12,spawnMul:0.6,music:'explore',
   brief:[['F','Morning, kid. First shift on Ohma-D\u2019un. Theed runs on plasma, and the Guild runs on crystals. Try not to crash my drill.'],
@@ -668,7 +672,7 @@ const MOB={crawler:{hp:2,r:9,sp:92,dmg:9,pts:50},spitter:{hp:4,r:10,sp:50,dmg:12
 function spawnMob(type,x,y){const d=MOB[type];const m={type,x,y,vx:0,vy:0,hp:d.hp+(type==='boss'?level*6:Math.floor((level-1)/3)),r:d.r,t:Math.random()*5,hf:0,cd:rnd(1,2),stun:0,seg:[],a:0,scd:5};m.max=m.hp;
   if(type==='worm')for(let k=0;k<7;k++)m.seg.push({x,y});mobs.push(m);if(type==='boss')boss=m;return m}
 function addCrack(tx,ty,type,dur){cracks.push({tx,ty,type,t:0,max:dur||1.4,seed:Math.random()*99});SFX.crack()}
-function trySpawn(){const maxM=cfg.maxMobs||4+level*2;if(mobs.length>=maxM)return;
+function trySpawn(){const maxM=midCalm()?MID_CAP[level]:(cfg.maxMobs||4+level*2);if(mobs.length+(midCalm()?cracks.length:0)>=maxM)return;
   const stx=Math.floor(ship.x/T),sty=Math.floor(ship.y/T);
   for(let k=0;k<40;k++){const a=Math.random()*Math.PI*2,r=rnd(4,9);const tx=Math.round(stx+Math.cos(a)*r),ty=Math.round(sty+Math.sin(a)*r);
     if(tileAt(tx,ty)!==ROCK)continue;if(!(passable(tileAt(tx+1,ty))||passable(tileAt(tx-1,ty))||passable(tileAt(tx,ty+1))||passable(tileAt(tx,ty-1))))continue;
@@ -681,10 +685,10 @@ function burst(c){const tx=c.tx,ty=c.ty,cx=(tx+0.5)*T,cy=(ty+0.5)*T;
   if(c.type==='boss'){for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)breakTile(tx+a,ty+b,true);boom(cx,cy,3,'#c4f');shake=Math.max(shake,22);spawnMob('boss',cx,cy);return}
   breakTile(tx,ty);boom(cx,cy,0.6,'#b84');shake=Math.max(shake,6);
   if(c.type==='scorpion'&&!scorpSeen){scorpSeen=true;sayComm('D','Black moon scorpion! Watch the tail, sir — it coils, then lunges. Keep it at range.')}
-  const n=c.type==='crawler'&&level>2&&Math.random()<0.4?2:1;for(let k=0;k<n;k++)spawnMob(c.type,cx+rnd(-4,4),cy+rnd(-4,4))}
+  const n=c.type==='crawler'&&level>2&&!midCalm()&&Math.random()<0.4?2:1;for(let k=0;k<n;k++)spawnMob(c.type,cx+rnd(-4,4),cy+rnd(-4,4))}
 function boom(x,y,sz,col){for(let k=0;k<14*sz+6;k++){const a=Math.random()*6.283,s=rnd(40,260)*Math.sqrt(sz);parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rnd(0.3,0.8)*(0.7+sz*0.3),max:0.8,c:col||'#fa4',s:rnd(2,4)*Math.min(2,sz+0.4),drag:2.5,g:1})}
   parts.push({x,y,vx:0,vy:0,life:0.25,max:0.25,c:'#fff',s:22*sz,drag:0,g:1,flash:1});SFX.boom(sz)}
-function kill(m){logCreature(m.type);const p=MOB[m.type].pts;score+=p;kills++;boom(m.x,m.y,m.type==='boss'?4:m.type==='worm'?1.3:0.8,m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':m.type==='boss'?'#e5f':'#f84');
+function kill(m){logCreature(m.type);if(midCalm()&&m.type!=='boss')spawnT=Math.max(spawnT,MID_BREATHER);const p=MOB[m.type].pts;score+=p;kills++;boom(m.x,m.y,m.type==='boss'?4:m.type==='worm'?1.3:0.8,m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':m.type==='boss'?'#e5f':'#f84');
   if(m.type==='worm')for(const s of m.seg)boom(s.x,s.y,0.3,'#c88');
   toast('+'+p,m.x,m.y,'#ffd27a');
   const r=Math.random();
@@ -955,7 +959,7 @@ function updatePlay(dt){
   laneTick();
   if(comm){comm.t+=dt;if(commQ.length&&comm.t>Math.max(comm.text.length/70+1.8,2.5)&&comm.max-comm.t>0.45)comm.max=comm.t+0.45;if(comm.t>comm.max){comm=commQ.shift()||null;if(comm)comm.t=0}}
   // cracks / spawning
-  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1);trySpawn()}}
+  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN:1);trySpawn()}}
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
     if(c.type==='boss')shake=Math.max(shake,4+c.t*4);if(c.t>=c.max){c.done=true;burst(c)}}
   cracks=cracks.filter(c=>!c.done);
@@ -970,17 +974,17 @@ function updatePlay(dt){
     let tvx=0,tvy=0,spd=MOB[m.type].sp*(1+Math.min(0.5,(level-1)*0.05));if(m.type!=='boss')spd=Math.min(spd,CHASE_CAP);
     if(m.type==='crawler'){const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}
     else if(m.type==='spitter'){m.cd-=dt;const see=d<300&&los(m.x,m.y,ship.x,ship.y);
-      if(see){if(d<140){tvx=-dx/d*spd;tvy=-dy/d*spd}if(m.cd<=0){m.cd=rnd(1.4,2.2);const a=Math.atan2(dy,dx);globs.push({x:m.x,y:m.y,vx:Math.cos(a)*165,vy:Math.sin(a)*165,life:2.6,r:5});SFX.spit()}}
+      if(see){if(d<140){tvx=-dx/d*spd;tvy=-dy/d*spd}if(m.cd<=0){m.cd=rnd(1.4,2.2)/EASE;const a=Math.atan2(dy,dx);globs.push({x:m.x,y:m.y,vx:Math.cos(a)*165,vy:Math.sin(a)*165,life:2.6,r:5});SFX.spit()}}
       else{const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}}
     else if(m.type==='scorpion'){m.cd-=dt;
       if(m.lunge>0){m.lunge-=dt;tvx=Math.cos(m.la)*spd*3.4;tvy=Math.sin(m.la)*spd*3.4}
       else if(m.wind>0){m.wind-=dt;tvx=0;tvy=0;m.a+=angDiff(m.a,Math.atan2(dy,dx))*Math.min(1,dt*10);if(m.wind<=0){m.lunge=0.34;m.la=m.a;SFX.spit()}}
-      else if(m.cd<=0&&d<130&&los(m.x,m.y,ship.x,ship.y)){m.wind=0.45;m.cd=rnd(1.9,2.7)}
+      else if(m.cd<=0&&d<130&&los(m.x,m.y,ship.x,ship.y)){m.wind=0.45;m.cd=rnd(1.9,2.7)/EASE}
       else{const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}}
     else if(m.type==='worm'){if(m.bf>0){m.bf-=dt;const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}else{tvx=dx/d*spd;tvy=dy/d*spd}}
     else if(m.type==='boss'){const ph2=m.hp<m.max/2;spd*=ph2?1.5:1;if(d>170){tvx=dx/d*spd;tvy=dy/d*spd}else{tvx=-dy/d*spd*0.6;tvy=dx/d*spd*0.6}
-      m.cd-=dt;if(m.cd<=0){m.cd=ph2?1.8:2.8;const n=ph2?18:12,off=m.t;for(let k=0;k<n;k++){const a=off+k/n*6.283;globs.push({x:m.x+Math.cos(a)*30,y:m.y+Math.sin(a)*30,vx:Math.cos(a)*140,vy:Math.sin(a)*140,life:4,r:7,ign:0.25})}SFX.spit()}
-      m.scd-=dt;if(m.scd<=0){if(cfg.hall){m.scd=ph2?7:9;if(mobs.filter(o=>o.type==='scorpion').length<3)spawnMob('scorpion',m.x+rnd(-30,30),m.y+rnd(-30,30))}else{m.scd=ph2?5:7;if(mobs.length<14)for(let k=0;k<2;k++)spawnMob('crawler',m.x+rnd(-30,30),m.y+rnd(-30,30))}}}
+      m.cd-=dt;if(m.cd<=0){m.cd=(ph2?1.8:2.8)/EASE;const n=ph2?18:12,off=m.t;for(let k=0;k<n;k++){const a=off+k/n*6.283;globs.push({x:m.x+Math.cos(a)*30,y:m.y+Math.sin(a)*30,vx:Math.cos(a)*140,vy:Math.sin(a)*140,life:4,r:7,ign:0.25})}SFX.spit()}
+      m.scd-=dt;if(m.scd<=0){if(cfg.hall){m.scd=(ph2?7:9)/EASE;if(mobs.filter(o=>o.type==='scorpion').length<3)spawnMob('scorpion',m.x+rnd(-30,30),m.y+rnd(-30,30))}else{m.scd=(ph2?5:7)/EASE;if(mobs.length<14)for(let k=0;k<2;k++)spawnMob('crawler',m.x+rnd(-30,30),m.y+rnd(-30,30))}}}
     // CHASE_V1: a chaser that has had no sight of you for 2.5 s while >10 tiles away loses the trail and drifts for a few seconds
     if(m.type!=='boss'){m.lc=(m.lc||0)-dt;if(m.lc<=0){m.lc=0.3;m.sees=d<T*10||(d<T*24&&los(m.x,m.y,ship.x,ship.y))}
       if(m.sees){m.lost=0;m.gu=0}else if(m.gu>0){m.gu-=dt;tvx=Math.cos(m.wa)*spd*0.35;tvy=Math.sin(m.wa)*spd*0.35}else{m.lost=(m.lost||0)+dt;if(m.lost>2.5){m.lost=0;m.gu=rnd(2.5,4);m.wa=Math.random()*6.283}}}

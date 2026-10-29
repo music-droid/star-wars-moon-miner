@@ -1382,6 +1382,11 @@ function texHull(t,o,dp){if(!texSil)texBuild();const S=SHIP_TEX,M=ctx.getTransfo
   g.globalAlpha=1;g.globalCompositeOperation='source-over';
   if(o.drilling){g.setTransform(c,s,-s,c,h,h);g.globalCompositeOperation='lighter';for(const sd of[-1,1]){const tx=S.sock[0]+S.drL,cy=sd*S.sock[1],gg=g.createRadialGradient(tx,cy,0,tx,cy,5.5);gg.addColorStop(0,'rgba(200,235,255,0.5)');gg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gg;g.beginPath();g.arc(tx,cy,5.5,0,6.283);g.fill()}g.globalCompositeOperation='source-over'}
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(texOC,M.e-h,M.f-h);ctx.restore()}
+// SHIP_NOSE_TUCK (Justin: "why are the lights protruding so far from the front?"): with the painted SHIP_TEXTURE hull, the cannon stub and headlamps sit on the sprite's real nose
+// (tip ~16.7u) instead of floating at the old vector nose (gun 26.2u, lamps 19.7u). Visual only: laser spawn (shipMuzzle), aim, hitbox unchanged; the headlight cone is drawn from the lamps with the same far reach. Revert: SHIP_NOSE_TUCK=false
+const SHIP_NOSE_TUCK=true;
+const SHIP_TUCK={tip:16.6,lamp:[15.0,2.35]};
+function shipTuckOn(){return SHIP_NOSE_TUCK&&shipTexOn()}
 const SHIP_NOSE=22.4,SHIP_RING=-33.6,SHIP_GUN=26.2,SHIP_WING=[-7.3,15.5];/* SHIP2: armored working hauler, 56u ring-to-nose */
 function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const dp=clamp(o.drill!=null?o.drill:(hov?0:1),0,1);
   const thr=o.thr!=null?o.thr:0.35,spin=o.spin!=null?o.spin:t*12;
@@ -1394,7 +1399,8 @@ function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const
   {const L=18+thr*18;ctx.save();ctx.translate(SHIP_RING-3,0);ctx.scale((1.7+thr*0.8)*(o.plume!=null?o.plume:1),0.42);const g=ctx.createRadialGradient(-4,0,0,-4,0,L);g.addColorStop(0,`rgba(170,255,225,${0.5*pulse})`);g.addColorStop(0.35,`rgba(70,225,190,${0.22*pulse})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(-4,0,L,0,6.283);ctx.fill();ctx.restore()}
   ctx.globalCompositeOperation='source-over';
   // belly cannon: short barrel under the nose, between the headlamps
-  {const r=o.mf>0?-0.9:0;ctx.fillStyle='#1d1b1a';ctx.fillRect(8+r,-1.25,SHIP_GUN-8,2.5);const g=ctx.createLinearGradient(0,-1.2,0,1.2);g.addColorStop(0,'#8d8780');g.addColorStop(0.5,'#4a4643');g.addColorStop(1,'#252321');ctx.fillStyle=g;ctx.fillRect(8+r,-1,SHIP_GUN-8.4,2);
+  if(TX&&SHIP_NOSE_TUCK){const r=o.mf>0?-0.5:0,e=SHIP_TUCK.tip+0.55+r;ctx.fillStyle='#141312';ctx.fillRect(10,-1.15,e-10,2.3);const g=ctx.createLinearGradient(0,-1,0,1);g.addColorStop(0,'#5a5550');g.addColorStop(0.5,'#33302d');g.addColorStop(1,'#1a1817');ctx.fillStyle=g;ctx.fillRect(10,-0.9,e-10.3,1.8);ctx.fillStyle='#070606';ctx.fillRect(e-0.55,-1.2,0.55,2.4)}
+  else {const r=o.mf>0?-0.9:0;ctx.fillStyle='#1d1b1a';ctx.fillRect(8+r,-1.25,SHIP_GUN-8,2.5);const g=ctx.createLinearGradient(0,-1.2,0,1.2);g.addColorStop(0,'#8d8780');g.addColorStop(0.5,'#4a4643');g.addColorStop(1,'#252321');ctx.fillStyle=g;ctx.fillRect(8+r,-1,SHIP_GUN-8.4,2);
     ctx.fillStyle='#0b0a0a';ctx.fillRect(SHIP_GUN-1+r,-1.35,1.1,2.7);ctx.fillStyle='rgba(200,150,110,0.55)';ctx.fillRect(SHIP_GUN-3.2+r,-1.05,0.6,2.1)}
   // painted hull
   const S=SPR.ship;if(SHIP_SCORPION){if(TX)texHull(t,o,dp);else scorpHull(t,o,dp)}else if(sprOK('ship'))ctx.drawImage(S.img,-S.ox,-S.oy,S.w,S.h);
@@ -1411,13 +1417,15 @@ function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const
   // SHIP2: the drill head retracts into the armoured nose; no petal plates on the hauler
   ctx.globalCompositeOperation='lighter';
   // headlamps
-  for(const s of[-1,1]){const g=ctx.createRadialGradient(19.7,s*2.7,0,19.7,s*2.7,3.3);g.addColorStop(0,'rgba(255,236,200,0.75)');g.addColorStop(0.45,'rgba(255,200,140,0.22)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(19.7,s*2.7,3.3,0,6.283);ctx.fill()}
+  if(TX&&SHIP_NOSE_TUCK){const lx=SHIP_TUCK.lamp[0],ly=SHIP_TUCK.lamp[1];ctx.globalCompositeOperation='source-over';for(const s of[-1,1]){ctx.fillStyle='rgba(12,11,10,0.85)';ctx.beginPath();ctx.arc(lx,s*ly,0.95,0,6.283);ctx.fill();ctx.fillStyle='rgba(255,226,170,0.9)';ctx.beginPath();ctx.arc(lx+0.12,s*ly,0.5,0,6.283);ctx.fill()}
+    ctx.globalCompositeOperation='lighter';for(const s of[-1,1]){const g=ctx.createRadialGradient(lx+0.2,s*ly,0,lx+0.2,s*ly,2);g.addColorStop(0,'rgba(255,240,210,0.8)');g.addColorStop(0.35,'rgba(255,205,150,0.28)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(lx+0.2,s*ly,2,0,6.283);ctx.fill()}}
+  else for(const s of[-1,1]){const g=ctx.createRadialGradient(19.7,s*2.7,0,19.7,s*2.7,3.3);g.addColorStop(0,'rgba(255,236,200,0.75)');g.addColorStop(0.45,'rgba(255,200,140,0.22)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(19.7,s*2.7,3.3,0,6.283);ctx.fill()}
   // warm floodlight glints on the wing-tip lamp pods
   for(const s of[-1,1]){const wx=SHIP_WING[0],wy=s*SHIP_WING[1],fl=0.42+0.08*Math.sin(t*2.3+s*1.7);const g=ctx.createRadialGradient(wx,wy,0,wx,wy,2.6);g.addColorStop(0,`rgba(255,226,180,${fl})`);g.addColorStop(0.5,`rgba(255,180,110,${fl*0.3})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(wx,wy,2.6,0,6.283);ctx.fill()}
   // mint engine ring pulse
   for(const ey of TX?[-SHIP_TEX.noz[1],SHIP_TEX.noz[1]]:SHIP_SCORPION?[-4.4,4.4]:[0]){const ex=TX?SHIP_TEX.noz[0]:SHIP_RING+0.45,er=TX?2.3:SHIP_SCORPION?3.2:4;const g=ctx.createRadialGradient(ex,ey,0,ex,ey,er);g.addColorStop(0,`rgba(225,255,245,${Math.min(1,0.55*pulse)})`);g.addColorStop(0.4,`rgba(90,240,200,${0.45*pulse})`);g.addColorStop(1,'rgba(20,120,110,0)');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(ex,ey,TX?1.3:SHIP_SCORPION?1.8:2.1,TX?1.6:SHIP_SCORPION?2.6:3.9,0,0,6.283);ctx.fill()}
   // cannon muzzle flash
-  if(o.mf>0){const g=ctx.createRadialGradient(SHIP_GUN+1,0,0,SHIP_GUN+1,0,6);g.addColorStop(0,`rgba(220,245,255,${Math.min(1,o.mf*12)})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(SHIP_GUN+1,0,6,0,6.283);ctx.fill()}
+  if(o.mf>0){const mx=TX&&SHIP_NOSE_TUCK?SHIP_TUCK.tip+1.2:SHIP_GUN+1;const g=ctx.createRadialGradient(mx,0,0,mx,0,6);g.addColorStop(0,`rgba(220,245,255,${Math.min(1,o.mf*12)})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(mx,0,6,0,6.283);ctx.fill()}
   ctx.globalCompositeOperation='source-over';
   ctx.restore()}
 // belly cannon muzzle in world space (fixed, fires along the heading)
@@ -1545,11 +1553,11 @@ function drawWorld(t){
   const light=(x,y,r,a=1)=>{if(!vis(x,y,r))return;lctx.globalAlpha=Math.min(1,a);lctx.drawImage(CUT,x-r,y-r,r*2,r*2)};
   const alive=ship&&state!=='dying'&&state!=='over';const hov=ship&&ship.mode==='hover';
   const cone=(c,x,y,a,R,sp,al,rgb)=>{const g=c.createRadialGradient(x,y,0,x,y,R);g.addColorStop(0,`rgba(${rgb},${al})`);g.addColorStop(0.5,`rgba(${rgb},${al*0.6})`);g.addColorStop(1,`rgba(${rgb},0)`);c.fillStyle=g;c.beginPath();c.moveTo(x-Math.cos(a)*4,y-Math.sin(a)*4);c.arc(x,y,R,a-sp,a+sp);c.closePath();c.fill()};
-  let nx=0,ny=0,ex=0,ey=0;
-  if(alive){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);nx=ship.x+ca*19;ny=ship.y+sa*19;ex=ship.x-ca*33.6;ey=ship.y-sa*33.6;
+  let nx=0,ny=0,ex=0,ey=0;const NC=alive&&shipTuckOn()?SHIP_TUCK.lamp[0]*HANDLING.vis+0.4:19,dR=19-NC;
+  if(alive){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);nx=ship.x+ca*NC;ny=ship.y+sa*NC;ex=ship.x-ca*33.6;ey=ship.y-sa*33.6;
     light(ship.x,ship.y,600,epOn()&&epDark()?0.12:0.4);            // faint wide falloff: walls stay readable near the ship
     light(ship.x,ship.y,hov?92:80,0.95);     // close ambient (about 1.5x the ship)
-    const R=hov?420:300;lctx.globalAlpha=1;cone(lctx,nx,ny,ship.a,R,0.5,0.3,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.97,0.36,0.45,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.9,0.2,0.4,'0,0,0');
+    const R=(hov?420:300)+dR;lctx.globalAlpha=1;cone(lctx,nx,ny,ship.a,R,0.5,0.3,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.97,0.36,0.45,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.9,0.2,0.4,'0,0,0');
     light(ex,ey,70,0.45+ship.thr*0.2);
     for(const s of[-1,1])light(ship.x+ca*SHIP_WING[0]-sa*s*SHIP_WING[1],ship.y+sa*SHIP_WING[0]+ca*s*SHIP_WING[1],26,0.28)}
   const act=padIsActive();light(padX,padY,act?(level===8?260:190):125,0.85);
@@ -1566,7 +1574,7 @@ function drawWorld(t){
   ctx.drawImage(lightC,0,0,lightC.width/LS,lightC.height/LS);
   // coloured light on top of the darkness: warm headlamp, mint engine, eyes, glows
   ctx.save();ctx.translate(-cx,-cy);ctx.globalCompositeOperation='lighter';
-  if(alive){const R=hov?400:290;cone(ctx,nx,ny,ship.a,R,0.42,0.075,'255,222,178');cone(ctx,nx,ny,ship.a,R*0.6,0.22,0.06,'255,235,200');
+  if(alive){const R=(hov?400:290)+dR;cone(ctx,nx,ny,ship.a,R,0.42,0.075,'255,222,178');cone(ctx,nx,ny,ship.a,R*0.6,0.22,0.06,'255,235,200');
     const pu=0.75+0.25*Math.sin(t*4.2)+ship.thr*0.35;glowAt(ctx,ex,ey,46,'80,255,205',0.2*pu*enGlow(t));
     if(ship.shf>0){const k=ship.shf/0.5;ctx.save();ctx.translate(ship.x,ship.y);ctx.rotate(ship.a);ctx.lineWidth=1.4;
       for(let i=0;i<9;i++){const fl=Math.sin(t*61+i*2.3)>-0.2?1:0.25;ctx.strokeStyle=`rgba(120,255,215,${0.75*k*fl})`;const a0=i*0.698+t*1.5;ctx.beginPath();ctx.ellipse(-4.5,0,36,22,0,a0,a0+0.5);ctx.stroke()}

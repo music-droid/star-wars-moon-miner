@@ -1886,7 +1886,7 @@ const HANDLING=HEAVY_HANDLING?{accH:330,accB:205,dragH:1.2,dragB:6,turnH:3.3,tur
 function wallScrape(nx,ny,vn,vt){// nx,ny: unit normal into the wall; vn: impact speed; vt: sliding speed along the wall
   const hit=Math.abs(vn),slide=Math.abs(vt);if(hit<HANDLING.sparkMin&&slide<45)return;
   const r=13*HANDLING.vis,cx=ship.x+nx*r,cy=ship.y+ny*r,n=Math.min(6,1+((hit+slide*0.4)/45)|0);
-  for(let k=0;k<n;k++){const back=rnd(30,110);parts.push({x:cx+rnd(-3,3),y:cy+rnd(-3,3),vx:-nx*back+(nx?0:Math.sign(-vt)*rnd(20,120))+rnd(-30,30),vy:-ny*back+(ny?0:Math.sign(-vt)*rnd(20,120))+rnd(-30,30),life:rnd(0.15,0.35),max:0.35,c:Math.random()<0.6?'#ffd9a0':'#ffb060',s:rnd(1,2),drag:3,g:1})}
+  for(let k=0;k<n;k++){const back=rnd(30,110);parts.push({x:cx+rnd(-3,3),y:cy+rnd(-3,3),vx:-nx*back+(nx?0:Math.sign(-vt)*rnd(20,120))+rnd(-30,30),vy:-ny*back+(ny?0:Math.sign(-vt)*rnd(20,120))+rnd(-30,30),life:rnd(0.15,0.35),max:0.35,c:Math.random()<0.6?'#ffd9a0':'#ffb060',s:rnd(1.3,2.8),drag:3,g:1})}
   if(Math.random()<0.3)parts.push({x:cx,y:cy,vx:rnd(-20,20),vy:rnd(-20,20),life:0.5,max:0.5,c:Math.random()<0.5?'#8a8070':'#5f574c',s:rnd(2,3.5),drag:3});
   vtScr++;SFX.grind(Math.min(1,(hit+slide*0.5)/140));if(hit>=HANDLING.sparkMin)shake=Math.max(shake,Math.min(3,hit*0.02))}
 function arrOn(){return COCKPIT_CINE&&ARRIVAL&&!(cfg&&cfg.hall)}
@@ -2935,6 +2935,14 @@ function shoveTick(dt,dx,dy,d){rival.shcd=(rival.shcd==null?4:rival.shcd)-dt;if(
   const sw=rival.sw;if(sw){sw.t+=dt;const k=Math.min(1,sw.t/SHOVE.wind);rival.x+=sw.nx*k*sw.d;rival.y+=sw.ny*k*sw.d;if(sw.t>SHOVE.wind+0.25)rival.sw=null;return}
   if(rival.fin||rival.dig||rival.so>0||rival.shcd>0||d>SHOVE.reach||d<RIVAL_R||ship.mode==='burrow')return;const nx=dx/d,ny=dy/d;
   if(Math.abs(nx*Math.cos(rival.a)+ny*Math.sin(rival.a))>0.6||!shoveWall(nx,ny))return;if(Math.random()<SHOVE.chance){rival.shcd=SHOVE.cd;rival.sw={t:0,nx,ny,d:d-RIVAL_R+8}}else rival.shcd=2.5}
+// RIVAL_GRIND (Justin): hull-to-hull contact no longer bounces. While the hulls touch they grind: sparks spray from the seam (like a wall scrape), you drag at
+// drag/s and Varro's pace drops to slow x. Revert: RIVAL_GRIND=false (old bounce)
+const RIVAL_GRIND=true,GRIND={drag:3.2,slow:0.45,hold:0.15,sparks:5};
+function rivalGrind(dt,nx,ny){rival.gr=GRIND.hold;const k=Math.exp(-GRIND.drag*dt);ship.vx*=k;ship.vy*=k;rival.grT=(rival.grT||0)+dt;
+  const cx=(ship.x+rival.x)/2,cy=(ship.y+rival.y)/2,tx=-ny,ty=nx,sd=Math.sign(tx*(ship.vx||1)+ty*(ship.vy||0))||1;
+  for(let q=0;q<GRIND.sparks;q++){const v=rnd(60,180);parts.push({x:cx+rnd(-3,3),y:cy+rnd(-3,3),vx:tx*v*sd*(Math.random()<0.3?-1:1)+rnd(-40,40),vy:ty*v*sd*(Math.random()<0.3?-1:1)+rnd(-40,40),life:rnd(0.15,0.35),max:0.35,c:Math.random()<0.6?'#ffd9a0':'#ffb060',s:rnd(1.3,2.8),drag:3,g:1})}
+  if(Math.random()<dt*6)parts.push({x:cx,y:cy,vx:rnd(-15,15),vy:rnd(-15,15),life:0.5,max:0.5,c:'rgba(150,140,130,0.45)',s:rnd(2,3.5),drag:2});shake=Math.max(shake,2.5);
+  if(!rival.bumped){rivalSay(RIVAL_LINES.bump);rival.bumped=1}}
 function rivalLure(m,d,spd){if(!RIVAL_DAMAGE||!rival||!rivalOn()||rival.fin||!rivBet||!rivBet.done||m.asleep)return null;const rx=rival.x-m.x,ry=rival.y-m.y,rd=Math.hypot(rx,ry)||1;return rd<d&&rd<T*RIVAL_HIT.lure?[rx/rd*spd,ry/rd*spd]:null}
 function rivalOn(){return RIVAL_RACE&&!!tunPath&&!!cfg&&!!cfg.tunnel}
 function rivalInit(){rival=null;rivBet=null;if(!rivalOn())return;
@@ -2957,18 +2965,18 @@ function rivalSettle(win){if(!rival||rival.settled||!rivBet||!rivBet.done)return
   rival.settled=true;rival.res=win?'win':'lose';rival.delta=d;if(typeof lvStats==='object'&&lvStats)lvStats.rival={win,bet:b,d};saveProg()}
 function rivalTick(dt){if(!rivalOn()||!rival||!rivBet||!rivBet.done||arr)return;const P=tunPath,N=P.length;
   let best=1e18,bi=rival.pi;for(let j=Math.max(0,rival.pi-25);j<Math.min(N,rival.pi+45);j++){const q=P[j],dx=(q[0]+0.5)*T-ship.x,dy=(q[1]+0.5)*T-ship.y,dd=dx*dx+dy*dy;if(dd<best){best=dd;bi=j}}rival.pi=bi;
-  rival.cd=Math.max(0,rival.cd-dt);if(RIVAL_DAMAGE)rivalDmgTick(dt);const so=RIVAL_DAMAGE&&rival.so>0;
+  rival.cd=Math.max(0,rival.cd-dt);if(RIVAL_GRIND)rival.gr=Math.max(0,(rival.gr||0)-dt);if(RIVAL_DAMAGE)rivalDmgTick(dt);const so=RIVAL_DAMAGE&&rival.so>0;
   if(!rival.fin){const g=rival.i-rival.pi,late=rival.i/N>0.85,m=clamp(1-g*RIVAL_RB,late?0.8:0.5,late?1.15:1.45),j=Math.min(N-1,Math.floor(rival.i)+1),q=P[j];
     rival.dig=map[q[1]*MW+q[0]]===ROCK;
     if(rival.dig){rival.dt+=so?0:dt;rival.lane=Math.max(0,rival.lane-dt*3);if(Math.random()<dt*30)parts.push({x:rival.x+Math.cos(rival.a)*22+rnd(-6,6),y:rival.y+Math.sin(rival.a)*22+rnd(-6,6),vx:rnd(-40,40),vy:rnd(-40,40),life:0.5,max:0.5,c:'#b08a52',s:2.5,drag:2,g:1});
       if(rival.dt>=RIVAL_DIG){rival.dt=0;breakTile(q[0],q[1],true)}}
-    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt*(so?0.12:1))}
+    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt*(so?0.12:1)*(RIVAL_GRIND&&rival.gr>0?GRIND.slow:1))}
     if(rival.i>=N-1){rival.fin=gameT||0.001;rivalSay(RIVAL_LINES.win);toast('VARRO REACHED THE RELAY FIRST',null,null,RIVAL_YEL)}
     const ld=rival.i-rival.pi>2?1:rival.i-rival.pi<-2?-1:rival.lead;if(ld!==rival.lead){if(rival.lead!==0&&gameT-rival.ovT>6){rivalSay(ld>0?RIVAL_LINES.pass:RIVAL_LINES.passed);rival.ovT=gameT}rival.lead=ld}}
   rivalPlace();
   if(ship.mode!=='burrow'&&state==='play'){let dx=ship.x-rival.x,dy=ship.y-rival.y,d=Math.hypot(dx,dy);if(RIVAL_SHOVE){shoveTick(dt,dx,dy,d);dx=ship.x-rival.x;dy=ship.y-rival.y;d=Math.hypot(dx,dy)}
     if(d<RIVAL_R&&d>0.01){const nx=dx/d,ny=dy/d;if(RIVAL_SHOVE&&(rival.sw||rival.cd<=0&&shoveWall(nx,ny)))doShove(nx,ny);else{if(RIVAL_SHOVE)rivalSep(nx,ny,RIVAL_R-d);else{ship.x+=nx*(RIVAL_R-d);ship.y+=ny*(RIVAL_R-d)}
-      if(rival.cd<=0){ship.vx+=nx*RIVAL_BUMP;ship.vy+=ny*RIVAL_BUMP;rival.cd=0.6;rival.bumps=(rival.bumps||0)+1;shake=Math.max(shake,5);SFX.click();if(!rival.bumped){rivalSay(RIVAL_LINES.bump);rival.bumped=1}if(!rival.fin)rival.i=Math.max(0,rival.i-0.4)}}}if(RIVAL_SHOVE)rivalUnstick()}
+      if(RIVAL_GRIND)rivalGrind(dt,nx,ny);else if(rival.cd<=0){ship.vx+=nx*RIVAL_BUMP;ship.vy+=ny*RIVAL_BUMP;rival.cd=0.6;rival.bumps=(rival.bumps||0)+1;shake=Math.max(shake,5);SFX.click();if(!rival.bumped){rivalSay(RIVAL_LINES.bump);rival.bumped=1}if(!rival.fin)rival.i=Math.max(0,rival.i-0.4)}}}else if(RIVAL_GRIND&&d<RIVAL_R+2&&d>0.01&&!rival.sw)rivalGrind(dt,dx/d,dy/d);if(RIVAL_SHOVE)rivalUnstick()}
   rival.pt+=dt;if(!rival.dig&&!rival.fin&&rival.pt>0.04){rival.pt=0;const ca=Math.cos(rival.a),sa=Math.sin(rival.a),G=rivalGlow();parts.push({x:rival.x-ca*30*HANDLING.vis,y:rival.y-sa*30*HANDLING.vis,vx:-ca*40,vy:-sa*40,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?G[5]:G[6],s:2.2,drag:1.5,g:1})}
   if(rival.cap){rival.cap.t-=dt;if(rival.cap.t<=0)rival.cap=null}
   rival.tt-=dt;if(rival.tt<=0&&!rival.fin){rival.tt=rnd(11,16);const L=RIVAL_LINES.taunt;if(rival.used.length>=L.length)rival.used=[];const fr=L.map((s,k)=>k).filter(k=>!rival.used.includes(k)),k=fr[Math.floor(Math.random()*fr.length)];rival.used.push(k);if(!rival.cap)rivalSay(L[k])}}

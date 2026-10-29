@@ -658,12 +658,47 @@ function waterTick(dt){let any=false;const hull=(i)=>{const x=(i%MW)*T,y=((i/MW)
     if(w.st<2)any=true}
   // a released flood keeps the bank next to it slow
   if(any){if(!ep.wnear)ep.wnear=new Uint8Array(MW*MH);ep.wnear.fill(0);for(const w of ep.weeps)if(w.on&&w.st<2)for(const i of w.tiles)if(wDeep[i])for(const d of[1,-1,MW,-MW])ep.wnear[i+d]=1}else ep.wnear=null}
-function waterDraw(t,vis){const pool=(tiles,a,deep)=>{ctx.beginPath();for(const i of tiles){const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(!vis(x,y,T))continue;ctx.moveTo(x+T*0.74,y);ctx.arc(x,y,T*0.74,0,6.283)}
+// WATER_BLOCKS (Justin): every bit of standing water (seep pools, weeping-rock floods, drained puddles, old round pools) draws as tile-aligned, bright, translucent
+// blue blocks: floor faintly visible through them, scrolling ripple lines in the flow direction (away from the seep / weeping rock), a sparkle shimmer, foam
+// where water meets rock, and a raised bevel on deep (blocking) flood blocks so they read as a wall of water. Visual only: hazards, slow-down and BFS untouched.
+// Two cached 64px patterns, one batched rect path per group: cheap on phones. Revert: WATER_BLOCKS=false (round blobs)
+const WATER_BLOCKS=true,WB={sh:'70,175,255,0.46',dp:'45,150,255,0.66',spd:26,spk:9,foam:0.6,grid:0.2,glow:0.16};
+let wbP=null;
+function wbPats(){if(wbP)return wbP;const mk=f=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');f(g);return ctx.createPattern(c,'repeat')};
+  wbP={st:mk(g=>{g.lineCap='round';for(const[y0,a,w]of[[6,0.6,2.2],[22,0.35,1.4],[38,0.6,2.2],[54,0.3,1.2]]){g.strokeStyle=`rgba(230,248,255,${a})`;g.lineWidth=w;g.beginPath();
+      for(let x=0;x<=64;x+=4){const y=y0+Math.sin(x/64*12.566+y0)*2.2;x?g.lineTo(x,y):g.moveTo(x,y)}g.stroke()}}),
+    sp:mk(g=>{for(let k=0;k<14;k++){const x=hash(k,3)*64,y=hash(5,k)*64,r=0.8+hash(k,k+9)*1.4;g.fillStyle=`rgba(255,255,255,${0.35+hash(k+2,7)*0.5})`;g.beginPath();g.arc(x,y,r,0,6.283);g.fill()}})};return wbP}
+const wbWet=i=>ep.wet&&ep.wet.has(i)||!!(wDeep&&wDeep[i]);
+function wbGroup(tiles,vis,deep,dx,dy,t,ph,isW){const vt=[];for(const i of tiles){const x=(i%MW)*T,y=((i/MW)|0)*T;if(vis(x+T/2,y+T/2,T))vt.push(i)}if(!vt.length)return;
+  const P=wbPats(),deg=Math.atan2(dy,dx)*57.2958-90,o=(t*WB.spd+ph*20)%64;
+  ctx.beginPath();for(const i of vt)ctx.rect((i%MW)*T,((i/MW)|0)*T,T,T);
+  ctx.fillStyle=`rgba(${deep?WB.dp:WB.sh})`;ctx.fill();
+  P.st.setTransform(new DOMMatrix().rotateSelf(deg).translateSelf(0,o));ctx.globalAlpha=deep?0.95:0.8;ctx.fillStyle=P.st;ctx.fill();
+  P.sp.setTransform(new DOMMatrix().rotateSelf(deg+35).translateSelf(0,(t*WB.spk+ph*30)%64));ctx.globalAlpha=0.45+0.35*Math.sin(t*2.3+ph);ctx.fillStyle=P.sp;ctx.fill();ctx.globalAlpha=1;
+  ctx.strokeStyle=`rgba(200,240,255,${WB.grid})`;ctx.lineWidth=1;ctx.stroke();
+  // foam where the water meets rock / dry floor
+  ctx.beginPath();for(const i of vt){const x=(i%MW)*T,y=((i/MW)|0)*T,f=3;if(!isW(i-1))ctx.rect(x,y,f,T);if(!isW(i+1))ctx.rect(x+T-f,y,f,T);if(!isW(i-MW))ctx.rect(x,y,T,f);if(!isW(i+MW))ctx.rect(x,y+T-f,T,f)}
+  ctx.fillStyle=`rgba(235,250,255,${WB.foam*(0.75+0.25*Math.sin(t*3.1+ph))})`;ctx.fill();
+  if(deep){ctx.beginPath();for(const i of vt)ctx.rect((i%MW)*T+2,((i/MW)|0)*T+2,T-4,3);ctx.fillStyle='rgba(210,245,255,0.55)';ctx.fill();
+    ctx.beginPath();for(const i of vt)ctx.rect((i%MW)*T+2,((i/MW)|0)*T+T-5,T-4,3);ctx.fillStyle='rgba(0,40,110,0.4)';ctx.fill()}}
+// same blocks again in the additive glow layer (above the darkness), faint, so the water stays bright blue outside the headlight
+function wbGlow(t,vis){if(!ep||!ep.wet)return;const P=wbPats();ctx.save();ctx.beginPath();let n=0;const add=i=>{const x=(i%MW)*T,y=((i/MW)|0)*T;if(vis(x+T/2,y+T/2,T)){ctx.rect(x,y,T,T);n++}};
+  for(const i of ep.wet)add(i);if(ep.weeps)for(const w of ep.weeps)if(w.on)for(const i of w.tiles)if(wDeep[i])add(i);if(!n){ctx.restore();return}
+  ctx.fillStyle=`rgba(40,130,255,${WB.glow})`;ctx.fill();P.st.setTransform(new DOMMatrix().translateSelf(0,(t*WB.spd)%64));ctx.globalAlpha=WB.glow*1.4;ctx.fillStyle=P.st;ctx.fill();ctx.restore()}
+function wbDraw(t,vis){if(!ep)return;ctx.save();
+  if(WATER_REWORK&&ep.seeps){
+    for(const s of ep.seeps){if(!vis((s.x+0.5)*T,(s.y+0.5)*T,T*6))continue;wbGroup(s.tiles.filter(i=>ep.wet.has(i)),vis,0,-s.dx,-s.dy,t,s.ph,wbWet)}
+    for(const w of ep.weeps){if(!w.on||!vis((w.x+0.5)*T,(w.y+0.5)*T,T*8))continue;if(!w.fd){let ax=0,ay=0;for(const i of w.tiles){ax+=i%MW-w.x;ay+=((i/MW)|0)-w.y}const l=Math.hypot(ax,ay)||1;w.fd=[ax/l,ay/l]}
+      wbGroup(w.tiles.filter(i=>!wDeep[i]&&ep.wet.has(i)),vis,0,w.fd[0],w.fd[1],t,w.ph,wbWet);wbGroup(w.tiles.filter(i=>wDeep[i]),vis,1,w.fd[0],w.fd[1],t,w.ph,wbWet)}}
+  for(const f of ep.flood){if(f.seep||!vis(f.x,f.y,f.r))continue;if(!f.tl){f.tl=[];const r=Math.ceil(f.r/T),cx=Math.floor(f.x/T),cy=Math.floor(f.y/T);for(let b=-r;b<=r;b++)for(let a=-r;a<=r;a++){const x=cx+a,y=cy+b;if(x<0||y<0||x>=MW||y>=MH)continue;if(Math.hypot((x+0.5)*T-f.x,(y+0.5)*T-f.y)<f.r)f.tl.push(y*MW+x)}f.set=new Set(f.tl)}
+    wbGroup(f.tl.filter(i=>map[i]!==ROCK&&map[i]!==BED),vis,0,0,1,t,f.ph,i=>f.set.has(i)&&map[i]!==ROCK&&map[i]!==BED)}
+  ctx.restore()}
+function waterDraw(t,vis){const pool=WATER_BLOCKS?()=>{}:(tiles,a,deep)=>{ctx.beginPath();for(const i of tiles){const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(!vis(x,y,T))continue;ctx.moveTo(x+T*0.74,y);ctx.arc(x,y,T*0.74,0,6.283)}
     ctx.fillStyle=deep?`rgba(25,80,150,${a})`:`rgba(45,120,200,${a})`;ctx.fill()};
   ctx.save();
   // shallow pools + seeps
   for(const s of ep.seeps){const wx=(s.x+0.5+s.dx*0.5)*T,wy=(s.y+0.5+s.dy*0.5)*T;if(!vis(wx,wy,T*5))continue;pool(s.tiles.filter(i=>ep.wet.has(i)),0.3);
-    for(const i of s.tiles){if(!ep.wet.has(i)||i%3)continue;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T,rr=((t*10+i*7)%(T*0.9));ctx.strokeStyle=`rgba(170,220,255,${0.16*(1-rr/(T*0.9))})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,rr,0,6.283);ctx.stroke()}
+    if(!WATER_BLOCKS)for(const i of s.tiles){if(!ep.wet.has(i)||i%3)continue;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T,rr=((t*10+i*7)%(T*0.9));ctx.strokeStyle=`rgba(170,220,255,${0.16*(1-rr/(T*0.9))})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,rr,0,6.283);ctx.stroke()}
     // wet streak on the wall face + droplets running into the pool (a fall is a wider, brighter sheet)
     const tx=-s.dy,ty=s.dx,wd=s.fall?T*0.42:T*0.16;ctx.fillStyle=s.fall?'rgba(150,210,255,0.35)':'rgba(120,180,240,0.25)';ctx.beginPath();ctx.moveTo(wx+tx*wd,wy+ty*wd);ctx.lineTo(wx-tx*wd,wy-ty*wd);ctx.lineTo(wx-tx*wd*0.6-s.dx*T*0.55,wy-ty*wd*0.6-s.dy*T*0.55);ctx.lineTo(wx+tx*wd*0.6-s.dx*T*0.55,wy+ty*wd*0.6-s.dy*T*0.55);ctx.fill();
     const nd=s.fall?7:3;for(let k=0;k<nd;k++){const u=((t*(s.fall?1.6:0.9)+k/nd+s.ph)%1),o=((k*0.37+s.ph)%1-0.5)*wd*1.6,x=wx+tx*o-s.dx*u*T*0.9,y=wy+ty*o-s.dy*u*T*0.9;
@@ -673,7 +708,7 @@ function waterDraw(t,vis){const pool=(tiles,a,deep)=>{ctx.beginPath();for(const 
     if(!w.on){// weeping rock: wet sheen + beading drips
       const gw=ctx.createRadialGradient(x,y,2,x,y,T*0.9);gw.addColorStop(0,`rgba(90,170,255,${0.5+0.12*Math.sin(t*2+w.ph)})`);gw.addColorStop(1,'rgba(90,170,255,0)');ctx.fillStyle=gw;ctx.fillRect(x-T*0.9,y-T*0.9,T*1.8,T*1.8);ctx.strokeStyle='rgba(170,225,255,0.8)';ctx.lineWidth=1.4;ctx.strokeRect(x-T*0.42,y-T*0.42,T*0.84,T*0.84);ctx.lineWidth=1.3;
       for(let k=0;k<3;k++){const u=(t*0.7+k/3+w.ph)%1,dx2=(k-1)*T*0.25;ctx.beginPath();ctx.moveTo(x+dx2,y-T*0.4+u*T*0.7);ctx.lineTo(x+dx2,y-T*0.4+u*T*0.7+4);ctx.stroke()}continue}
-    const deep=w.tiles.filter(i=>wDeep[i]),sh=w.tiles.filter(i=>!wDeep[i]&&ep.wet.has(i));if(sh.length)pool(sh,0.3);if(!deep.length)continue;pool(deep,0.82,1);
+    const deep=w.tiles.filter(i=>wDeep[i]),sh=w.tiles.filter(i=>!wDeep[i]&&ep.wet.has(i));if(sh.length)pool(sh,0.3);if(!deep.length||WATER_BLOCKS)continue;pool(deep,0.82,1);
     ctx.strokeStyle='rgba(170,220,255,0.35)';ctx.lineWidth=1.2;for(const i of deep){const cx=(i%MW+0.5)*T,cy=(((i/MW)|0)+0.5)*T;if(!vis(cx,cy,T))continue;const o=((t*9+i*5)%T)-T/2;ctx.beginPath();for(let k=0;k<=6;k++){const xx=cx-T*0.35+k*T*0.12,yy=cy+o*0.5+Math.sin(t*4+k*1.2+i)*2;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)}ctx.stroke()}}
   ctx.restore()}
 // called at the end of startLevel: sleeping nests + pacing
@@ -742,13 +777,13 @@ function epHud(L,t){if(!ep||!EP_HUD)return;const sm=L.sm,x=12;let y=L.top+(sm?40
     ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.font=`bold ${sm?8:9}px ${FW}`;y+=sm?11:13;const kn=`${st}/5 \u00b7 `+(epQuiet1()?EP_KNAME.quiet:EP_KNAME[ep.kind]||'');ctx.strokeText(kn,x,y);ctx.fillStyle=ep.kind==='heavy'?'rgba(225,160,255,0.95)':'rgba(255,220,160,0.9)';ctx.fillText(kn,x,y)}ctx.font=`${sm?8:9}px ${FW}`;
   for(const n of cfg.pit.names.slice(0,3)){y+=sm?11:13;ctx.strokeText(n,x,y);ctx.fillStyle='rgba(255,150,110,0.85)';ctx.fillText(n,x,y)}ctx.restore()}
 // world layer (under mobs): flood water, gas clouds, unstable crystal warnings
-function epDrawWorld(t,vis){if(!ep)return;if(WATER_REWORK&&ep.seeps)waterDraw(t,vis);
-  for(const f of ep.flood){if(!vis(f.x,f.y,f.r))continue;const g=ctx.createRadialGradient(f.x,f.y,f.r*0.2,f.x,f.y,f.r);g.addColorStop(0,'rgba(40,110,190,0.42)');g.addColorStop(0.8,'rgba(40,110,190,0.3)');g.addColorStop(1,'rgba(40,110,190,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,6.283);ctx.fill();
+function epDrawWorld(t,vis){if(!ep)return;if(WATER_BLOCKS)wbDraw(t,vis);if(WATER_REWORK&&ep.seeps)waterDraw(t,vis);
+  for(const f of ep.flood){if(WATER_BLOCKS||!vis(f.x,f.y,f.r))continue;const g=ctx.createRadialGradient(f.x,f.y,f.r*0.2,f.x,f.y,f.r);g.addColorStop(0,'rgba(40,110,190,0.42)');g.addColorStop(0.8,'rgba(40,110,190,0.3)');g.addColorStop(1,'rgba(40,110,190,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,6.283);ctx.fill();
     ctx.strokeStyle='rgba(150,210,255,0.22)';ctx.lineWidth=1;for(let k=0;k<3;k++){const rr=((t*14+k*f.r/3+f.ph*10)%f.r);ctx.beginPath();ctx.arc(f.x,f.y,rr,0,6.283);ctx.stroke()}}
   for(const g of ep.gas){if(!vis(g.x,g.y,g.r))continue;for(let k=0;k<4;k++){const ox=Math.cos(g.ph*0.7+k*1.7)*g.r*0.3,oy=Math.sin(g.ph*0.5+k*2.1)*g.r*0.3,gr=ctx.createRadialGradient(g.x+ox,g.y+oy,0,g.x+ox,g.y+oy,g.r);
     gr.addColorStop(0,`rgba(150,220,60,${g.fuse>=0?0.6:0.22})`);gr.addColorStop(1,'rgba(150,220,60,0)');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(g.x+ox,g.y+oy,g.r,0,6.283);ctx.fill()}}}
 // glow layer (above the darkness, additive): telegraphs, weak spot, veterans, unstable fuses, gas glow
-function epDrawGlow(t,vis){if(!ep)return;
+function epDrawGlow(t,vis){if(!ep)return;if(WATER_BLOCKS&&WATER_REWORK)wbGlow(t,vis);
   for(const g of ep.gas)if(vis(g.x,g.y,g.r))glowAt(ctx,g.x,g.y,g.r*1.3,'150,230,70',0.12+0.04*Math.sin(t*2+g.ph));
   if(PIT_FLOW_V2)for(const it of items)if(it.rich&&!it.dead&&vis(it.x,it.y))glowAt(ctx,it.x,it.y,46,'170,70,255',0.45+0.2*Math.sin(t*2.2+it.ph));
   for(const it of items)if(it.unst&&!it.dead&&vis(it.x,it.y)){const f=it.fuse!=null?it.fuse:3,u=it.fuse!=null;glowAt(ctx,it.x,it.y,u?30:20,'255,80,60',(u?0.5:0.25)+0.2*Math.sin(t*(u?18:3)));

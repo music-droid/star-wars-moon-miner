@@ -487,7 +487,7 @@ function rfTick(dt){for(const z of rockfalls){
       if(!solidAt(Math.floor(x/T),Math.floor(y/T)))rfx.push({x,y,t:0,max:0.85})}}
   for(const r of rfx){r.t+=dt;if(r.t>=r.max){r.dead=true;shake=Math.max(shake,5);SFX.crack();
     for(let k=0;k<14;k++){const a=Math.random()*6.283,v=rnd(40,150);parts.push({x:r.x,y:r.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.3,0.7),max:0.7,c:Math.random()<0.5?'#8a7a66':'#5c5246',s:rnd(2,4.5),drag:3})}
-    if(dist(r.x,r.y,ship.x,ship.y)<24)hurtShip(RACE_RF_DMG)}}
+    if(dist(r.x,r.y,ship.x,ship.y)<24)hurtShip(RACE_RF_DMG);if(RIVAL_DAMAGE&&rival&&dist(r.x,r.y,rival.x,rival.y)<26)rivalHit(1.2)}}
   rfx=rfx.filter(r=>!r.dead)}
 function rfDraw(t){for(const r of rfx){const p=r.t/r.max;ctx.save();ctx.fillStyle=`rgba(0,0,0,${0.25+0.4*p})`;ctx.beginPath();ctx.ellipse(r.x,r.y+2,6+13*p,4+8*p,0,0,6.283);ctx.fill();
     ctx.strokeStyle=`rgba(255,${(90+80*Math.sin(t*20))|0},40,${0.35+0.5*p})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(r.x,r.y,20-6*p,0,6.283);ctx.stroke();
@@ -617,7 +617,7 @@ function epSleep(m,d){if(!m.asleep)return false;if(m.hp<m.max||(d<T*5&&los(m.x,m
 function epInFlood(x,y){if(!ep)return false;for(const f of ep.flood)if(dist(x,y,f.x,f.y)<f.r)return true;return false}
 function epGasBoom(g){if(g.dead)return;g.dead=true;boom(g.x,g.y,2.2,'#bf6');shake=Math.max(shake,16);for(let k=0;k<26;k++){const a=Math.random()*6.283,s=rnd(40,200);parts.push({x:g.x,y:g.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0.7,max:0.7,c:k%2?'#cf6':'#fd6',s:3,drag:2,g:1})}
   const R2=g.r*1.7;for(const m of mobs)if(!m.dead&&dist(m.x,m.y,g.x,g.y)<R2){m.hp-=m.type==='boss'?8:6;m.hf=0.1;m.asleep=0;if(m.hp<=0)kill(m)}
-  if(dist(ship.x,ship.y,g.x,g.y)<g.r*1.4)hurtShip(15);for(const o of ep.gas)if(!o.dead&&o.fuse<0&&dist(o.x,o.y,g.x,g.y)<g.r*2.6)o.fuse=0.3}
+  if(dist(ship.x,ship.y,g.x,g.y)<g.r*1.4)hurtShip(15);if(RIVAL_DAMAGE&&rival&&dist(rival.x,rival.y,g.x,g.y)<g.r*1.4)rivalHit(1.3);for(const o of ep.gas)if(!o.dead&&o.fuse<0&&dist(o.x,o.y,g.x,g.y)<g.r*2.6)o.fuse=0.3}
 function epTick(dt){if(!ep)return;const c=ep.c;
   for(const g of ep.gas){if(g.dead)continue;g.ph+=dt;if(g.fuse>=0){g.fuse-=dt;if(g.fuse<=0)epGasBoom(g);continue}for(const b of bolts)if(!b.dead&&dist(b.x,b.y,g.x,g.y)<g.r){b.dead=true;epGasBoom(g);break}}
   ep.gas=ep.gas.filter(g=>!g.dead);
@@ -1248,6 +1248,7 @@ function updatePlay(dt){
     // CHASE_V1: a chaser that has had no sight of you for 2.5 s while >10 tiles away loses the trail and drifts for a few seconds
     if(m.type!=='boss'){m.lc=(m.lc||0)-dt;if(m.lc<=0){m.lc=0.3;m.sees=d<T*10||(d<T*24&&los(m.x,m.y,ship.x,ship.y))}
       if(m.sees){m.lost=0;m.gu=0}else if(m.gu>0){m.gu-=dt;tvx=Math.cos(m.wa)*spd*0.35;tvy=Math.sin(m.wa)*spd*0.35}else{m.lost=(m.lost||0)+dt;if(m.lost>2.5){m.lost=0;m.gu=rnd(2.5,4);m.wa=Math.random()*6.283}}}
+    if(RIVAL_DAMAGE&&rival&&m.type!=='boss'){const q=rivalLure(m,d,spd);if(q){tvx=q[0];tvy=q[1]}}
     if(m.stun>0){tvx*=0.1;tvy*=0.1}
     const k=Math.min(1,dt*(m.type==='crawler'||m.lunge>0?6:3));m.vx=lerp(m.vx,tvx,k);m.vy=lerp(m.vy,tvy,k);
     if(Math.hypot(m.vx,m.vy)>5)m.a+=angDiff(m.a,Math.atan2(m.vy,m.vx))*Math.min(1,dt*8);
@@ -1272,7 +1273,7 @@ function updatePlay(dt){
     if(b.life<=0)b.dead=true}
   bolts=bolts.filter(b=>!b.dead);mobs=mobs.filter(m=>!m.dead);
   for(const g of globs){g.life-=dt;g.x+=g.vx*dt;g.y+=g.vy*dt;if(g.ign>0)g.ign-=dt;else if(solidAt(Math.floor(g.x/T),Math.floor(g.y/T))){g.dead=true;for(let k=0;k<5;k++)parts.push({x:g.x,y:g.y,vx:rnd(-60,60),vy:rnd(-60,60),life:0.4,max:0.4,c:'#9e3',s:2.5,drag:3,g:1})}
-    if(dist(g.x,g.y,ship.x,ship.y)<g.r+10){g.dead=true;hurtShip(g.r>6?14:11)}if(g.life<=0)g.dead=true}
+    if(dist(g.x,g.y,ship.x,ship.y)<g.r+10){g.dead=true;hurtShip(g.r>6?14:11)}if(RIVAL_DAMAGE&&rival&&!g.dead&&dist(g.x,g.y,rival.x,rival.y)<g.r+12&&rivalHit(1))g.dead=true;if(g.life<=0)g.dead=true}
   globs=globs.filter(g=>!g.dead);
   if(tunPath)rfTick(dt);
   if(epOn()&&ep)epTick(dt);
@@ -2904,6 +2905,19 @@ const RIVAL_LINES={open:'Grey hauler on your six, Guild. Name\u2019s Varro. I ru
   bump:'Bump me again and I bill the Guild for the paint.',pass:'See you at the relay. I\u2019ll keep the seat warm.',passed:'Enjoy the view up front. It won\u2019t last.',
   win:'Relay\u2019s mine. Pay up, Guild.',lose:'Lucky drill. Don\u2019t get used to it.'};
 let rival=null,rivBet=null,rivTexC=null,rivPorImg=null;
+// RIVAL_DAMAGE (Justin): Varro is no longer immune. Bug bites, acid globs, rockfalls and gas blasts spin him out: he stalls (stall s x hit weight), loses back tiles of
+// progress, sparks and smokes, then recovers (never dies). Bugs closer to him than to you (within lure tiles) go for him. One table drives it. Revert: RIVAL_DAMAGE=false
+const RIVAL_DAMAGE=true,RIVAL_HIT={stall:1.1,back:0.7,cd:1.2,lure:4,r:16,lines:['Get these bugs off my hull!','Kriff! That one bit.','Not a scratch. Mostly.','Your bugs, Guild? Figures.']};
+function rivalHit(k){if(!RIVAL_DAMAGE||!rival||!rivBet||!rivBet.done||rival.fin||rival.hcd>0)return false;k=clamp(k||1,0.5,1.5);rival.hcd=RIVAL_HIT.cd;rival.so=RIVAL_HIT.stall*k;rival.spv=(Math.random()<0.5?-1:1)*rnd(10,14);
+  rival.i=Math.max(0,rival.i-RIVAL_HIT.back*k);rival.hits=(rival.hits||0)+1;rival.hf=0.25;
+  for(let q=0;q<16;q++){const a=Math.random()*6.283,v=rnd(60,200);parts.push({x:rival.x,y:rival.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.25,0.5),max:0.5,c:q%3?'#ffd27a':'#fff4c8',s:rnd(1.5,2.6),drag:3,g:1})}
+  if(Math.abs(rival.x-ship.x)<W&&Math.abs(rival.y-ship.y)<H)SFX.crack();if(!rival.cap&&Math.random()<0.6)rivalSay(RIVAL_HIT.lines[(Math.random()*RIVAL_HIT.lines.length)|0]);return true}
+function rivalDmgTick(dt){rival.hcd=Math.max(0,(rival.hcd||0)-dt);rival.hf=Math.max(0,(rival.hf||0)-dt);
+  if(rival.so>0){rival.so-=dt;rival.spa=(rival.spa||0)+rival.spv*dt;rival.spv*=Math.exp(-1.8*dt);if(Math.random()<dt*24)parts.push({x:rival.x+rnd(-8,8),y:rival.y+rnd(-8,8),vx:rnd(-15,15),vy:rnd(-35,-10),life:0.9,max:0.9,c:Math.random()<0.5?'rgba(70,70,74,0.6)':'rgba(120,110,100,0.5)',s:rnd(3,6),drag:0.8})}
+  else if(rival.spa){let a=rival.spa%6.283;if(a>Math.PI)a-=6.283;if(a<-Math.PI)a+=6.283;a*=Math.exp(-8*dt);rival.spa=Math.abs(a)<0.01?0:a}
+  if(state!=='play'||rival.fin)return;for(const m of mobs){if(m.dead||m.dormant||m.asleep||m.type==='boss')continue;const dx=m.x-rival.x,dy=m.y-rival.y,d=Math.hypot(dx,dy)||1;
+    if(d<m.r+RIVAL_HIT.r&&rivalHit(MOB[m.type].dmg/12)){m.vx=dx/d*160;m.vy=dy/d*160;m.stun=0.7;m.lunge=0;m.wind=0}}}
+function rivalLure(m,d,spd){if(!RIVAL_DAMAGE||!rival||!rivalOn()||rival.fin||!rivBet||!rivBet.done||m.asleep)return null;const rx=rival.x-m.x,ry=rival.y-m.y,rd=Math.hypot(rx,ry)||1;return rd<d&&rd<T*RIVAL_HIT.lure?[rx/rd*spd,ry/rd*spd]:null}
 function rivalOn(){return RIVAL_RACE&&!!tunPath&&!!cfg&&!!cfg.tunnel}
 function rivalInit(){rival=null;rivBet=null;if(!rivalOn())return;
   rival={i:1.5,pi:0,x:0,y:0,a:0,lane:1,dig:false,dt:0,cd:0,tt:9,cap:null,used:[],lead:0,ovT:-99,fin:0,settled:false,res:null,delta:0,bumped:0,pt:0};rivalPlace();
@@ -2925,12 +2939,12 @@ function rivalSettle(win){if(!rival||rival.settled||!rivBet||!rivBet.done)return
   rival.settled=true;rival.res=win?'win':'lose';rival.delta=d;if(typeof lvStats==='object'&&lvStats)lvStats.rival={win,bet:b,d};saveProg()}
 function rivalTick(dt){if(!rivalOn()||!rival||!rivBet||!rivBet.done||arr)return;const P=tunPath,N=P.length;
   let best=1e18,bi=rival.pi;for(let j=Math.max(0,rival.pi-25);j<Math.min(N,rival.pi+45);j++){const q=P[j],dx=(q[0]+0.5)*T-ship.x,dy=(q[1]+0.5)*T-ship.y,dd=dx*dx+dy*dy;if(dd<best){best=dd;bi=j}}rival.pi=bi;
-  rival.cd=Math.max(0,rival.cd-dt);
+  rival.cd=Math.max(0,rival.cd-dt);if(RIVAL_DAMAGE)rivalDmgTick(dt);const so=RIVAL_DAMAGE&&rival.so>0;
   if(!rival.fin){const g=rival.i-rival.pi,late=rival.i/N>0.85,m=clamp(1-g*RIVAL_RB,late?0.8:0.5,late?1.15:1.45),j=Math.min(N-1,Math.floor(rival.i)+1),q=P[j];
     rival.dig=map[q[1]*MW+q[0]]===ROCK;
-    if(rival.dig){rival.dt+=dt;rival.lane=Math.max(0,rival.lane-dt*3);if(Math.random()<dt*30)parts.push({x:rival.x+Math.cos(rival.a)*22+rnd(-6,6),y:rival.y+Math.sin(rival.a)*22+rnd(-6,6),vx:rnd(-40,40),vy:rnd(-40,40),life:0.5,max:0.5,c:'#b08a52',s:2.5,drag:2,g:1});
+    if(rival.dig){rival.dt+=so?0:dt;rival.lane=Math.max(0,rival.lane-dt*3);if(Math.random()<dt*30)parts.push({x:rival.x+Math.cos(rival.a)*22+rnd(-6,6),y:rival.y+Math.sin(rival.a)*22+rnd(-6,6),vx:rnd(-40,40),vy:rnd(-40,40),life:0.5,max:0.5,c:'#b08a52',s:2.5,drag:2,g:1});
       if(rival.dt>=RIVAL_DIG){rival.dt=0;breakTile(q[0],q[1],true)}}
-    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt)}
+    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt*(so?0.12:1))}
     if(rival.i>=N-1){rival.fin=gameT||0.001;rivalSay(RIVAL_LINES.win);toast('VARRO REACHED THE RELAY FIRST',null,null,RIVAL_YEL)}
     const ld=rival.i-rival.pi>2?1:rival.i-rival.pi<-2?-1:rival.lead;if(ld!==rival.lead){if(rival.lead!==0&&gameT-rival.ovT>6){rivalSay(ld>0?RIVAL_LINES.pass:RIVAL_LINES.passed);rival.ovT=gameT}rival.lead=ld}}
   rivalPlace();
@@ -2950,7 +2964,8 @@ function rivalTex(){if(rivTexC)return rivTexC;if(!shipTexOn())return null;const 
     g.save();g.translate(300,205);g.rotate(Math.PI/2);g.globalAlpha=0.95;g.drawImage(ic,-s/2,-s/2);g.restore()}
   rivTexC=c;return c}
 function rivalLights(light){if(!rival)return;light(rival.x,rival.y,90,0.85);light(rival.x+Math.cos(rival.a)*60,rival.y+Math.sin(rival.a)*60,120,0.35)}
-function rivalDraw(t){if(!rivalOn()||!rival)return;drawShip(rival.x,rival.y,rival.a,'hover',t,HANDLING.vis,{fit:1,plume:HANDLING.plume,en:100,drill:rival.dig?1:0,drilling:rival.dig,thr:rival.dig||rival.fin||!(rivBet&&rivBet.done)?0.15:0.75,spin:t*12,tex:rivalTex(),glow:rivalGlow()});
+function rivalDraw(t){if(!rivalOn()||!rival)return;drawShip(rival.x,rival.y,rival.a+(RIVAL_DAMAGE&&rival.spa||0),'hover',t,HANDLING.vis,{fit:1,plume:HANDLING.plume,en:100,drill:rival.dig?1:0,drilling:rival.dig,thr:rival.dig||rival.fin||!(rivBet&&rivBet.done)?0.15:0.75,spin:t*12,tex:rivalTex(),glow:rivalGlow()});
+  if(RIVAL_DAMAGE&&rival.hf>0){ctx.globalCompositeOperation='lighter';glowAt(ctx,rival.x,rival.y,48,'255,200,90',rival.hf*2.4);ctx.globalCompositeOperation='source-over'}
   ctx.save();ctx.textAlign='center';ctx.font=`bold 10px ${FW}`;ctx.fillStyle=RIVAL_YEL;ctx.globalAlpha=0.85;ctx.fillText('VARRO',rival.x,rival.y+34);ctx.globalAlpha=1;
   if(rival.cap){const s=rival.cap.text,fs=touchMode?12:13;ctx.font=`${fs}px ${FB}`;const L=wrapLines(s,200),w=Math.max(...L.map(l=>ctx.measureText(l).width))+16,h=L.length*(fs+3)+10,x=clamp(rival.x-w/2,cam.x+6,cam.x+W-w-6),y=Math.max(cam.y+6,rival.y-40-h);
     ctx.globalAlpha=Math.min(1,rival.cap.t*2);ctx.fillStyle='rgba(18,16,12,0.85)';rrect(x,y,w,h,5);ctx.fill();ctx.strokeStyle=RIVAL_YEL;ctx.lineWidth=1;ctx.stroke();ctx.fillStyle='#f4e6c0';L.forEach((l,k)=>ctx.fillText(l,x+w/2,y+fs+3+k*(fs+3)))}

@@ -1144,6 +1144,63 @@ function dossierIns(d){return{porF:'guild',porD:'droid',porR:'rsf',porV:d.tone==
 function spr(n,x,y,a,sc=1,sy){const s=SPR[n];if(!sprOK(n))return false;sy=sy==null?sc:sy;ctx.save();ctx.translate(x,y);if(a)ctx.rotate(a);ctx.drawImage(s.img,-s.ox*sc,-s.oy*sy,s.w*sc,s.h*sy);ctx.restore();return true}
 // SHIP_V3_PAINTED: Naboo mining craft (painted top-down, nose = +x). No turret: a fixed belly cannon pokes out under the nose.
 // o:{drill 0..1, thr 0..1, spin, mf muzzle flash, chomp, drilling}
+// SHIP_SCORPION: Justin's approved redesign (ship-scorpion/c3-drill-arms.jpg). Matte black faceted armor with thin yellow plate lines,
+// squared scorpion-like carapace, slit cockpit at the nose, twin mint engines at the rear, two bulky segmented arms reaching straight forward,
+// each ending in a drill bit that spins while burrowing or mining. No legs, no tail. Drawn procedurally inside the old sprite's footprint
+// (hitbox, handling, muzzle and lamp points unchanged). Revert: SHIP_SCORPION=false
+const SHIP_SCORPION=true;
+const SCORP={body:[[-27,-8],[-20,-12],[-6,-12.5],[4,-11],[12,-7],[17,-4],[19.5,-1.6],[19.5,1.6],[17,4],[12,7],[4,11],[-6,12.5],[-20,12],[-27,8]],
+  plates:[// [polygon, shade]
+   [[[-12,-5],[-4,-7.2],[4,-5],[4,5],[-4,7.2],[-12,5]],'#29292d'],
+   [[[4,-5],[12,-7],[17,-4],[17,4],[12,7],[4,5]],'#222226'],
+   [[[-20,-12],[-6,-12.5],[-4,-7.2],[-12,-5],[-18,-6.5]],'#1f1f23'],[[[-20,12],[-6,12.5],[-4,7.2],[-12,5],[-18,6.5]],'#1f1f23'],
+   [[[-6,-12.5],[4,-11],[12,-7],[4,-5],[-4,-7.2]],'#26262a'],[[[-6,12.5],[4,11],[12,7],[4,5],[-4,7.2]],'#26262a'],
+   [[[-27,-8],[-20,-12],[-18,-6.5],[-12,-5],[-12,5],[-18,6.5],[-20,12],[-27,8]],'#1c1c20']],
+  lines:[[[-27,0],[-12,0]],[[-18,-6.5],[-18,6.5]],[[-4,-7.2],[-6,-12.5]],[[-4,7.2],[-6,12.5]],[[4,-5],[12,-7]],[[4,5],[12,7]],[[-12,-5],[-20,-12]],[[-12,5],[-20,12]]],
+  arm:{y:13.6,h:8,segs:[[-6,0.6],[1.4,8.6],[9.4,17]],tip:17.4,len:8.8}};
+let scorpCv=null;const SCORP_K=8,SCORP_OX=38,SCORP_OY=20;
+function scorpPoly(g,P){g.beginPath();P.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath()}
+function scorpBuild(){const c=document.createElement('canvas');c.width=68*SCORP_K;c.height=40*SCORP_K;const g=c.getContext('2d');g.scale(SCORP_K,SCORP_K);g.translate(SCORP_OX,SCORP_OY);g.lineJoin='round';
+  const YL='rgba(226,168,36,0.9)',RIM='rgba(120,124,136,0.55)';
+  // arms (behind the carapace): chunky segments with chamfered ends, yellow seam trim
+  for(const s of[-1,1]){const A=SCORP.arm,cy=s*A.y,h=A.h;
+    g.fillStyle='#141416';g.fillRect(-9,cy-h*0.32,A.tip+9,h*0.64);// inner strut
+    A.segs.forEach(([x0,x1],k)=>{const hh=h*(0.46+k*0.03),ch=1.5;const P=[[x0,cy-hh+ch],[x0+ch,cy-hh],[x1-ch,cy-hh],[x1,cy-hh+ch],[x1,cy+hh-ch],[x1-ch,cy+hh],[x0+ch,cy+hh],[x0,cy+hh-ch]];
+      scorpPoly(g,P);const gr=g.createLinearGradient(0,cy-hh,0,cy+hh);gr.addColorStop(0,'#2c2c31');gr.addColorStop(0.5,'#1d1d21');gr.addColorStop(1,'#121214');g.fillStyle=gr;g.fill();
+      g.strokeStyle='#050506';g.lineWidth=0.5;g.stroke();const q=1.05,I=[[x0+q,cy-hh+ch+q*0.4],[x0+ch+q*0.4,cy-hh+q],[x1-ch-q*0.4,cy-hh+q],[x1-q,cy-hh+ch+q*0.4],[x1-q,cy+hh-ch-q*0.4],[x1-ch-q*0.4,cy+hh-q],[x0+ch+q*0.4,cy+hh-q],[x0+q,cy+hh-ch-q*0.4]];
+      scorpPoly(g,I);g.strokeStyle=YL;g.lineWidth=0.3;g.stroke();g.strokeStyle='rgba(255,255,255,0.08)';g.lineWidth=0.4;g.beginPath();g.moveTo(x0+ch,cy-hh+0.25);g.lineTo(x1-ch,cy-hh+0.25);g.stroke();
+      g.fillStyle='#0a0a0b';g.fillRect((x0+x1)/2-1.2,cy-0.5,2.4,1)});
+    // shoulder joint into the carapace
+    scorpPoly(g,[[-9,s*9.5],[-3,s*9.2],[-1,s*11],[-1,s*15.4],[-8,s*15.4]]);g.fillStyle='#1a1a1d';g.fill();g.strokeStyle='#060607';g.lineWidth=0.45;g.stroke();
+    // drill collar
+    g.fillStyle='#3a3a40';g.fillRect(A.tip-0.6,cy-h*0.36,1.4,h*0.72);g.strokeStyle=YL;g.lineWidth=0.35;g.strokeRect(A.tip-0.6,cy-h*0.36,1.4,h*0.72)}
+  // carapace
+  scorpPoly(g,SCORP.body);g.fillStyle='#18181b';g.fill();
+  for(const[P,c]of SCORP.plates){scorpPoly(g,P);g.fillStyle=c;g.fill()}
+  // facet light from the upper left
+  scorpPoly(g,SCORP.body);g.save();g.clip();const fl=g.createLinearGradient(-20,-12,10,12);fl.addColorStop(0,'rgba(255,255,255,0.07)');fl.addColorStop(0.5,'rgba(255,255,255,0)');fl.addColorStop(1,'rgba(0,0,0,0.25)');g.fillStyle=fl;g.fillRect(-30,-14,52,28);g.restore();
+  // yellow plate lines
+  for(const[P]of SCORP.plates){scorpPoly(g,P);g.strokeStyle='#060607';g.lineWidth=0.55;g.stroke()}g.strokeStyle=YL;g.lineWidth=0.32;for(const[P]of SCORP.plates.slice(0,2)){scorpPoly(g,P);g.stroke()}
+  g.lineWidth=0.3;g.beginPath();for(const[[a,b],[c,d]]of SCORP.lines){g.moveTo(a,b);g.lineTo(c,d)}g.stroke();
+  // vents + rivets
+  g.fillStyle='#0b0b0c';for(const s of[-1,1])for(let k=0;k<3;k++)g.fillRect(-9+k*1.5,s*8.6-0.9,0.8,1.8);
+  g.fillStyle='rgba(170,170,180,0.5)';for(const[x,y]of[[-24,-6],[-24,6],[-2,-10.5],[-2,10.5],[9,-7.5],[9,7.5]])g.fillRect(x-0.3,y-0.3,0.6,0.6);
+  // engine housings (twin, at the rear)
+  for(const s of[-1,1]){const P=[[-34,s*1.8],[-34,s*7],[-30,s*8.4],[-26.5,s*8],[-26.5,s*1.8]];scorpPoly(g,P);g.fillStyle='#1e1e22';g.fill();g.strokeStyle=YL;g.lineWidth=0.4;g.stroke()}
+  // slit cockpit
+  scorpPoly(g,[[12.6,-2.7],[17.8,-1.5],[17.8,1.5],[12.6,2.7]]);const cg=g.createLinearGradient(12.6,-2.7,17.8,2.7);cg.addColorStop(0,'#2d5a48');cg.addColorStop(0.5,'#0f2a22');cg.addColorStop(1,'#07140f');g.fillStyle=cg;g.fill();g.strokeStyle=YL;g.lineWidth=0.45;g.stroke();
+  g.strokeStyle='rgba(190,255,225,0.45)';g.lineWidth=0.35;g.beginPath();g.moveTo(13.4,-1.9);g.lineTo(17,-1.1);g.stroke();
+  // silhouette rim so the black hull reads against dark rock
+  scorpPoly(g,SCORP.body);g.strokeStyle=RIM;g.lineWidth=0.55;g.stroke();g.save();scorpPoly(g,SCORP.body);g.clip();g.strokeStyle='rgba(255,255,255,0.05)';g.lineWidth=0.3;for(let i=0;i<40;i++){const x=-26+((i*37)%45),y=-11+((i*53)%22);g.beginPath();g.moveTo(x,y);g.lineTo(x+1.2,y+0.4);g.stroke()}g.restore();
+  return c}
+function scorpDrill(cx,cy,len,r,ph,spinning){// cone pointing +x, spiral flutes scroll with ph
+  ctx.save();ctx.beginPath();ctx.moveTo(cx,cy-r);ctx.lineTo(cx+len,cy);ctx.lineTo(cx,cy+r);ctx.closePath();const g=ctx.createLinearGradient(0,cy-r,0,cy+r);g.addColorStop(0,'#c9ccd2');g.addColorStop(0.45,'#7b7f88');g.addColorStop(1,'#2b2d32');ctx.fillStyle=g;ctx.fill();ctx.clip();
+  ctx.strokeStyle='rgba(20,20,24,0.85)';ctx.lineWidth=0.75;const step=2.4,o=((ph%step)+step)%step;for(let x=cx-step+o;x<cx+len;x+=step){ctx.beginPath();ctx.moveTo(x,cy-r);ctx.lineTo(x+1.6,cy+r);ctx.stroke()}
+  ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=0.4;for(let x=cx-step+o+0.5;x<cx+len;x+=step){ctx.beginPath();ctx.moveTo(x,cy-r);ctx.lineTo(x+1.6,cy+r);ctx.stroke()}ctx.restore()}
+function scorpHull(t,o,dp){if(!scorpCv)scorpCv=scorpBuild();ctx.drawImage(scorpCv,-SCORP_OX,-SCORP_OY,68,40);
+  const A=SCORP.arm,spinning=!!o.drilling||dp>0.3,ph=spinning?t*(o.drilling?30:14):0;
+  for(const s of[-1,1]){const cy=s*A.y,jit=o.drilling?Math.sin(t*90+s)*0.15:0;scorpDrill(A.tip+0.8+jit,cy,A.len,3.1,ph*(s>0?1:1),spinning);
+    if(o.drilling){ctx.globalCompositeOperation='lighter';const tx=A.tip+0.8+A.len,gg=ctx.createRadialGradient(tx,cy,0,tx,cy,6);gg.addColorStop(0,'rgba(200,240,255,0.55)');gg.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gg;ctx.beginPath();ctx.arc(tx,cy,6,0,6.283);ctx.fill();ctx.globalCompositeOperation='source-over'}}}
 const SHIP_NOSE=22.4,SHIP_RING=-33.6,SHIP_GUN=26.2,SHIP_WING=[-7.3,15.5];/* SHIP2: armored working hauler, 56u ring-to-nose */
 function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const dp=clamp(o.drill!=null?o.drill:(hov?0:1),0,1);
   const thr=o.thr!=null?o.thr:0.35,spin=o.spin!=null?o.spin:t*12;
@@ -1159,9 +1216,9 @@ function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const
   {const r=o.mf>0?-0.9:0;ctx.fillStyle='#1d1b1a';ctx.fillRect(8+r,-1.25,SHIP_GUN-8,2.5);const g=ctx.createLinearGradient(0,-1.2,0,1.2);g.addColorStop(0,'#8d8780');g.addColorStop(0.5,'#4a4643');g.addColorStop(1,'#252321');ctx.fillStyle=g;ctx.fillRect(8+r,-1,SHIP_GUN-8.4,2);
     ctx.fillStyle='#0b0a0a';ctx.fillRect(SHIP_GUN-1+r,-1.35,1.1,2.7);ctx.fillStyle='rgba(200,150,110,0.55)';ctx.fillRect(SHIP_GUN-3.2+r,-1.05,0.6,2.1)}
   // painted hull
-  const S=SPR.ship;if(sprOK('ship'))ctx.drawImage(S.img,-S.ox,-S.oy,S.w,S.h);
+  const S=SPR.ship;if(SHIP_SCORPION)scorpHull(t,o,dp);else if(sprOK('ship'))ctx.drawImage(S.img,-S.ox,-S.oy,S.w,S.h);
   // crystal drill slides out of the nose (clipped so it never shows over the hull)
-  if(dp>0.01){ctx.save();ctx.beginPath();ctx.rect(SHIP_NOSE-0.3,-8,30,16);ctx.clip();
+  if(!SHIP_SCORPION&&dp>0.01){ctx.save();ctx.beginPath();ctx.rect(SHIP_NOSE-0.3,-8,30,16);ctx.clip();
     const D=SPR.drill,bx=SHIP_NOSE-0.3-D.w*(1-dp),jit=o.drilling?Math.sin(t*90)*0.15:0;
     if(sprOK('drill'))ctx.drawImage(D.img,bx-D.ox+jit,-D.oy,D.w,D.h);
     // spinning facet glints
@@ -1177,7 +1234,7 @@ function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const
   // warm floodlight glints on the wing-tip lamp pods
   for(const s of[-1,1]){const wx=SHIP_WING[0],wy=s*SHIP_WING[1],fl=0.42+0.08*Math.sin(t*2.3+s*1.7);const g=ctx.createRadialGradient(wx,wy,0,wx,wy,2.6);g.addColorStop(0,`rgba(255,226,180,${fl})`);g.addColorStop(0.5,`rgba(255,180,110,${fl*0.3})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(wx,wy,2.6,0,6.283);ctx.fill()}
   // mint engine ring pulse
-  {const g=ctx.createRadialGradient(SHIP_RING+0.45,0,0,SHIP_RING+0.45,0,4);g.addColorStop(0,`rgba(225,255,245,${Math.min(1,0.55*pulse)})`);g.addColorStop(0.4,`rgba(90,240,200,${0.45*pulse})`);g.addColorStop(1,'rgba(20,120,110,0)');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(SHIP_RING+0.45,0,2.1,3.9,0,0,6.283);ctx.fill()}
+  for(const ey of SHIP_SCORPION?[-4.4,4.4]:[0]){const ex=SHIP_RING+0.45,er=SHIP_SCORPION?3.2:4;const g=ctx.createRadialGradient(ex,ey,0,ex,ey,er);g.addColorStop(0,`rgba(225,255,245,${Math.min(1,0.55*pulse)})`);g.addColorStop(0.4,`rgba(90,240,200,${0.45*pulse})`);g.addColorStop(1,'rgba(20,120,110,0)');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(ex,ey,SHIP_SCORPION?1.8:2.1,SHIP_SCORPION?2.6:3.9,0,0,6.283);ctx.fill()}
   // cannon muzzle flash
   if(o.mf>0){const g=ctx.createRadialGradient(SHIP_GUN+1,0,0,SHIP_GUN+1,0,6);g.addColorStop(0,`rgba(220,245,255,${Math.min(1,o.mf*12)})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(SHIP_GUN+1,0,6,0,6.283);ctx.fill()}
   ctx.globalCompositeOperation='source-over';

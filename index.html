@@ -512,19 +512,23 @@ function epStep(c){return((c-1)%5)+1}
 // (quota = count-1), exactly 2-4 burrowable shortcut walls drawn as cracked rock. Solvable without shortcuts (BFS-checked at generation). Revert: MAZE_LEVELS=false (step 3 = rescue/race)
 const MAZE_LEVELS=true;
 let mazeCrack=null,mazeInfo=null;
+// MAZE_HARDER (Justin): ~30% more complex Warrens, all from these numbers: bigger grid (cells), growing-tree carve (grow = chance to branch off an older open cell instead of the newest:
+// more forks + dead ends), lift = farthest cell so the route lengthens with the grid, shortcuts still 2-4 but together may cut the start->lift route by at most (1-keep). Revert: MAZE_HARDER=false
+const MAZE_HARDER=true,MAZE_HARD={cells:c=>Math.min(15,10+Math.floor(c/10)),grow:0.15,win:3,keep:0.6,minGain:5};
 function mazeGen(R,cells,set){const N=cells*cells,link=new Uint8Array(N*4),vis=new Uint8Array(N),st=[0],DX=[1,0,-1,0],DY=[0,1,0,-1];vis[0]=1;
   for(let y=2;y<MH-2;y++)for(let x=2;x<MW-2;x++)map[y*MW+x]=BED;
   const room=(cx,cy)=>{const ox=3+cx*4,oy=3+cy*4;for(let a=0;a<2;a++)for(let b=0;b<2;b++)map[(oy+b)*MW+ox+a]=FLOOR};
   const wall=(cx,cy,d)=>{const ox=3+cx*4,oy=3+cy*4,o=[];for(let j=2;j<4;j++)for(let k=0;k<2;k++)o.push(d===0?(oy+k)*MW+ox+j:d===1?(oy+j)*MW+ox+k:d===2?(oy+k)*MW+ox-j+1:(oy-j+1)*MW+ox+k);return o};
-  room(0,0);while(st.length){const c=st[st.length-1],cx=c%cells,cy=(c/cells)|0,nb=[];for(let d=0;d<4;d++){const nx=cx+DX[d],ny=cy+DY[d];if(nx>=0&&ny>=0&&nx<cells&&ny<cells&&!vis[ny*cells+nx])nb.push(d)}
-    if(!nb.length){st.pop();continue}const d=nb[(R()*nb.length)|0],n=(cy+DY[d])*cells+cx+DX[d];vis[n]=1;link[c*4+d]=1;link[n*4+(d+2)%4]=1;for(const i of wall(cx,cy,d))map[i]=FLOOR;room(n%cells,(n/cells)|0);st.push(n)}
+  room(0,0);while(st.length){const si=MAZE_HARDER&&R()<MAZE_HARD.grow?st.length-1-((R()*Math.min(st.length,MAZE_HARD.win))|0):st.length-1,c=st[si],cx=c%cells,cy=(c/cells)|0,nb=[];for(let d=0;d<4;d++){const nx=cx+DX[d],ny=cy+DY[d];if(nx>=0&&ny>=0&&nx<cells&&ny<cells&&!vis[ny*cells+nx])nb.push(d)}
+    if(!nb.length){st.splice(si,1);continue}const d=nb[(R()*nb.length)|0],n=(cy+DY[d])*cells+cx+DX[d];vis[n]=1;link[c*4+d]=1;link[n*4+(d+2)%4]=1;for(const i of wall(cx,cy,d))map[i]=FLOOR;room(n%cells,(n/cells)|0);st.push(n)}
   const cbfs=s0=>{const D=new Int16Array(N).fill(-1),q=[s0];D[s0]=0;for(let h=0;h<q.length;h++){const c=q[h];for(let d=0;d<4;d++)if(link[c*4+d]){const n=c+(d===0?1:d===2?-1:d===1?cells:-cells);if(D[n]<0){D[n]=D[c]+1;q.push(n)}}}return D};
   const D0=cbfs(0);let pc=0;for(let c=0;c<N;c++)if(D0[c]>D0[pc])pc=c;
   // shortcuts: unlinked walls that cut the most off the routes from the start to the lift + dead ends (where crystals go), spread apart; 2-4 of them, bedrock -> cracked soft rock
   const obj=[pc];for(let c=1;c<N;c++){let k=0;for(let d=0;d<4;d++)k+=link[c*4+d];if(k===1&&c!==pc)obj.push(c)}
-  const want=2+((R()*3)|0),cand=[];for(let c=0;c<N;c++){const cx=c%cells,cy=(c/cells)|0;for(const d of[0,1]){const nx=cx+DX[d],ny=cy+DY[d];if(nx>=cells||ny>=cells||link[c*4+d])continue;const n=ny*cells+nx;if(Math.abs(D0[n]-D0[c])<5)continue;link[c*4+d]=link[n*4+d+2]=1;const D1=cbfs(0);link[c*4+d]=link[n*4+d+2]=0;let save=0;for(const o of obj)save+=D0[o]-D1[o];if(save>0)cand.push({c,d,n,save,r:R()})}}
+  const want=2+((R()*3)|0),cand=[];for(let c=0;c<N;c++){const cx=c%cells,cy=(c/cells)|0;for(const d of[0,1]){const nx=cx+DX[d],ny=cy+DY[d];if(nx>=cells||ny>=cells||link[c*4+d])continue;const n=ny*cells+nx;if(Math.abs(D0[n]-D0[c])<(MAZE_HARDER?MAZE_HARD.minGain:5))continue;link[c*4+d]=link[n*4+d+2]=1;const D1=cbfs(0);link[c*4+d]=link[n*4+d+2]=0;let save=0;for(const o of obj)save+=D0[o]-D1[o];if(save>0)cand.push({c,d,n,save,r:R()})}}
   cand.sort((a,b)=>b.save-a.save||a.r-b.r);const cut=[];mazeCrack=new Set();
-  for(const sp of[cells*0.45,cells*0.3,2,0])for(const k of cand){if(cut.length>=want)break;if(cut.includes(k))continue;const kx=k.c%cells,ky=(k.c/cells)|0;if(!cut.every(o=>Math.abs(o.c%cells-kx)+Math.abs(((o.c/cells)|0)-ky)>=sp))continue;cut.push(k)}
+  const lk=(k,v)=>{link[k.c*4+k.d]=link[k.n*4+k.d+2]=v},floorP=Math.ceil(D0[pc]*MAZE_HARD.keep),okCut=k=>{if(!MAZE_HARDER)return true;for(const o of cut)lk(o,1);lk(k,1);const D=cbfs(0);for(const o of cut)lk(o,0);lk(k,0);return D[pc]>=floorP};
+  for(const sp of[cells*0.45,cells*0.3,2,0])for(const k of cand){if(cut.length>=want)break;if(cut.includes(k))continue;const kx=k.c%cells,ky=(k.c/cells)|0;if(!cut.every(o=>Math.abs(o.c%cells-kx)+Math.abs(((o.c/cells)|0)-ky)>=sp))continue;if(!okCut(k))continue;cut.push(k)}
   for(const k of cut)for(const i of wall(k.c%cells,(k.c/cells)|0,k.d)){map[i]=ROCK;mazeCrack.add(i)}
   // start chamber and lift chamber (4x4: opens half a wall at most, never a new connection)
   for(let y=2;y<=5;y++)for(let x=2;x<=5;x++)map[y*MW+x]=FLOOR;const px=3+(pc%cells)*4,py=3+((pc/cells)|0)*4;for(let y=py-1;y<=py+2;y++)for(let x=px-1;x<=px+2;x++)map[y*MW+x]=FLOOR;
@@ -580,7 +584,7 @@ function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),
   else if(kind==='rescue'){cfg.crystals=Math.round(Q*0.5);cfg.rescue=Math.min(5,3+Math.floor(c/10));cfg.name='Lost Crew \u00b7 '+SECTORS[(c+3)%SECTORS.length];
     cfg.rescueLines=['Pilot! Thought we\u2019d die down here.','Another one! Tell the Guild we\u2019re still breathing.','Get me out of this hole, I\u2019m done with mining.','Watch the nests on the way back, they\u2019re everywhere.','That\u2019s all of us. Go, go!']}
   else if(kind==='heavy'){const R=mulberry((Math.imul(c,2246822519)+11)>>>0);R();const n=3+((R()*3)|0);cfg.crystals=n;cfg.rich=n;cfg.richNeed=Math.max(3,n-1);cfg.name='Rich Vein \u00b7 '+SECTORS[(c+6)%SECTORS.length];cfg.music='tension';cfg.maxMobs=Math.min(8,epCap(c)+3)}
-  else if(kind==='maze'){const R=mulberry((Math.imul(c,1597334677)+5)>>>0);R();const n=4+((R()*3)|0);cfg.crystals=n;cfg.maze=true;cfg.mazeN=n;cfg.mazeNeed=n-1;cfg.cells=Math.min(13,9+Math.floor(c/12));cfg.name='The Warrens \u00b7 '+SECTORS[(c+2)%SECTORS.length];cfg.maxMobs=0}
+  else if(kind==='maze'){const R=mulberry((Math.imul(c,1597334677)+5)>>>0);R();const n=4+((R()*3)|0);cfg.crystals=n;cfg.maze=true;cfg.mazeN=n;cfg.mazeNeed=n-1;cfg.cells=MAZE_HARDER?MAZE_HARD.cells(c):Math.min(13,9+Math.floor(c/12));cfg.name='The Warrens \u00b7 '+SECTORS[(c+2)%SECTORS.length];cfg.maxMobs=0}
   else if(kind==='boss'){cfg.crystals=Math.round(Q*0.4);cfg.boss=true;cfg.music='tension';if(EP_BOSSGEN){cfg.pit.boss=epBossGen(c);cfg.name='Lair of '+cfg.pit.boss.name.split(' ')[0].charAt(0)+cfg.pit.boss.name.split(' ')[0].slice(1).toLowerCase()}else cfg.name='The Hive Lair'}
   else{cfg.crystals=0;cfg.tunnel=true;cfg.timed=1;cfg.cells=15;cfg.music='tension';cfg.pad='TUNNEL EXIT';cfg.name='Collapsed Haul Tunnel';cfg.spawnMul=1.4;delete cfg.maxMobs}
   if(has('pockets')&&kind!=='race'&&kind!=='heavy'){cfg.pockets=true;cfg.epPockets=Math.min(5,2+Math.floor(c/6))}

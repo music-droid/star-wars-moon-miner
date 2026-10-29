@@ -783,6 +783,7 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','ar
   unlockAudio();if(KEYMAP[k])K[KEYMAP[k]]=true;if(e.repeat)return;onKey(k)});
 function onKey(k){
   if(k==='m'){toggleMute();return}
+  if(BASECAMP_V1&&state==='camp'){campKey(k);return}
   if(state==='gate'){setState('crawl');return}
   if(state==='crawl'){setState('menu');return}
   if(state==='pan'){setState('menu');return}
@@ -797,7 +798,7 @@ function onKey(k){
   if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8&&(k==='enter'||k===' '))advance()}
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(KEYMAP[k])K[KEYMAP[k]]=false});
 addEventListener('blur',()=>{for(const k in K)K[k]=false;mouse.down=false;if(state==='play')setState('pause')});
-function screenTap(x,y){unlockAudio();if(COCKPIT_CINE&&pitShot()){pitSkip();return}if(state==='gate')setState('crawl');else if(state==='crawl'||state==='pan')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='debrief')debNext();else if(state==='pause')pauseTap(x,y);
+function screenTap(x,y){unlockAudio();if(BASECAMP_V1&&state==='camp'){campTap(x,y);return}if(COCKPIT_CINE&&pitShot()){pitSkip();return}if(state==='gate')setState('crawl');else if(state==='crawl'||state==='pan')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='debrief')debNext();else if(state==='pause')pauseTap(x,y);
   else if(state==='levelDone'&&COMPLETE_DATAPAD)doneTap(x,y);
   else if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8)advance()}
 // ICON_V1: canvas sits inside the safe area, so pointer coordinates are taken relative to it
@@ -861,7 +862,7 @@ function gpPoll(dt){if(!navigator.getGamepads)return;let pads;try{pads=navigator
       const d=Math.hypot(lx,ly)<0.5?null:Math.abs(lx)>Math.abs(ly)?(lx>0?'arrowright':'arrowleft'):(ly>0?'arrowdown':'arrowup');
       if(d!==gpDir){gpDir=d;gpDirT=0.35;if(d)onKey(d)}else if(d){gpDirT-=dt;if(gpDirT<=0){gpDirT=0.12;onKey(d)}}
       // right stick scrolls the messages log
-      if((state==='pause'||state==='levelDone')&&pausePage==='archive'&&aboutTab==='msgs'&&Math.abs(ry)>0.05)msgScroll=clamp(msgScroll+ry*700*dt,0,msgMax)}}
+      if((state==='pause'||state==='levelDone'||state==='camp')&&pausePage==='archive'&&(aboutTab==='msgs'||aboutTab==='scans')&&Math.abs(ry)>0.05)msgScroll=clamp(msgScroll+ry*700*dt,0,msgMax)}}
   gpPrev=b}
 function gpDraw(t){if(gpNote){gpNote.t+=1/60;const a=Math.min(1,gpNote.t*5,(2.8-gpNote.t)*3);if(a<=0)gpNote=null;else{ctx.save();ctx.globalAlpha=a;const sm=W<700;ctx.font=`bold ${sm?10:12}px ${FB}`;const tw=ctx.measureText(gpNote.text).width+28,x=W/2-tw/2,y=(state==='pause'||state==='paused')?6:Math.round(H*0.7);
     ctx.fillStyle='rgba(6,14,16,0.88)';ctx.strokeStyle=gpNote.c;ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,tw,26,13):ctx.rect(x,y,tw,26);ctx.fill();ctx.stroke();ctx.fillStyle=gpNote.c;ctx.textAlign='center';ctx.fillText(gpNote.text,W/2,y+17);ctx.restore()}}
@@ -905,7 +906,7 @@ function advance(){if(state==='over'){setState('menu');return}
   if(state==='levelDone'){if(level===8){markBeaten();setState('epilogue');return}if(level<=8&&cfg.debrief&&cfg.debrief.length){setState('debrief');return}level++;startLevel();return}
   if(state==='debrief'){debNext();return}
   if(state==='epilogue'){if(epiIdx<EPILOGUE.length-1){epiIdx++;epiT=0;SFX.click();return}level++;startLevel()}}
-function completeLevel(cine){const bonus=Math.round(ship.sh*5+ship.en*2+(timed?timeLeft*15:0)+level*250);score+=bonus;
+function completeLevel(cine){if(BASECAMP_V1&&level===1)campUnlock();const bonus=Math.round(ship.sh*5+ship.en*2+(timed?timeLeft*15:0)+level*250);score+=bonus;
   lvStats.bonus=bonus;lvStats.time=gameT-lvStats.t0;lvStats.kills=kills-lvStats.kills0;recordBest();
   if(score>hi){hi=score;localStorage.setItem('nm_hi',hi)}if(cine==='cave'&&COCKPIT_CINE){setState('caveIn');return}setState(COCKPIT_CINE&&cine?'docking':'levelDone');Music.play('victory')}
 
@@ -1750,7 +1751,7 @@ function stageInfo(lv){if(lv>8)return{num:'\u221e',name:'ENDLESS SECTORS',moon:'
 let stageSel=0,pausePage='main',pauseHits=[],pausePick=0,lockFlash=-9;
 function launchStage(n){unlockAudio();SFX.click();evidence=[];score=0;kills=0;level=n;startLevel()}
 function lockIcon(x,y,s,col){ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=Math.max(1.5,s*0.16);ctx.beginPath();ctx.arc(x+s/2,y+s*0.42,s*0.27,Math.PI,0);ctx.stroke();rrect(x+s*0.12,y+s*0.42,s*0.76,s*0.58,s*0.1);ctx.fill();ctx.restore()}
-function aboutTabs(cx,y,cw,t,TL){const th=Math.max(clamp(cw/18,24,34),touchMode&&cw<560?44:0);let fs=clamp(cw/18,24,34)*0.5;const tabs=(TL||ABOUT_TABS).map(id=>[id,{story:'STORY',chars:TL?'PROFILES':'CHARACTERS',creatures:cw>640?'CREATUREPEDIA':'CREATURES',art:'ARTWORK',msgs:'MESSAGES'}[id]]);let x=cx;
+function aboutTabs(cx,y,cw,t,TL){const th=Math.max(clamp(cw/18,24,34),touchMode&&cw<560?44:0);let fs=clamp(cw/18,24,34)*0.5;const tabs=(TL||ABOUT_TABS).map(id=>[id,{story:'STORY',chars:TL?'PROFILES':'CHARACTERS',creatures:cw>640?'CREATUREPEDIA':'CREATURES',art:'ARTWORK',msgs:campDesk?(cw>560?'MISSION LOGS':'LOGS'):'MESSAGES',scans:cw>560?'FOUND SCANS':'SCANS'}[id]]);let x=cx;
   ctx.font=boxFont(fs);{const tot=()=>tabs.reduce((a,[,lb])=>a+ctx.measureText(lb).width+fs*2.2+10,-10);while(tot()>cw&&fs>8){fs-=0.5;ctx.font=boxFont(fs)}}const gapX=fs*1.1;for(const[id,lb]of tabs){const lk=false,w=ctx.measureText(lb).width+gapX*2+(lk?fs*1.4:0),on=aboutTab===id;rrect(x,y,w,th,5);ctx.fillStyle=on?'#ffd21f':'rgba(40,22,12,0.85)';ctx.fill();ctx.strokeStyle=on?'#3a0a04':'rgba(255,210,31,0.6)';ctx.lineWidth=1.5;ctx.stroke();
     ctx.fillStyle=on?'#3a0a04':'#ffd21f';ctx.textAlign='left';ctx.fillText(lb,x+fs*1.1,y+th*0.68);if(lk)lockIcon(x+w-fs*2.2,y+th*0.27,fs*1.0,on?'#3a0a04':'#ffd21f');const hp=touchMode?Math.max(0,(44-th)/2):0;menuHits.push({x,y:y-hp,w,h:th+hp*2,tab:id,act:()=>{SFX.click();aboutTab=id;artPage=0;msgScroll=0}});x+=w+10}
   return y+th+Math.max(10,th*0.45)}
@@ -2091,8 +2092,8 @@ function padComm(x,y,w,h,t,c,fall){const st=dlgStyle(c.who),col=DLG_COL[st];ctx.
   let fs=sm?12.5:clamp(h*0.16,14,18);ctx.font=`${fs}px ${FB}`;let ls=wrapLines(c.text,tw);const maxL=Math.max(1,Math.floor((h-(sm?26:32))/(fs*1.3)));while(ls.length>maxL&&fs>10){fs-=0.5;ctx.font=`${fs}px ${FB}`;ls=wrapLines(c.text,tw)}
   if(ls.length>maxL){ls=ls.slice(0,maxL);ls[maxL-1]=ls[maxL-1].replace(/\s*\S*$/,'')+'\u2026'}ctx.fillStyle=col[2];ls.forEach((l,i)=>ctx.fillText(l,tx,y+(sm?26:32)+fs*0.95+i*fs*1.3));ctx.restore()}
 function padBtnRow(L,y,t,full){const bs=[['STAGE SELECT',{lock:!gameBeaten,sub:gameBeaten?'':'beat the campaign'},()=>{if(!gameBeaten){lockFlash=performance.now()/1000;SFX.click();return}SFX.click();pausePage='stages';stageSel=clamp(level<=8?level-1:8,0,8)}],
-  ['MAIN MENU',{},()=>{SFX.click();pausePage='quit'}],['ARCHIVE',{hot:true},()=>{SFX.click();padOpenArchive()}]];return bs}
-function padOpenArchive(){pausePage='archive';if(!PAD_TABS.includes(aboutTab))aboutTab='msgs';msgScroll=0;artPage=0}
+  ['MAIN MENU',{},()=>{SFX.click();pausePage='quit'}],[campOn()?'BASE CAMP':'ARCHIVE',{hot:true},()=>{SFX.click();padOpenArchive()}]];return bs}
+function padOpenArchive(){if(BASECAMP_V1&&!campDesk&&campOn()&&(state==='pause'||state==='levelDone')){campOpen(state==='pause'?'pause':'done');return}pausePage='archive';if(!PAD_TABS.includes(aboutTab))aboutTab='msgs';msgScroll=0;artPage=0}
 function drawDatapad(t){const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.78)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L;const ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2;ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();
   if(pausePage==='archive'){drawPadArchive(L,cx,cw,ip,t);ctx.restore();if(artView>=0)drawArtView(t);return}
   const land=sw>=560,tf=clamp(Math.min(sw/(sw<560?9:14),sh/9),22,48),bh=Math.max(touchMode?44:34,Math.min(48,sh*0.09));let y=sy+ip;
@@ -2125,8 +2126,8 @@ function drawPadQuit(L,t){ctx.fillStyle='rgba(2,6,4,0.75)';ctx.fillRect(L.sx,L.s
   const bh=touchMode?44:38,bw=(cw-36)/2,by=cy+ch-bh-12;padBtn(cx+12,by,bw,bh,'MAIN MENU',{hot:true},padGoMenu);padBtn(cx+24+bw,by,bw,bh,'CANCEL',{},()=>{SFX.click();pausePage='main'});
   if(!touchMode){ctx.font='11px '+FB;ctx.fillStyle='rgba(159,245,207,0.45)';ctx.textAlign='center';ctx.fillText('ENTER / Y main menu  \u00b7  ESC / N cancel',cx+cw/2,cy+ch+16)}}
 function drawPadArchive(L,cx,cw,ip,t){const{sx,sy,sw,sh}=L;let y=sy+ip;const tf=clamp(Math.min(sw/18,sh/12),18,34),bh=Math.max(touchMode?44:32,tf*1.25),bw=clamp(tf*4,96,140);
-  padChrome('ARCHIVE',cx,y+tf*0.9,tf,'left');padBtn(cx+cw-bw,y+(tf-bh)/2+2,bw,bh,'\u25c0 BACK',{},()=>{SFX.click();artView=-1;pausePage='main'});y+=Math.max(tf,bh)+ip*0.6;
-  menuHits=[];y=aboutTabs(cx,y,cw,t,PAD_TABS);const avail=sy+sh-ip-y;if(aboutTab==='art')drawArtwork(cx,y,cw,avail,t);else if(aboutTab==='chars')drawCharacters(cx,y,cw,avail,t);else if(aboutTab==='creatures')drawCreatures(cx,y,cw,avail,t);else drawMessages(cx,y,cw,avail,t)}
+  padChrome(campDesk?'DESK DATAPAD':'ARCHIVE',cx,y+tf*0.9,tf,'left');padBtn(cx+cw-bw,y+(tf-bh)/2+2,bw,bh,'\u25c0 BACK',{},()=>{SFX.click();artView=-1;pausePage='main'});y+=Math.max(tf,bh)+ip*0.6;
+  menuHits=[];y=aboutTabs(cx,y,cw,t,campDesk?CAMP_TABS:PAD_TABS);const avail=sy+sh-ip-y;if(campDesk&&aboutTab==='scans')drawScans(cx,y,cw,avail,t);else if(aboutTab==='art')drawArtwork(cx,y,cw,avail,t);else if(aboutTab==='chars')drawCharacters(cx,y,cw,avail,t);else if(aboutTab==='creatures')drawCreatures(cx,y,cw,avail,t);else drawMessages(cx,y,cw,avail,t)}
 function drawMessages(cx,y,cw,avail,t){const sm=cw<520,fs=sm?12.5:14.5,hf=sm?10:12,ins=sm?26:32,tw=cw-ins-30;
   if(!MSGLOG.length){ctx.font=`${fs}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=PAD_DIM;ctx.fillText('No transmissions logged yet.',cx+cw/2,y+40);return}
   const lvs=[...new Set(MSGLOG.map(m=>m.lv))].sort((a,b)=>b-a);const rows=[];ctx.font=`${fs}px ${FB}`;
@@ -2144,17 +2145,17 @@ function padTap(x,y){if(pausePage==='archive'){if(artView>=0){artViewTap(x,y);re
   return false}
 function padKey(k){if(pausePage==='archive'){if(artView>=0){galKey(k);return true}
     if(k==='escape'||k==='backspace'){SFX.click();pausePage='main';return true}
-    if(k==='tab'){SFX.click();aboutTab=PAD_TABS[(PAD_TABS.indexOf(aboutTab)+1)%PAD_TABS.length];artPage=0;msgScroll=0;return true}
-    if(aboutTab==='msgs'){if(k==='arrowup'||k==='w')msgScroll=clamp(msgScroll-60,0,msgMax);else if(k==='arrowdown'||k==='s')msgScroll=clamp(msgScroll+60,0,msgMax);else if(k==='pageup')msgScroll=clamp(msgScroll-300,0,msgMax);else if(k==='pagedown')msgScroll=clamp(msgScroll+300,0,msgMax);return true}
+    if(k==='tab'){SFX.click();const TB=campDesk?CAMP_TABS:PAD_TABS;aboutTab=TB[(TB.indexOf(aboutTab)+1)%TB.length];artPage=0;msgScroll=0;return true}
+    if(aboutTab==='msgs'||aboutTab==='scans'){if(k==='arrowup'||k==='w')msgScroll=clamp(msgScroll-60,0,msgMax);else if(k==='arrowdown'||k==='s')msgScroll=clamp(msgScroll+60,0,msgMax);else if(k==='pageup')msgScroll=clamp(msgScroll-300,0,msgMax);else if(k==='pagedown')msgScroll=clamp(msgScroll+300,0,msgMax);return true}
     if(/^(arrow|[wasd]$)/.test(k)||(aboutTab==='art'&&(k==='enter'||k===' '))){const mp=menuPage;menuPage='about';menuKey(k);menuPage=mp}return true}
   if(pausePage==='quit'){if(k==='enter'||k==='y')padGoMenu();else if(k==='escape'||k==='n'||k==='backspace'){SFX.click();pausePage='main'}return true}
   if(pausePage==='main'){if(k==='q'){SFX.click();pausePage='quit';return true}if(k==='a'){SFX.click();padOpenArchive();return true}
     if(k==='tab'||k==='arrowright'||k==='arrowleft'){SFX.click();padSel=k==='arrowleft'?(padSel+2)%3:(padSel+1)%3;return true}
     if((k==='enter'||k===' ')&&padSel>=0){const h=pauseHits.filter(h=>h.pad)[padSel];if(h)h.act();return true}}
   return false}
-addEventListener('wheel',e=>{if((state==='pause'||state==='levelDone')&&pausePage==='archive'&&aboutTab==='msgs'&&artView<0)msgScroll=clamp(msgScroll+e.deltaY,0,msgMax)},{passive:true});
-cv.addEventListener('touchstart',e=>{if((state==='pause'||state==='levelDone')&&pausePage==='archive'&&aboutTab==='msgs'&&e.touches.length===1)msgTY=e.touches[0].clientY},{passive:true});
-cv.addEventListener('touchmove',e=>{if(msgTY!=null&&(state==='pause'||state==='levelDone')){const y=e.touches[0].clientY;msgScroll=clamp(msgScroll+(msgTY-y),0,msgMax);msgTY=y}},{passive:true});
+addEventListener('wheel',e=>{if((state==='pause'||state==='levelDone'||state==='camp')&&pausePage==='archive'&&(aboutTab==='msgs'||aboutTab==='scans')&&artView<0)msgScroll=clamp(msgScroll+e.deltaY,0,msgMax)},{passive:true});
+cv.addEventListener('touchstart',e=>{if((state==='pause'||state==='levelDone'||state==='camp')&&pausePage==='archive'&&(aboutTab==='msgs'||aboutTab==='scans')&&e.touches.length===1)msgTY=e.touches[0].clientY},{passive:true});
+cv.addEventListener('touchmove',e=>{if(msgTY!=null&&(state==='pause'||state==='levelDone'||state==='camp')){const y=e.touches[0].clientY;msgScroll=clamp(msgScroll+(msgTY-y),0,msgMax);msgTY=y}},{passive:true});
 cv.addEventListener('touchend',()=>{msgTY=null},{passive:true});
 
 // COMPLETE_DATAPAD_V1: MISSION COMPLETE screen in the pause-datapad style (reuses padFrame/padBtn/padChrome/padLeader/padComm/drawPadArchive). false = old overlay.
@@ -2165,7 +2166,7 @@ const DONE_LINES={1:['F','Full quota on the lift and my drill came back in one p
   8:['R','Transmission received. Royal Security is moving on Vosh now. The Senator flies safe because of you.']};
 if(M7_V2)DONE_LINES[7]=['F','Out from under the queen and a collapsing tunnel, all in one shift. Kid\u2026 I owe you a drink. Several.'];
 if(M6_CAVEIN)DONE_LINES[6]=['R','Vosh. A Guild survey chief running an agitator cell, and now he\u2019s trying to bury you with the evidence. Follow that service tunnel, miner. I\u2019ll find you a way out.'];
-function doneComm(){const d=level<=8&&cfg&&cfg.debrief&&cfg.debrief.length?cfg.debrief[0]:DONE_LINES[level]||['F','Sector cleared and the hauler\u2019s full. Lift\u2019s heading back down for the next one, kid.'];return{who:d[0],text:d[1],tag:'DEBRIEF'}}
+function doneComm(){if(BASECAMP_V1&&level===1)return{who:'S',text:'Nice work, kid. Base Camp is off the hauler deck: bunk, desk, a window on Naboo. Go take a look. I\u2019d like you settled in.',tag:'BASE CAMP'};const d=level<=8&&cfg&&cfg.debrief&&cfg.debrief.length?cfg.debrief[0]:DONE_LINES[level]||['F','Sector cleared and the hauler\u2019s full. Lift\u2019s heading back down for the next one, kid.'];return{who:d[0],text:d[1],tag:'DEBRIEF'}}
 function doneMetrics(){const ms=[];if(need)ms.push(['CRYSTALS',`${got}/${need}`]);if(intelTotal)ms.push(['INTEL',`${intelGot}/${intelTotal}`]);if(rescueNeed)ms.push(['SURVIVORS',`${rescued}/${rescueNeed}`]);if(cratesTotal)ms.push(['CRATES',`${cratesGot}/${cratesTotal}`]);
   const tm=(lvStats&&lvStats.time)||0;ms.push(['TIME',`${Math.floor(tm/60)}:${String(Math.floor(tm%60)).padStart(2,'0')}`]);ms.push(['CREATURES',String((lvStats&&lvStats.kills)||0)]);ms.push(['SHIELDS',Math.round(ship?Math.max(0,ship.sh):0)+'%']);return ms}
 function doneScores(){const s0=(lvStats&&lvStats.s0)||0,ms=lvStats&&lvStats.ms!=null?lvStats.ms:Math.max(0,score-s0),bonus=(lvStats&&lvStats.bonus)||0,r=[];
@@ -2178,7 +2179,7 @@ function doneCanStages(){return gameBeaten||level===8}
 function doneNext(){if(stateT<0.8)return;SFX.click();advance()}
 function doneStages(){if(!doneCanStages()){lockFlash=performance.now()/1000;SFX.click();return}SFX.click();if(level===8&&!gameBeaten)markBeaten();const ns=clamp(level<=8?level%9:8,0,8);setState('menu');menuPage='stages';stageSel=ns;menuHits=[];if(H<520&&W>H)ap.style.display='none'}
 function doneMenu(){if(level===8&&!gameBeaten)markBeaten();padGoMenu()}
-function doneBtns(){return[[level===8?'CONTINUE':level<8?'NEXT MISSION':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],['ARCHIVE',{},()=>{SFX.click();padOpenArchive()}]]}
+function doneBtns(){return[[level===8?'CONTINUE':level<8?'NEXT MISSION':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],[campOn()?'BASE CAMP':'ARCHIVE',{hot:level===1&&campOn()},()=>{SFX.click();padOpenArchive()}]]}
 function drawComplete(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.8)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L;const ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2;ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();
   if(pausePage==='archive'){drawPadArchive(L,cx,cw,ip,t);ctx.restore();if(artView>=0)drawArtView(t);return}
   const land=sw>=560,short=land&&sh<380,title=level===8?'EVIDENCE TRANSMITTED':level>8?'SECTOR CLEARED':'MISSION COMPLETE',tf=clamp(Math.min(sw/(land?18:12.5),sh/(short?12:10)),18,44),bh=Math.max(touchMode?44:34,Math.min(46,sh*0.085));let y=sy+ip;
@@ -2209,6 +2210,110 @@ function doneKey(k){if(pausePage==='archive'){padKey(k);return}
   if(k==='n'){doneNext();return}if(k==='s'){doneStages();return}if(k==='q'){doneMenu();return}if(k==='a'){SFX.click();padOpenArchive();return}
   if(k==='tab'||k==='arrowright'||k==='arrowleft'){SFX.click();padSel=k==='arrowleft'?(padSel+3)%4:(padSel+1)%4}}
 
+// BASECAMP_V1 (Justin): the pause / mission-complete ARCHIVE becomes BASE CAMP after Mission 1 (Vosh suggests it on the M1 debrief).
+// A painted crew room with a viewport onto a distant Naboo, and tappable stations: COT (rest -> next mission / back to the mission),
+// DESK (datapad: characters, creatures, mission logs, found scans, artwork), LOCKER (locked until the campaign is beaten; gear coming),
+// HANGAR (ship paint, coming soon) and COMM STATION (character talks, coming soon). Set BASECAMP_V1=false for the old ARCHIVE.
+const BASECAMP_V1=true;
+const CAMP_TABS=['chars','creatures','msgs','scans','art'];
+let campFrom='done',campPage='room',campSel=1,campHits=[],campFade=-1,campDesk=false,campStars=null,campT0=0;
+function campOn(){return BASECAMP_V1&&!!(PROG.camp||gameBeaten||PROG.best[1])}
+function campUnlock(){if(!BASECAMP_V1||PROG.camp)return;PROG.camp=1;saveProg();toast('BASE CAMP UNLOCKED',null,null,'#ffbe55')}
+function campOpen(from){campFrom=from;campPage='room';campDesk=false;campFade=-1;campHits=[];campT0=performance.now()/1000;artView=-1;setState('camp');ap.style.display='none'}
+function campLeave(){SFX.click();campDesk=false;campPage='room';if(campFrom==='pause')setState('pause');else{setState('levelDone')}}
+function campStations(){const beat=gameBeaten;return[
+  {id:'comm',lb:'COMM STATION',sub:'talks coming soon',act:()=>{SFX.click();campPage='comm'}},
+  {id:'cot',lb:'COT',sub:campFrom==='pause'?'rest \u00b7 back to the mission':level>=8?'rest \u00b7 continue':'rest \u00b7 next mission',hot:true,act:campRest},
+  {id:'desk',lb:'DESK',sub:'datapad archive',hot:true,act:()=>{SFX.click();campPage='desk';campDesk=true;pausePage='archive';if(!CAMP_TABS.includes(aboutTab))aboutTab='msgs';msgScroll=0;artPage=0;menuHits=[]}},
+  {id:'closet',lb:'LOCKER',sub:beat?'gear coming soon':'beat the campaign',lock:!beat,act:()=>{SFX.click();campPage='closet'}},
+  {id:'hangar',lb:'HANGAR',sub:'ship paint coming soon',act:()=>{SFX.click();campPage='hangar'}}]}
+function campRest(){if(campFade>=0)return;SFX.click();campFade=0}
+function campRestDone(){campFade=-1;campDesk=false;campPage='room';if(campFrom==='pause'){setState('play')}else{setState('levelDone');stateT=1;advance()}}
+function campLayout(){const land=W>=H*1.05,top=Math.max(8,Math.min(W,H)*0.02);let vp,st;
+  if(land){vp={x:W*0.2,y:H*0.08,w:W*0.42,h:H*0.4};st={comm:[0.02,0.42,0.14,0.26],cot:[0.18,0.66,0.22,0.2],desk:[0.43,0.58,0.19,0.28],closet:[0.66,0.3,0.12,0.38],hangar:[0.81,0.22,0.17,0.46]}}
+  else{vp={x:W*0.07,y:H*0.09,w:W*0.86,h:H*0.22};st={comm:[0.03,0.42,0.28,0.13],closet:[0.36,0.36,0.28,0.19],hangar:[0.69,0.34,0.28,0.21],cot:[0.04,0.68,0.44,0.14],desk:[0.53,0.64,0.43,0.18]}}
+  for(const k in st){const s=st[k];st[k]={x:s[0]*W,y:s[1]*H,w:s[2]*W,h:s[3]*H}}return{land,vp,st,top,floor:land?H*0.52:H*0.37}}
+function campNaboo(x,y,r,t){ctx.save();const at=ctx.createRadialGradient(x,y,r*0.9,x,y,r*1.5);at.addColorStop(0,'rgba(120,200,255,0.35)');at.addColorStop(1,'rgba(120,200,255,0)');ctx.fillStyle=at;ctx.beginPath();ctx.arc(x,y,r*1.5,0,6.283);ctx.fill();
+  ctx.beginPath();ctx.arc(x,y,r,0,6.283);ctx.clip();const g=ctx.createRadialGradient(x-r*0.4,y-r*0.4,r*0.1,x,y,r);g.addColorStop(0,'#7fc6a0');g.addColorStop(0.5,'#3f8a6a');g.addColorStop(1,'#1d4a5a');ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);
+  ctx.fillStyle='rgba(40,90,160,0.55)';for(let i=0;i<5;i++){const a=i*1.7+t*0.02;ctx.beginPath();ctx.ellipse(x+Math.cos(a)*r*0.5,y+Math.sin(a*1.3)*r*0.45,r*0.35,r*0.18,a,0,6.283);ctx.fill()}
+  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=Math.max(1,r*0.06);for(let i=0;i<4;i++){const yy=y-r*0.6+i*r*0.4,o=((t*0.03+i*0.3)%1)*r*2;ctx.beginPath();ctx.moveTo(x-r+o-r,yy);ctx.bezierCurveTo(x-r*0.3+o-r,yy-r*0.12,x+r*0.2+o-r,yy+r*0.12,x+r+o-r,yy);ctx.stroke()}
+  const sh=ctx.createLinearGradient(x-r*0.3,y-r*0.3,x+r,y+r);sh.addColorStop(0,'rgba(0,0,0,0)');sh.addColorStop(0.55,'rgba(0,0,10,0.25)');sh.addColorStop(1,'rgba(0,0,10,0.9)');ctx.fillStyle=sh;ctx.fillRect(x-r,y-r,r*2,r*2);ctx.restore()}
+function campViewport(v,t){if(!campStars){campStars=[];for(let i=0;i<120;i++)campStars.push({x:Math.random(),y:Math.random(),s:Math.random()<0.15?2:1,p:Math.random()*6})}
+  ctx.save();rrect(v.x,v.y,v.w,v.h,Math.min(v.w,v.h)*0.18);ctx.fillStyle='#01030a';ctx.fill();ctx.clip();
+  for(const s of campStars){ctx.globalAlpha=0.4+0.4*Math.sin(t*1.2+s.p);ctx.fillStyle='#fff';ctx.fillRect(v.x+((s.x+t*0.002)%1)*v.w,v.y+s.y*v.h,s.s,s.s)}ctx.globalAlpha=1;
+  const neb=ctx.createRadialGradient(v.x+v.w*0.25,v.y+v.h*0.7,0,v.x+v.w*0.25,v.y+v.h*0.7,v.w*0.5);neb.addColorStop(0,'rgba(90,60,140,0.22)');neb.addColorStop(1,'rgba(90,60,140,0)');ctx.fillStyle=neb;ctx.fillRect(v.x,v.y,v.w,v.h);
+  const r=Math.min(v.w,v.h)*0.16;campNaboo(v.x+v.w*0.68,v.y+v.h*0.42,r,t);ctx.fillStyle='#b8b0a0';ctx.beginPath();ctx.arc(v.x+v.w*0.68+r*1.9,v.y+v.h*0.42-r*0.9,r*0.16,0,6.283);ctx.fill();
+  const gl=ctx.createLinearGradient(v.x,v.y,v.x+v.w,v.y+v.h);gl.addColorStop(0,'rgba(200,230,255,0.10)');gl.addColorStop(0.35,'rgba(200,230,255,0)');gl.addColorStop(0.7,'rgba(200,230,255,0.04)');gl.addColorStop(1,'rgba(200,230,255,0)');ctx.fillStyle=gl;ctx.fillRect(v.x,v.y,v.w,v.h);
+  ctx.strokeStyle='#2a2c30';ctx.lineWidth=Math.max(4,v.w*0.012);ctx.beginPath();ctx.moveTo(v.x+v.w/3,v.y);ctx.lineTo(v.x+v.w/3,v.y+v.h);ctx.moveTo(v.x+v.w*2/3,v.y);ctx.lineTo(v.x+v.w*2/3,v.y+v.h);ctx.stroke();ctx.restore();
+  ctx.save();rrect(v.x,v.y,v.w,v.h,Math.min(v.w,v.h)*0.18);ctx.strokeStyle='#4a4d52';ctx.lineWidth=Math.max(6,v.w*0.02);ctx.stroke();ctx.strokeStyle='rgba(0,0,0,0.6)';ctx.lineWidth=2;ctx.stroke();ctx.restore();
+  const n=8;for(let i=0;i<n;i++){const a=i/n*6.283,rx=v.x+v.w/2+Math.cos(a)*(v.w/2+Math.max(3,v.w*0.01)*0.0),ry=v.y+v.h/2+Math.sin(a)*(v.h/2);rivet(clamp(rx,v.x,v.x+v.w),clamp(ry,v.y,v.y+v.h),Math.max(2,v.w*0.007))}}
+function campRoom(L,t){const g=ctx.createLinearGradient(0,0,0,L.floor);g.addColorStop(0,'#1c1d22');g.addColorStop(1,'#2b2a2a');ctx.fillStyle=g;ctx.fillRect(0,0,W,L.floor);
+  ctx.fillStyle=grimePat();ctx.globalAlpha=0.5;ctx.fillRect(0,0,W,L.floor);ctx.globalAlpha=1;ctx.strokeStyle='rgba(0,0,0,0.45)';ctx.lineWidth=2;const pw=Math.max(60,W/8);for(let x=pw*0.5;x<W;x+=pw){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,L.floor);ctx.stroke()}
+  ctx.strokeStyle='rgba(255,230,190,0.06)';ctx.lineWidth=1;for(let x=pw*0.5+2;x<W;x+=pw){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,L.floor);ctx.stroke()}
+  const fg=ctx.createLinearGradient(0,L.floor,0,H);fg.addColorStop(0,'#3a342c');fg.addColorStop(1,'#16140f');ctx.fillStyle=fg;ctx.fillRect(0,L.floor,W,H-L.floor);
+  ctx.strokeStyle='rgba(0,0,0,0.4)';ctx.lineWidth=1.5;for(let i=-8;i<=8;i++){ctx.beginPath();ctx.moveTo(W/2+i*W*0.06,L.floor);ctx.lineTo(W/2+i*W*0.22,H);ctx.stroke()}for(let k=1;k<6;k++){const y=L.floor+(H-L.floor)*(k*k)/36;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  ctx.fillStyle='#111';ctx.fillRect(0,L.floor-3,W,5);ctx.fillStyle='rgba(255,190,85,0.5)';for(let x=8;x<W;x+=26)ctx.fillRect(x,L.floor-2,12,2);
+  const lamp=ctx.createRadialGradient(W/2,0,0,W/2,0,Math.max(W,H)*0.7);lamp.addColorStop(0,'rgba(255,220,170,0.10)');lamp.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=lamp;ctx.fillRect(0,0,W,H);
+  campViewport(L.vp,t);const nl=ctx.createRadialGradient(L.vp.x+L.vp.w*0.68,L.vp.y+L.vp.h,0,L.vp.x+L.vp.w*0.6,L.vp.y+L.vp.h,Math.max(W,H)*0.5);nl.addColorStop(0,'rgba(120,200,255,0.10)');nl.addColorStop(1,'rgba(120,200,255,0)');ctx.fillStyle=nl;ctx.fillRect(0,0,W,H)}
+function campFurniture(id,b,t,lock){const{x,y,w,h}=b;ctx.save();ctx.lineJoin='round';const metal=(x,y,w,h,c1,c2)=>{const g=ctx.createLinearGradient(x,y,x,y+h);g.addColorStop(0,c1);g.addColorStop(1,c2);ctx.fillStyle=g;rrect(x,y,w,h,Math.min(6,w*0.06));ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.7)';ctx.lineWidth=1.5;ctx.stroke()};
+  ctx.fillStyle='rgba(0,0,0,0.35)';ctx.beginPath();ctx.ellipse(x+w/2,y+h*0.97,w*0.5,h*0.06,0,0,6.283);ctx.fill();
+  if(id==='cot'){metal(x+w*0.02,y+h*0.55,w*0.96,h*0.18,'#5a5650','#2e2c29');ctx.fillStyle='#2e2c29';ctx.fillRect(x+w*0.06,y+h*0.72,w*0.05,h*0.22);ctx.fillRect(x+w*0.89,y+h*0.72,w*0.05,h*0.22);
+    metal(x+w*0.05,y+h*0.38,w*0.9,h*0.2,'#6b5a44','#3c3226');ctx.fillStyle='#8a7a62';rrect(x+w*0.07,y+h*0.27,w*0.24,h*0.15,h*0.06);ctx.fill();ctx.fillStyle='#4a5a6a';rrect(x+w*0.4,y+h*0.33,w*0.52,h*0.12,h*0.05);ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.beginPath();ctx.moveTo(x+w*0.45,y+h*0.39);ctx.lineTo(x+w*0.88,y+h*0.39);ctx.stroke()}
+  else if(id==='desk'){metal(x,y+h*0.42,w,h*0.1,'#6a645a','#3a3630');ctx.fillStyle='#2a2826';ctx.fillRect(x+w*0.05,y+h*0.52,w*0.08,h*0.42);ctx.fillRect(x+w*0.87,y+h*0.52,w*0.08,h*0.42);metal(x+w*0.6,y+h*0.52,w*0.27,h*0.3,'#4a4640','#2a2724');
+    const pg=0.6+0.4*Math.sin(t*3);ctx.fillStyle='#1a1917';rrect(x+w*0.22,y+h*0.3,w*0.36,h*0.13,3);ctx.fill();ctx.fillStyle=`rgba(159,245,207,${0.5+0.3*pg})`;rrect(x+w*0.25,y+h*0.32,w*0.3,h*0.09,2);ctx.fill();ctx.globalCompositeOperation='lighter';glowAt(ctx,x+w*0.4,y+h*0.36,w*0.35,'120,255,190',0.18*pg);ctx.globalCompositeOperation='source-over';
+    ctx.strokeStyle='#3a3630';ctx.lineWidth=Math.max(2,w*0.02);ctx.beginPath();ctx.moveTo(x+w*0.78,y+h*0.42);ctx.lineTo(x+w*0.8,y+h*0.12);ctx.lineTo(x+w*0.68,y+h*0.06);ctx.stroke();ctx.fillStyle='#ffd08a';ctx.beginPath();ctx.arc(x+w*0.67,y+h*0.1,w*0.035,0,6.283);ctx.fill();ctx.globalCompositeOperation='lighter';glowAt(ctx,x+w*0.67,y+h*0.12,w*0.3,'255,200,120',0.16);ctx.globalCompositeOperation='source-over'}
+  else if(id==='closet'){metal(x+w*0.05,y+h*0.04,w*0.9,h*0.9,'#575c58','#2a2e2c');ctx.strokeStyle='rgba(0,0,0,0.6)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x+w/2,y+h*0.06);ctx.lineTo(x+w/2,y+h*0.92);ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,0.45)';for(let i=0;i<4;i++){ctx.fillRect(x+w*0.14,y+h*(0.12+i*0.035),w*0.28,h*0.012);ctx.fillRect(x+w*0.58,y+h*(0.12+i*0.035),w*0.28,h*0.012)}ctx.fillStyle='#9a9a90';ctx.fillRect(x+w*0.43,y+h*0.45,w*0.04,h*0.1);ctx.fillRect(x+w*0.53,y+h*0.45,w*0.04,h*0.1);
+    if(lock){ctx.fillStyle=PAD_AMB;lockIcon(x+w/2-w*0.09,y+h*0.6,w*0.18,PAD_AMB)}}
+  else if(id==='hangar'){metal(x,y,w,h*0.94,'#3c3e42','#232427');ctx.save();rrect(x+w*0.08,y+h*0.08,w*0.84,h*0.8,4);ctx.clip();ctx.fillStyle='#4c4a44';ctx.fillRect(x,y,w,h);
+    ctx.fillStyle='#d9a13a';for(let i=-6;i<12;i++){ctx.beginPath();const sx=x+i*w*0.14,yb=y+h*0.74;ctx.moveTo(sx,yb);ctx.lineTo(sx+w*0.07,yb);ctx.lineTo(sx+w*0.07+h*0.14,yb+h*0.14);ctx.lineTo(sx+h*0.14,yb+h*0.14);ctx.fill()}ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(x+w*0.49,y,w*0.02,h);ctx.restore();
+    ctx.font=`bold ${Math.max(9,w*0.12)}px ${FW}`;ctx.textAlign='center';ctx.fillStyle='rgba(230,220,200,0.55)';ctx.fillText('HANGAR 3',x+w/2,y+h*0.3);const on=Math.sin(t*2.4)>0;ctx.fillStyle=on?'#ffb43c':'#5a3a14';ctx.beginPath();ctx.arc(x+w/2,y+h*0.045,Math.max(2,w*0.03),0,6.283);ctx.fill()}
+  else if(id==='comm'){metal(x+w*0.08,y+h*0.45,w*0.84,h*0.5,'#4a4a4e','#26262a');metal(x+w*0.15,y+h*0.1,w*0.7,h*0.38,'#3a3a3e','#1e1e22');const fl=0.75+0.25*Math.sin(t*7+Math.sin(t*1.7)*3);ctx.fillStyle=`rgba(255,190,85,${0.55*fl})`;rrect(x+w*0.2,y+h*0.14,w*0.6,h*0.29,3);ctx.fill();
+    ctx.strokeStyle='rgba(60,30,0,0.6)';ctx.lineWidth=1;for(let yy=y+h*0.16;yy<y+h*0.42;yy+=3){ctx.beginPath();ctx.moveTo(x+w*0.2,yy);ctx.lineTo(x+w*0.8,yy);ctx.stroke()}ctx.strokeStyle='rgba(90,40,0,0.9)';ctx.lineWidth=1.5;ctx.beginPath();for(let i=0;i<=20;i++){const xx=x+w*(0.22+i*0.028),yy=y+h*0.285+Math.sin(i*1.3+t*8)*h*0.05*Math.sin(t*2);i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)}ctx.stroke();
+    ctx.fillStyle='#2a2a2e';ctx.fillRect(x+w*0.7,y,w*0.03,h*0.12);for(let i=0;i<5;i++){ctx.fillStyle=Math.sin(t*4+i*1.3)>0.3?['#7ff','#8f8','#fb6','#f66','#7ff'][i]:'#222';ctx.fillRect(x+w*(0.2+i*0.13),y+h*0.58,w*0.07,h*0.04)}}
+  ctx.restore()}
+function drawCamp(t){const L=campLayout();campHits=[];if(campPage!=='desk')menuHits=[];campRoom(L,t);const S=campStations();
+  S.forEach((s,i)=>{const b=L.st[s.id];const sel=campSel===i,hp=(campPage==='room')&&sel;campFurniture(s.id,b,t,s.lock);
+    const fs=clamp(Math.min(b.w/7.5,H/40),10,15),lh=fs*2.9,lw=Math.max(b.w*0.96,Math.min(fs*8,b.w*1.15)),lx=b.x+b.w/2-lw/2,ly=Math.min(H-lh-6,b.y+b.h+4);
+    ctx.save();rrect(lx,ly,lw,lh,5);ctx.fillStyle=hp?'rgba(255,190,85,0.22)':'rgba(6,18,13,0.82)';ctx.fill();if(s.lock)ctx.setLineDash([4,3]);ctx.strokeStyle=hp?PAD_AMB:s.hot?'rgba(255,190,85,0.75)':'rgba(159,245,207,0.6)';ctx.lineWidth=hp?2.4:1.3;ctx.stroke();ctx.setLineDash([]);
+    ctx.textAlign='center';ctx.font=`bold ${fs}px ${FW}`;ctx.fillStyle=s.lock?'rgba(255,190,85,0.8)':s.hot?PAD_AMB:PAD_MINT;ctx.fillText(s.lb,lx+lw/2,ly+fs*1.25,lw-8);ctx.font=`${fs*0.72}px ${FB}`;ctx.fillStyle='rgba(220,235,225,0.7)';ctx.fillText(s.sub,lx+lw/2,ly+fs*2.35,lw-8);ctx.restore();
+    if(hp){ctx.save();ctx.strokeStyle=`rgba(255,190,85,${0.4+0.3*Math.sin(t*5)})`;ctx.lineWidth=2;ctx.setLineDash([6,4]);rrect(b.x-4,b.y-4,b.w+8,b.h+8,8);ctx.stroke();ctx.restore()}
+    campHits.push({x:Math.min(b.x,lx),y:b.y,w:Math.max(b.w,lw),h:ly+lh-b.y,i,act:s.act})});
+  const tf=clamp(Math.min(W/16,H/14),18,36);padChrome('BASE CAMP',L.top+6,L.top+tf,tf,'left');ctx.font=`${clamp(tf*0.4,10,14)}px ${FB}`;ctx.textAlign='left';ctx.fillStyle='rgba(255,210,150,0.7)';
+  ctx.fillText('Guild hauler \u00b7 crew deck'+(PROG.cr!=null?'  \u00b7  CREDITS '+PROG.cr:''),L.top+6,L.top+tf+tf*0.55);
+  const bh=touchMode?44:34,bw=clamp(tf*4,96,150);const bx=W-bw-L.top,by=L.top;if(campPage==='room')padBtn(bx,by,bw,bh,'\u25c0 BACK',{},campLeave);
+  if(campPage==='room'){for(const h of pauseHits.splice(0))campHits.push(h);if(!touchMode&&H>420){ctx.font='11px '+FB;ctx.textAlign='center';ctx.fillStyle='rgba(255,230,200,0.45)';ctx.fillText('\u2190 \u2192 choose  \u00b7  ENTER use  \u00b7  ESC back',W/2,H-8)}}
+  if(campPage==='desk'){pauseHits=[];ctx.fillStyle='rgba(2,4,8,0.6)';ctx.fillRect(0,0,W,H);const P=padLayout();padFrame(P,t);const{sx,sy,sw,sh}=P;const ip=clamp(sw*0.03,10,22);ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();drawPadArchive(P,sx+ip,sw-ip*2,ip,t);ctx.restore();if(artView>=0)drawArtView(t)}
+  else if(campPage!=='room')campPanel(campPage,t);
+  if(campFade>=0){campFade+=1/60;const a=clamp(campFade/1.1,0,1);ctx.fillStyle=`rgba(0,0,0,${a})`;ctx.fillRect(0,0,W,H);if(a>0.6){ctx.font=`${clamp(W/30,12,18)}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=`rgba(255,220,170,${(a-0.6)*2})`;ctx.fillText(campFrom==='pause'?'A few minutes of rest\u2026':'Lights out. The hauler hums on\u2026',W/2,H/2)}if(campFade>1.5)campRestDone()}}
+function campPanel(id,t){pauseHits=[];ctx.fillStyle='rgba(2,4,8,0.62)';ctx.fillRect(0,0,W,H);const pw=Math.min(W-24,560),ph=Math.min(H-24,H<480?H-24:340),px=(W-pw)/2,py=(H-ph)/2,b=clamp(Math.min(pw,ph)*0.035,9,16);
+  const P={px,py,pw,ph,b,sx:px+b,sy:py+b,sw:pw-2*b,sh:ph-2*b};padFrame(P,t);const ip=clamp(P.sw*0.04,10,20),cx=P.sx+ip,cw=P.sw-ip*2;let y=P.sy+ip;const tf=clamp(Math.min(pw/16,ph/9),16,28);
+  const T={closet:['MINER LOCKER',gameBeaten?'Your locker is cleared for new gear. The outfitter is still unpacking crates: full outfits, colour schemes and a male or female miner, bought with credits you earn in the deep.':'The locker is sealed with a Guild requisition tag. Finish the campaign to unlock miner customisation: outfits, colours and a male or female miner, bought with credits.'],
+    hangar:['HANGAR 3','Your hover-drill sits in the cradle, scorched and dented. The paint shop is coming soon: hull colour, hazard stripes and engine glow.'],
+    comm:['COMM STATION','Coming soon: talk to the crew between missions and hear more of their stories each time you check in.']}[id];
+  padChrome(T[0],cx,y+tf*0.9,tf,'left');const bh=touchMode?44:32,bw=clamp(tf*4,90,130);padBtn(cx+cw-bw,y+(tf-bh)/2+2,bw,bh,'\u25c0 BACK',{},()=>{SFX.click();campPage='room'});y+=Math.max(tf,bh)+ip*0.8;
+  const fs=clamp(cw/30,12,15);ctx.font=`${fs}px ${FB}`;ctx.textAlign='left';ctx.fillStyle=PAD_MINT;for(const l of wrapLines(T[1],cw)){ctx.fillText(l,cx,y+fs);y+=fs*1.4}
+  if(id==='comm'){y+=fs*0.6;ctx.font=`bold ${fs*0.85}px ${FW}`;ctx.fillStyle=PAD_AMB;ctx.fillText('CONTACTS ON FILE',cx,y+fs);y+=fs*1.6;ctx.font=`${fs}px ${FB}`;for(const d of dossierEntries()){if(y>P.sy+P.sh-fs)break;ctx.fillStyle=d.locked?PAD_DIM:PAD_MINT;ctx.fillText((d.locked?'\u2022 ':'\u25b8 ')+d.name+(d.role?'  \u00b7  '+d.role:''),cx,y+fs,cw);y+=fs*1.45}}
+  if(id==='closet'&&!gameBeaten)lockIcon(cx+cw-fs*2,P.sy+P.sh-ip-fs*2,fs*1.6,PAD_AMB)}
+function campScanList(){const out=[],was=leaderRevealed;leaderRevealed=!!PROG.d.V;const seen=new Set(MSGLOG.map(m=>m.text));
+  for(let lv=1;lv<=8;lv++){const c=CAMPAIGN[lv];if(!c||!c.intel||!c.intel.length)continue;const rows=c.intel.map(e=>({who:e[1],text:e[2],found:gameBeaten||seen.has(e[2]),st:dlgStyle(e[1]),nm:speakerName(e[1])}));out.push({lv,name:c.name,rows})}leaderRevealed=was;return out}
+function drawScans(cx,y,cw,avail,t){const sm=cw<520,fs=sm?12.5:14.5,hf=sm?10:12,ins=sm?26:32,tw=cw-ins-30;const L=campScanList(),rows=[];ctx.font=`${fs}px ${FB}`;let nf=0,nt=0;
+  for(const g of L){rows.push({hd:g.lv,nm:g.name,h:hf*2.6});for(const r of g.rows){nt++;if(r.found)nf++;const ls=r.found?wrapLines(r.text,tw):['Encrypted scan \u2014 not yet recovered.'];rows.push({r,ls,h:Math.max(ins+8,hf*1.6+ls.length*fs*1.3+10)})}}
+  if(!rows.length){ctx.textAlign='center';ctx.fillStyle=PAD_DIM;ctx.fillText('No scans recovered yet.',cx+cw/2,y+40);return}
+  ctx.font=`${hf}px ${FW}`;ctx.textAlign='right';ctx.fillStyle=PAD_DIM;ctx.textAlign='left';ctx.fillText(`${nf}/${nt} SCANS RECOVERED`,cx,y+hf);y+=hf*1.9;avail-=hf*1.9;
+  const total=rows.reduce((a,r)=>a+r.h,0),sbw=touchMode?44:30;msgMax=Math.max(0,total-avail+8);msgScroll=clamp(msgScroll,0,msgMax);ctx.save();ctx.beginPath();ctx.rect(cx,y,cw,avail);ctx.clip();let yy=y-msgScroll;
+  for(const row of rows){if(yy+row.h>=y&&yy<=y+avail){if(row.hd){ctx.font=`bold ${hf}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_AMB;ctx.fillText(`MISSION ${row.hd}  \u00b7  ${row.nm.toUpperCase()}`,cx,yy+hf*1.7);ctx.fillStyle='rgba(255,190,85,0.3)';ctx.fillRect(cx,yy+hf*2.2,cw-sbw-6,1)}
+    else{const r=row.r,col=DLG_COL[r.st]||DLG_COL.survey;const tx=cx+ins+12;if(r.found)drawInsignia(r.st,cx+2,yy+4,ins,t);else{ctx.strokeStyle='rgba(159,245,207,0.3)';ctx.setLineDash([3,3]);ctx.strokeRect(cx+2,yy+4,ins,ins);ctx.setLineDash([])}
+      ctx.textAlign='left';ctx.font=`${hf*0.9}px ${FW}`;ctx.fillStyle=r.found?col[0]:PAD_DIM;ctx.fillText(r.found?r.nm:'ENCRYPTED',tx,yy+hf*1.1,tw-60);ctx.font=`${fs}px ${FB}`;ctx.fillStyle=r.found?col[2]:'rgba(159,245,207,0.35)';row.ls.forEach((l,i)=>ctx.fillText(l,tx,yy+hf*1.6+fs*1.05+i*fs*1.3))}}yy+=row.h}ctx.restore();
+  if(msgMax>0){const bx=cx+cw-sbw,bh=Math.max(44,sbw);for(const[by,d,lb,on]of[[y,-1,'\u25b2',msgScroll>0],[y+avail-bh,1,'\u25bc',msgScroll<msgMax]]){rrect(bx,by,sbw,bh,5);ctx.fillStyle=on?'rgba(16,40,30,0.92)':'rgba(16,40,30,0.4)';ctx.fill();ctx.strokeStyle=on?PAD_MINT:'rgba(159,245,207,0.25)';ctx.lineWidth=1.2;ctx.stroke();ctx.font=`bold 14px ${FW}`;ctx.textAlign='center';ctx.fillStyle=on?PAD_MINT:'rgba(159,245,207,0.3)';ctx.fillText(lb,bx+sbw/2,by+bh/2+5);
+    menuHits.push({x:bx,y:by,w:sbw,h:bh,act:()=>{SFX.click();msgScroll=clamp(msgScroll+d*avail*0.8,0,msgMax)}})}}}
+function campTap(x,y){if(campFade>=0)return;if(campPage==='desk'){padTap(x,y);if(pausePage!=='archive'){campPage='room';campDesk=false}return}
+  if(campPage!=='room'){for(const h of pauseHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return}return}
+  for(const h of campHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){if(h.i!=null)campSel=h.i;h.act();return}}
+function campKey(k){if(campFade>=0)return;if(campPage==='desk'){padKey(k);if(pausePage!=='archive'){campPage='room';campDesk=false}return}
+  if(campPage!=='room'){if(k==='escape'||k==='backspace'||k==='enter'||k===' '){SFX.click();campPage='room'}return}
+  const n=campStations().length;if(k==='arrowleft'||k==='a'||k==='arrowup'||k==='w'){SFX.click();campSel=(campSel+n-1)%n}else if(k==='arrowright'||k==='d'||k==='arrowdown'||k==='s'||k==='tab'){SFX.click();campSel=(campSel+1)%n}
+  else if(k==='enter'||k===' '){campStations()[campSel].act()}else if(k==='r'){campRest()}else if(k==='escape'||k==='backspace'||k==='p'){campLeave()}}
 // pause screen (UNLOCKS_V1): resume / quit, STAGE SELECT (locked until the campaign is beaten), evidence log
 function drawPause(t){pauseHits=[];if(PAUSE_DATAPAD&&(pausePage==='main'||pausePage==='quit'||pausePage==='archive')){drawDatapad(t);return}
   if(pausePage==='main'){const L=pauseLines();overlay('PAUSED',(touchMode&&!(GAMEPAD_V1&&padMode))?'Tap to resume':KH('Press P / Esc to resume \u00b7 Q to quit to title')+(gameBeaten?' \u00b7 S stage select':''),L,'chrome');
@@ -2275,7 +2380,8 @@ function frame(now){const dt=Math.min(0.033,(now-lastT)/1000);lastT=now;const t=
   try{
     if(GAMEPAD_V1)gpPoll(dt);
     ctx.setTransform(DPR,0,0,DPR,0,0);
-    if(state==='gate'||state==='crawl'||state==='pan'||state==='menu'){drawTitle(t)}
+    if(BASECAMP_V1&&state==='camp'){drawCamp(t)}
+    else if(state==='gate'||state==='crawl'||state==='pan'||state==='menu'){drawTitle(t)}
     else{
       if(state==='play')updatePlay(dt);
       if(state==='dying'){gameT+=dt;if(stateT>1.8&&!COCKPIT_CINE)setState('over');for(const m of mobs){m.t+=dt}}

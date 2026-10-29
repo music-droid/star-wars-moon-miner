@@ -931,6 +931,7 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','ar
   unlockAudio();if(KEYMAP[k])K[KEYMAP[k]]=true;if(e.repeat)return;onKey(k)});
 function onKey(k){
   if(k==='m'){toggleMute();return}
+  if(PIK_CREDITS_COMM&&pikCom){if(k==='enter'||k===' '||k==='escape')pikTap();return}
   if(BASECAMP_V1&&state==='camp'){campKey(k);return}
   if(state==='gate'){setState('crawl');return}
   if(state==='crawl'){setState('menu');return}
@@ -946,7 +947,7 @@ function onKey(k){
   if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8&&(k==='enter'||k===' '))advance()}
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(KEYMAP[k])K[KEYMAP[k]]=false});
 addEventListener('blur',()=>{for(const k in K)K[k]=false;mouse.down=false;if(state==='play')setState('pause')});
-function screenTap(x,y){unlockAudio();if(BASECAMP_V1&&state==='camp'){campTap(x,y);return}if(COCKPIT_CINE&&pitShot()){pitSkip();return}if(state==='gate')setState('crawl');else if(state==='crawl'||state==='pan')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='debrief')debNext();else if(state==='pause')pauseTap(x,y);
+function screenTap(x,y){unlockAudio();if(PIK_CREDITS_COMM&&pikCom){pikTap();return}if(BASECAMP_V1&&state==='camp'){campTap(x,y);return}if(COCKPIT_CINE&&pitShot()){pitSkip();return}if(state==='gate')setState('crawl');else if(state==='crawl'||state==='pan')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='debrief')debNext();else if(state==='pause')pauseTap(x,y);
   else if(state==='levelDone'&&COMPLETE_DATAPAD)doneTap(x,y);
   else if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8)advance()}
 // ICON_V1: canvas sits inside the safe area, so pointer coordinates are taken relative to it
@@ -2677,7 +2678,7 @@ function gearKey(k){const pg=campPage;if(pg==='hatch'&&QM_STORE){if(k==='arrowle
   if(k==='arrowleft'||k==='a'||k==='arrowright'||k==='d'){const d=k==='arrowleft'||k==='a'?-1:1;let i=items.findIndex(o=>o.id===S[gearTab]);for(let n=0;n<items.length;n++){i=(i+d+items.length)%items.length;if(mode==='qm'||gearP().own[items[i].id])break}SFX.click();S[gearTab]=items[i].id;gearMsg=null;return true}
   if((k==='enter'||k===' ')&&gearAct){gearAct();return true}return false}
 // NEW tag (after Pik's credits comm) on the hatch, until the Quartermaster is opened once
-function gearNewTag(){return QM_STORE&&typeof PIK_CREDITS_COMM!=='undefined'&&PIK_CREDITS_COMM&&!!PROG.pikCr&&!PROG.qmSeen}
+function gearNewTag(){return QM_STORE&&gameBeaten&&typeof PIK_CREDITS_COMM!=='undefined'&&PIK_CREDITS_COMM&&!!PROG.pikCr&&!PROG.qmSeen}
 function gearNewPill(x,y,t){const p=0.5+0.5*Math.sin(t*5);ctx.save();ctx.font=`bold 11px ${FW}`;const w=ctx.measureText('NEW').width+12;ctx.translate(x,y);ctx.scale(1+0.08*p,1+0.08*p);ctx.shadowColor='rgba(255,170,60,0.9)';ctx.shadowBlur=8+8*p;rrect(-w/2,-9,w,18,9);ctx.fillStyle=`rgba(255,${150+40*p|0},60,0.95)`;ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#1a0e04';ctx.textAlign='center';ctx.fillText('NEW',0,4);ctx.restore()}
 // room extras over the Quarters painting: NEW pill on the hatch, trophies on display on the furniture
 const ROOM_TROPH={t_crystal:[551,338,34],t_stinger:[738,410,40],t_fang:[703,127,34]};
@@ -2691,6 +2692,21 @@ function gearCase(im,cx,by,h,t,glow){const ar=im.naturalWidth/im.naturalHeight,w
 function gearRoomExtras(t){if(campPage!=='room'&&campPage!=='hatch')return;const F=campArtFit();if(gearMine()){const g=gearP();for(const id in g.show){const p=ROOM_TROPH[id],ti=gearIt(id),im=ti&&gearImg(ti.img);if(!p||!im||!im.naturalWidth)continue;
   gearCase(im,F.ox+p[0]*F.s,F.oy+p[1]*F.s,p[2]*F.s,t,id==='t_crystal')}}
   if(campPage==='room'&&gearNewTag()){const sp=CAMP_SPOTS.find(o=>o.id==='hangar');if(sp){const b=campSpotScr(sp,F);gearNewPill(clamp(b.x+b.w-14,24,W-24),clamp(b.y+b.h*0.32,touchMode?84:58,H-20),t)}}}
+// PIK_CREDITS_COMM (Justin): Pik tells you once that Pit credits are spendable. Plays after the first finished Endless Pit shift, or, for saves that already
+// hold credits, at the next shift end or Quarters entry. Two comm boxes (Pik portrait), tap/Enter: first reveals the line, then advances. PROG.pikCr=1 once
+// it starts, so it never repeats; afterwards a pulsing NEW tag sits on the hatch until the Quartermaster is opened. Revert: PIK_CREDITS_COMM=false
+const PIK_CREDITS_COMM=true;
+const PIK_CR_LINES=['Shift logged. The Federation has graciously allowed you to keep a fraction of what you dug up. Credits are in your account.',
+  'The Captain says your locker is unsealed. Jumpsuits, helmets, trophies. Spend it before he invents a fee for it.'];
+let pikCom=null;
+function pikCheck(){if(!PIK_CREDITS_COMM||pikCom||PROG.pikCr||!((PROG.cr||0)>0))return;
+  const shiftEnd=(state==='levelDone'||state==='over')&&level>8&&stateT>0.8,quarters=state==='camp'&&campPage==='room'&&!campBunk&&campFade<0;
+  if(shiftEnd||quarters){pikCom={i:0,t0:performance.now()/1000};PROG.pikCr=1;saveProg()}}
+function pikShown(){return Math.floor((performance.now()/1000-pikCom.t0)*70)}
+function pikTap(){if(!pikCom)return;const L=PIK_CR_LINES[pikCom.i];if(pikShown()<L.length){pikCom.t0=-1e9;return}SFX.click();pikCom.i++;pikCom.t0=performance.now()/1000;if(pikCom.i>=PIK_CR_LINES.length)pikCom=null}
+function pikDraw(t){pikCheck();if(!pikCom)return;const port=H>W,w=port?W-12:Math.min(640,W-24),x=(W-w)/2,y=port?(touchMode?60:6):(touchMode?52:4),text=PIK_CR_LINES[pikCom.i];
+  ctx.save();ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;const h=dlgH(text,w,1);dialogBox('D',text,x,y,w,pikShown(),t,1);
+  ctx.textAlign='right';ctx.font=`${touchMode?12:11}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.75)';ctx.fillText((pikCom.i+1)+'/'+PIK_CR_LINES.length+'  \u00b7  '+(touchMode?'TAP':'ENTER')+' TO CONTINUE',x+w-8,y+h+16);ctx.restore()}
 function campStations(){const beat=gameBeaten;if(QUARTERS_HATCH)return campStationsH(beat);return[
   {id:'comm',lb:'COMM STATION',sub:'talks coming soon',act:()=>{SFX.click();campPage='comm'}},
   {id:'cot',lb:'COT',sub:BUNK_REST?'lie down a while':campFrom==='menu'?'rest \u00b7 '+campNextName():campFrom==='pause'?'rest \u00b7 back to the mission':level>=8?'rest \u00b7 continue':'rest \u00b7 next mission',hot:!BUNK_REST,act:BUNK_REST?bunkStart:campRest},
@@ -3028,6 +3044,7 @@ function frame(now){const dt=Math.min(0.033,(now-lastT)/1000);lastT=now;const t=
       if(state==='debrief')drawDebrief(t);
       if(COCKPIT_CINE)pitAfter(dt);
     }
+    if(PIK_CREDITS_COMM)pikDraw(t);
     if(GAMEPAD_V1)gpDraw(t);
   }catch(e){console.error(e)}
   requestAnimationFrame(frame)}

@@ -700,6 +700,22 @@ function epLights(light){if(!ep)return;for(const g of ep.gas)light(g.x,g.y,g.r*1
 function epDark(){return !!(ep&&cfg.pit&&cfg.pit.mods.includes('dark'))}
 function epLabel(lv){return ENDLESS_PIT?`THE PIT \u00b7 DEPTH ${lv-8}`:`ENDLESS SECTOR ${lv}`}
 function epShort(lv){return ENDLESS_PIT?`DEPTH ${lv-8}`:`SECTOR ${lv}`}
+// BOSS_ARENA (Justin): Pit boss levels carve a wide-open arena in the middle of the map (radius f x map width, clamped; ragged soft-rock rim; a ring of
+// diggable rock pillars for cover), tunnel it to the start if the caves don't reach it, keep the lift outside it, and the boss bursts up out of a hole
+// in the arena floor when you enter (instead of under the lift). Revert: BOSS_ARENA=false
+const BOSS_ARENA=true,ARENA={f:0.2,rMin:6,rMax:10,rag:0.9,rim:1.8,pillars:5,pr:0.6,wake:2.5,liftGap:4};let bArena=null;
+function arenaCarve(R,set){const r=Math.max(ARENA.rMin,Math.min(ARENA.rMax,Math.round(MW*ARENA.f))),cx=MW>>1,cy=MH>>1,ph=R()*6.28;
+  for(let y=cy-r-3;y<=cy+r+3;y++)for(let x=cx-r-3;x<=cx+r+3;x++){const dd=Math.hypot(x-cx,y-cy),e=r+ARENA.rag*Math.sin(Math.atan2(y-cy,x-cx)*5+ph);
+    if(dd<=e)set(x,y,FLOOR);else if(dd<=e+ARENA.rim&&map[y*MW+x]===BED&&x>=2&&y>=2&&x<MW-2&&y<MH-2)map[y*MW+x]=ROCK}
+  for(let k=0;k<ARENA.pillars;k++){const a=k/ARENA.pillars*6.283+ph,px=Math.round(cx+Math.cos(a)*r*ARENA.pr),py=Math.round(cy+Math.sin(a)*r*ARENA.pr);for(let b=0;b<2;b++)for(let c=0;c<2;c++)set(px+c,py+b,ROCK)}
+  // reach: dig a 2-wide tunnel from the arena toward the start until it meets the start's cave system
+  const d=bfs(4,4,9999);if(d[cy*MW+cx]<0){let x=cx,y=cy;for(let k=0;k<MW*3;k++){const i=y*MW+x;if(d[i]>=0||d[i+1]>=0||d[i+MW]>=0)break;const dx=4-x,dy=4-y;if(Math.abs(dx)>Math.abs(dy)||(Math.abs(dx)===Math.abs(dy)&&k%2))x+=Math.sign(dx);else y+=Math.sign(dy);
+    for(let b=0;b<2;b++)for(let c=0;c<2;c++)set(x+c,y+b,FLOOR)}}
+  return{tx:cx,ty:cy,r}}
+function arenaDraw(t,vis){if(!bArena)return;const x=(bArena.tx+0.5)*T,y=(bArena.ty+0.5)*T;if(!vis(x,y,T*3))return;const open=bossWoke&&!cracks.some(c=>c.type==='boss');ctx.save();
+  const g=ctx.createRadialGradient(x,y,2,x,y,T*1.9);g.addColorStop(0,open?'rgba(0,0,0,0.95)':'rgba(20,14,12,0.55)');g.addColorStop(0.6,open?'rgba(10,5,15,0.8)':'rgba(30,22,18,0.35)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,T*1.9,0,6.283);ctx.fill();
+  ctx.strokeStyle=open?'rgba(200,90,255,0.35)':'rgba(120,95,80,0.6)';ctx.lineWidth=1.5;for(let k=0;k<9;k++){const a=k*0.7+bArena.r,l=T*(open?1.3:0.6+0.5*((k*37)%10)/10);ctx.beginPath();ctx.moveTo(x+Math.cos(a)*T*0.3,y+Math.sin(a)*T*0.3);ctx.lineTo(x+Math.cos(a+0.2)*l*0.6,y+Math.sin(a+0.2)*l*0.6);ctx.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);ctx.stroke()}
+  if(!bossWoke){ctx.globalAlpha=0.25+0.15*Math.sin(t*2.2);ctx.fillStyle='#c4f';ctx.beginPath();ctx.arc(x,y,T*0.35,0,6.283);ctx.fill()}ctx.restore()}
 function genLevel(lv){
   const R=mulberry((Date.now()^Math.imul(lv,7919))>>>0);
   ep=null;cfg=levelCfg(lv);const cells=cfg.cells||Math.min(24,7+lv*2);MW=MH=cells*4+3;
@@ -739,8 +755,9 @@ function genLevel(lv){
     for(const i of fl){const x=i%MW,y=(i/MW)|0;for(let b=-2;b<=2;b++)for(let a=-2;a<=2;a++){const X=x+a,Y=y+b;if(X>=2&&Y>=2&&X<MW-2&&Y<MH-2&&map[Y*MW+X]===BED)map[Y*MW+X]=ROCK}}
     tunPath=P}
   mazeCrack=null;mazeInfo=null;const mazePad=MAZE_LEVELS&&cfg.maze?mazeGen(R,cells,set):-1;
+  bArena=BOSS_ARENA&&cfg.boss&&cfg.pit&&!cfg.hall&&!cfg.maze&&!cfg.tunnel?arenaCarve(R,set):null;
   // extraction lift: farthest reachable point
-  let d=bfs(4,4,9999),best=0,bi=0;for(let i=0;i<d.length;i++){if(d[i]<0)continue;const sc=d[i]+3*Math.hypot(i%MW-4,((i/MW)|0)-4);if(sc>best){best=sc;bi=i}}
+  let d=bfs(4,4,9999),best=0,bi=0;for(let i=0;i<d.length;i++){if(d[i]<0)continue;if(bArena&&Math.hypot(i%MW-bArena.tx,((i/MW)|0)-bArena.ty)<bArena.r+ARENA.rag+ARENA.liftGap)continue;const sc=d[i]+3*Math.hypot(i%MW-4,((i/MW)|0)-4);if(sc>best){best=sc;bi=i}}
   if(cfg.hall){const cx0=MW/2,cy0=(11+MH-3)/2;let bd=1e9;for(let i=0;i<d.length;i++){if(d[i]<0||map[i]!==FLOOR)continue;const x=i%MW,y=(i/MW)|0;if(y<14)continue;const q=Math.hypot(x-cx0,y-cy0);if(q<bd){bd=q;bi=i}}}
   if(tunPath){const e=tunPath[tunPath.length-1];bi=e[1]*MW+e[0]}
   if(mazePad>=0)bi=mazePad;
@@ -1237,8 +1254,8 @@ function updatePlay(dt){
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
     if(c.type==='boss')shake=Math.max(shake,4+c.t*4);if(c.t>=c.max){c.done=true;burst(c)}}
   cracks=cracks.filter(c=>!c.done);
-  if(bossLevel&&!bossWoke&&(cfg.hall?boss&&(dist(ship.x,ship.y,boss.x,boss.y)<T*11||boss.hp<boss.max):dist(ship.x,ship.y,padX,padY)<T*10)){bossWoke=true;if(cfg.hall){boss.dormant=false;shake=Math.max(shake,22);boom(boss.x,boss.y,2,'#c4f')}else addCrack(Math.floor(padX/T),Math.floor(padY/T),'boss',2.4);
-    toast(cfg.hall?'SEISMIC ALERT — the hive queen is awake!':'SEISMIC ALERT — something huge is rising beneath the lift!',null,null,'#f6f');Music.play('mars');if(epOn()&&cfg.pit&&cfg.pit.boss)sayComm('D',`Contact: ${cfg.pit.boss.name}. Watch for the red warning markers, sir, and aim for the amber node on its back.`);else sayComm('F','That\u2019s her. The hive queen! Vosh\u2019s blasting drove her mad. Light her up, kid!')}
+  if(bossLevel&&!bossWoke&&(cfg.hall?boss&&(dist(ship.x,ship.y,boss.x,boss.y)<T*11||boss.hp<boss.max):(bArena?dist(ship.x,ship.y,(bArena.tx+0.5)*T,(bArena.ty+0.5)*T)<T*(bArena.r+ARENA.wake):dist(ship.x,ship.y,padX,padY)<T*10))){bossWoke=true;if(cfg.hall){boss.dormant=false;shake=Math.max(shake,22);boom(boss.x,boss.y,2,'#c4f')}else if(bArena)addCrack(bArena.tx,bArena.ty,'boss',2.4);else addCrack(Math.floor(padX/T),Math.floor(padY/T),'boss',2.4);
+    toast(cfg.hall?'SEISMIC ALERT — the hive queen is awake!':bArena?'SEISMIC ALERT — something huge is rising from the arena floor!':'SEISMIC ALERT — something huge is rising beneath the lift!',null,null,'#f6f');Music.play('mars');if(epOn()&&cfg.pit&&cfg.pit.boss)sayComm('D',`Contact: ${cfg.pit.boss.name}. Watch for the red warning markers, sir, and aim for the amber node on its back.`);else sayComm('F','That\u2019s her. The hive queen! Vosh\u2019s blasting drove her mad. Light her up, kid!')}
   // mobs
   let threat=0;
   if(cfg.hall)m7Tick(dt);
@@ -1681,7 +1698,7 @@ function drawWorld(t){
   const vis=(x,y,m=60)=>x>cx-m&&x<cx+W+m&&y>cy-m&&y<cy+H+m;
   if(cfg.hall)drawHall(t,vis);
   if(vis(padX,padY))drawPad(t);
-  if(epOn())epDrawWorld(t,vis);
+  if(BOSS_ARENA)arenaDraw(t,vis);if(epOn())epDrawWorld(t,vis);
   for(const c of cracks)if(vis(c.tx*T,c.ty*T))drawCrack(c);
   for(const it of items)if(vis(it.x,it.y))drawItem(it,t);
   for(const mn of miners)if(vis(mn.x,mn.y))drawMiner(mn,t);

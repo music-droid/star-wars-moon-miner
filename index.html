@@ -443,6 +443,12 @@ let padX=0,padY=0,need=0,got=0,timed=false,timeLeft=0,timeMax=0,bossLevel=false,
 let cfg=null,cratesGot=0,cratesNeed=0,cratesTotal=0,debIdx=0,debT=0,intelGot=0,intelTotal=0,intelNeed=0,intelLog=[],evidence=[],miners=[],rescued=0,rescueNeed=0,comm=null;
 let spawnT=0,flow=null,flowT=0,shake=0,cam={x:0,y:0},banner=0,hurtFlash=0,gameT=0,lastTile=-1,overReason='',lvStats=null,kills=0;
 const passable=t=>t===FLOOR||t===PAD;
+// PICKUP_NOSTICK: pulled/dropped pickups never come to rest inside rock or bedrock. Revert: PICKUP_NOSTICK=false
+const PICKUP_NOSTICK=true;
+function itemUnstick(it){const tx=clamp(Math.floor(it.x/T),0,MW-1),ty=clamp(Math.floor(it.y/T),0,MH-1);if(!solidAt(Math.floor(it.x/T),Math.floor(it.y/T)))return true;
+  let best=null,bd=1e9;for(let r=1;r<=8&&!best;r++)for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++){if(Math.max(Math.abs(x-tx),Math.abs(y-ty))!==r||solidAt(x,y))continue;const cx=(x+0.5)*T,cy=(y+0.5)*T,dd=(cx-it.x)**2+(cy-it.y)**2;if(dd<bd){bd=dd;best=[cx,cy]}}
+  if(best){it.x=best[0];it.y=best[1];return true}return false}
+function itemDrop(it){if(PICKUP_NOSTICK){it.loose=true;itemUnstick(it)}items.push(it)}
 const solidAt=(x,y)=>x<0||y<0||x>=MW||y>=MH||(map[y*MW+x]===ROCK||map[y*MW+x]===BED);
 const tileAt=(x,y)=>(x<0||y<0||x>=MW||y>=MH)?BED:map[y*MW+x];
 function bfs(sx,sy,maxD){const N=MW*MH,d=new Int16Array(N).fill(-1),q=new Int32Array(N);let h=0,tl=0;const s=sy*MW+sx;if(s<0||s>=N||!passable(map[s]))return d;d[s]=0;q[tl++]=s;
@@ -735,9 +741,9 @@ function kill(m){logCreature(m.type);if(midCalm()&&m.type!=='boss')spawnT=Math.m
   if(m.type==='worm')for(const s of m.seg)boom(s.x,s.y,0.3,'#c88');
   toast('+'+p,m.x,m.y,'#ffd27a');
   const r=Math.random();
-  if(m.type==='boss'){boss=null;bossDead=true;shake=30;toast('THE HIVE MOTHER IS SLAIN!',null,null,'#f8f');if(cfg.hall){m7Collapse=true;quakeT=1.2;toast('SERVICE PASSAGE COLLAPSING',null,null,'#ff8a5a');comm=null;commQ=[];sayComm('D','Queen down! Sir, the service passage is collapsing. Get to the exit portal NOW!')}for(let k=0;k<6;k++)items.push({x:m.x+rnd(-50,50),y:m.y+rnd(-50,50),type:k<3?'crystal':k<5?'energy':'shield',ph:0});Music.play(cfg.music)}
-  else if(m.type==='worm'&&r<0.6)items.push({x:m.x,y:m.y,type:'crystal',ph:0});
-  else if(r<(m.type==='spitter'?0.35:0.14))items.push({x:m.x,y:m.y,type:Math.random()<0.6?'energy':'shield',ph:0});
+  if(m.type==='boss'){boss=null;bossDead=true;shake=30;toast('THE HIVE MOTHER IS SLAIN!',null,null,'#f8f');if(cfg.hall){m7Collapse=true;quakeT=1.2;toast('SERVICE PASSAGE COLLAPSING',null,null,'#ff8a5a');comm=null;commQ=[];sayComm('D','Queen down! Sir, the service passage is collapsing. Get to the exit portal NOW!')}for(let k=0;k<6;k++)itemDrop({x:m.x+rnd(-50,50),y:m.y+rnd(-50,50),type:k<3?'crystal':k<5?'energy':'shield',ph:0});Music.play(cfg.music)}
+  else if(m.type==='worm'&&r<0.6)itemDrop({x:m.x,y:m.y,type:'crystal',ph:0});
+  else if(r<(m.type==='spitter'?0.35:0.14))itemDrop({x:m.x,y:m.y,type:Math.random()<0.6?'energy':'shield',ph:0});
   m.dead=true}
 function hurtShip(d){if(ship.inv>0||state!=='play')return;if(ship.mode==='burrow')d*=0.7;ship.sh-=d;ship.inv=0.6;ship.arrProt=false;ship.shf=0.5;shake=Math.max(shake,9);hurtFlash=0.3;SFX.hurt();
   for(let k=0;k<8;k++)parts.push({x:ship.x,y:ship.y,vx:rnd(-150,150),vy:rnd(-150,150),life:0.4,max:0.4,c:'#8ef',s:2.5,drag:2,g:1});
@@ -984,7 +990,8 @@ function updatePlay(dt){
   flowT-=dt;if(flowT<=0){flowT=0.25;flow=bfs(Math.floor(ship.x/T),Math.floor(ship.y/T),48)}
   mmT-=dt;if(mmT<=0){mmT=0.3;updateMinimap()}
   // items
-  for(const it of items){it.ph+=dt;if(solidAt(Math.floor(it.x/T),Math.floor(it.y/T))){if(it.type==='crystal'&&Math.random()<dt*1.4&&dist(it.x,it.y,ship.x,ship.y)<560)parts.push({x:it.x+rnd(-9,9),y:it.y+rnd(-9,9),vx:rnd(-8,8),vy:rnd(-22,-6),life:0.7,max:0.7,c:Math.random()<0.5?'#bff':'#6ef',s:rnd(1.2,2.2),drag:1,g:1});continue}const d=dist(it.x,it.y,ship.x,ship.y);
+  for(const it of items){it.ph+=dt;const inRock=solidAt(Math.floor(it.x/T),Math.floor(it.y/T));if(PICKUP_NOSTICK&&it.loose&&inRock&&!(it.grab&&dist(it.x,it.y,ship.x,ship.y)<75)){it.grab=false;itemUnstick(it)}else if(inRock&&!(PICKUP_NOSTICK&&it.grab)){if(it.type==='crystal'&&Math.random()<dt*1.4&&dist(it.x,it.y,ship.x,ship.y)<560)parts.push({x:it.x+rnd(-9,9),y:it.y+rnd(-9,9),vx:rnd(-8,8),vy:rnd(-22,-6),life:0.7,max:0.7,c:Math.random()<0.5?'#bff':'#6ef',s:rnd(1.2,2.2),drag:1,g:1});continue}const d=dist(it.x,it.y,ship.x,ship.y);
+    if(PICKUP_NOSTICK){if(d<75){it.grab=true;it.loose=true}else it.grab=false}
     if(d<75){const p=(1-d/75)*500*dt;it.x+=(ship.x-it.x)/d*p;it.y+=(ship.y-it.y)/d*p}
     if(d<20){it.dead=true;SFX.pickup(it.type);
       if(it.type==='crystal'){got++;score+=100;if(tunPath&&timed){timeLeft+=RACE_CRY;toast('+'+RACE_CRY+'s',ship.x,ship.y-26,'#ffd27a')}toast(need?`\u25c6 ${got}/${need}`:'\u25c6 +1',ship.x,ship.y-8,'#7ff');if(got===need)toast(padIsActive()?'Quota met! Return to the extraction lift':'Crystal quota met — finish your other objectives',null,null,'#8f8')}

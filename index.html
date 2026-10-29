@@ -880,7 +880,7 @@ function toggleMute(){muted=!muted;localStorage.setItem('nm_mute',muted?'1':'0')
 mb.textContent=muted?'🔇 Unmute (M)':'🔊 Mute (M)';
 
 // ================= STATE =================
-function setState(s){const prev=state;state=s;stateT=0;if(s==='epilogue')markBeaten();if(s==='pause'||s==='levelDone'){pausePage='main';pauseHits=[];padSel=-1;artView=-1}
+function setState(s){const prev=state;state=s;stateT=0;if(s==='epilogue')markBeaten();if(s==='pause'||s==='levelDone'){if(s==='levelDone'||prev!=='camp')stageCap=9;pausePage='main';pauseHits=[];padSel=-1;artView=-1}
   ap.style.display=(s==='menu'||s==='pause'||s==='over'||s==='levelDone'||s==='epilogue')?'flex':'none';
   if(s==='crawl'){crawlY=56;crawlMusic=false;Music.play(null)}
   if(s==='menu'){menuPage='main';menuSel=1;menuHits=[];if(prev!=='menu'&&!(prev==='camp'&&campFrom==='menu'))Music.play('title')}else cv.style.cursor=''
@@ -1751,7 +1751,7 @@ const TINT={};function tinted(n,mode){const key=n+':'+mode;if(TINT[key])return T
 function stageInfo(lv){if(lv>8)return{num:'\u221e',name:'ENDLESS SECTORS',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END',best:PROG.deep?'DEEPEST SECTOR '+PROG.deep:'FROM SECTOR 9'};const c=CAMPAIGN[lv],tg=[];if(c.rescue)tg.push('RESCUE');if(c.crates)tg.push('CRATES');if(c.intelNeed)tg.push('INTEL');if(c.boss)tg.push('BOSS');if(c.timed)tg.push('TIMED');if(c.quakes)tg.push('QUAKES');
   return{num:String(lv).padStart(2,'0'),name:c.name.toUpperCase(),moon:c.moon,tags:tg.join(' \u00b7 '),best:PROG.best[lv]?'BEST '+PROG.best[lv].toLocaleString('en-US'):'NO SCORE YET'}}
 let stageSel=0,pausePage='main',pauseHits=[],pausePick=0,lockFlash=-9;
-function launchStage(n){campStageRet=false;unlockAudio();SFX.click();evidence=[];score=0;kills=0;level=n;startLevel()}
+function launchStage(n){campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;level=n;startLevel()}
 function lockIcon(x,y,s,col){ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=Math.max(1.5,s*0.16);ctx.beginPath();ctx.arc(x+s/2,y+s*0.42,s*0.27,Math.PI,0);ctx.stroke();rrect(x+s*0.12,y+s*0.42,s*0.76,s*0.58,s*0.1);ctx.fill();ctx.restore()}
 function aboutTabs(cx,y,cw,t,TL){const th=Math.max(clamp(cw/18,24,34),touchMode&&cw<560?44:0);let fs=clamp(cw/18,24,34)*0.5;const tabs=(TL||ABOUT_TABS).map(id=>[id,{story:'STORY',chars:TL?'PROFILES':'CHARACTERS',creatures:cw>640?'CREATUREPEDIA':'CREATURES',art:'ARTWORK',msgs:campDesk?(cw>560?'MISSION LOGS':'LOGS'):'MESSAGES',scans:cw>560?'FOUND SCANS':'SCANS'}[id]]);let x=cx;
   ctx.font=boxFont(fs);{const tot=()=>tabs.reduce((a,[,lb])=>a+ctx.measureText(lb).width+fs*2.2+10,-10);while(tot()>cw&&fs>8){fs-=0.5;ctx.font=boxFont(fs)}}const gapX=fs*1.1;for(const[id,lb]of tabs){const lk=false,w=ctx.measureText(lb).width+gapX*2+(lk?fs*1.4:0),on=aboutTab===id;rrect(x,y,w,th,5);ctx.fillStyle=on?'#ffd21f':'rgba(40,22,12,0.85)';ctx.fill();ctx.strokeStyle=on?'#3a0a04':'rgba(255,210,31,0.6)';ctx.lineWidth=1.5;ctx.stroke();
@@ -1865,7 +1865,7 @@ function drawStageList(X,y,W0,h,t,hits,onPick){const n=9,gap=clamp(h/90,3,7);
   const two=W0>=520&&(h-gap*(n-1)-22)/n<28,cols=two?2:1,per=Math.ceil(n/cols),cg=12,w=two?(W0-cg)/2:W0,narrow=w<520;
   let rh=two?clamp((h-gap*(per-1)-18)/per,26,44):clamp((h-gap*(n-1)-(narrow?18:22))/n,narrow?30:28,narrow?44:46);
   stageSel=clamp(stageSel,0,n-1);
-  for(let i=0;i<n;i++){const lv=i<8?i+1:9,info=stageInfo(lv),x=X+Math.floor(i/per)*(w+cg),ry=y+(i%per)*(rh+gap),on=stageSel===i;
+  for(let i=0;i<n;i++){const lv=i<8?i+1:9,capd=lv>stageCap,info=capd?{num:lv>8?'\u221e':String(lv).padStart(2,'0'),name:'LOCKED',moon:'COMPLETE MISSION '+Math.min(8,lv-1)+' FIRST',tags:'',best:'\u2014'}:stageInfo(lv),x=X+Math.floor(i/per)*(w+cg),ry=y+(i%per)*(rh+gap),on=stageSel===i;
     rrect(x,ry,w,rh,5);ctx.fillStyle=on?'#ffd21f':'rgba(40,22,12,0.85)';ctx.fill();ctx.strokeStyle=on?'#3a0a04':'rgba(255,210,31,0.45)';ctx.lineWidth=1.5;ctx.stroke();
     const nf=clamp(rh*0.42,11,19);ctx.textBaseline='middle';ctx.textAlign='left';ctx.font=boxFont(nf*1.05);ctx.fillStyle=on?'#3a0a04':'#f2741c';const nw=nf*2.1;ctx.fillText(info.num,x+nf*0.6,ry+rh/2+1);
     const bx=x+nf*0.6+nw,rightW=narrow?0:Math.min(190,w*0.3);
@@ -1874,6 +1874,7 @@ function drawStageList(X,y,W0,h,t,hits,onPick){const n=9,gap=clamp(h/90,3,7);
     else{ctx.font=boxFont(nf);ctx.fillStyle=on?'#3a0a04':'#ffd21f';ctx.fillText(info.name,bx,ry+rh/2+1);const nmw=ctx.measureText(info.name).width;ctx.font=`700 ${Math.max(8,nf*0.55)}px ${FW}`;ctx.fillStyle=on?'#5a2a10':'#bfae90';
       const sub=info.moon+(info.tags?'  \u00b7  '+info.tags:'');if(bx+nmw+16+ctx.measureText(sub).width<x+w-rightW)ctx.fillText(sub,bx+nmw+16,ry+rh/2+1);
       ctx.textAlign='right';ctx.font=`bold ${Math.max(10,nf*0.72)}px ${FB}`;ctx.fillStyle=on?'#3a0a04':(info.best.startsWith('NO')?'rgba(240,228,204,0.45)':'#f0e4cc');ctx.fillText(info.best,x+w-12,ry+rh/2+1)}
+    if(capd){ctx.textBaseline='alphabetic';rrect(x,ry,w,rh,5);ctx.fillStyle=on?'rgba(20,12,8,0.35)':'rgba(8,6,6,0.55)';ctx.fill();const ls=clamp(rh*0.42,10,18),sh=performance.now()/1000-lockFlash,dx=on&&sh<0.45?Math.sin(sh*48)*4*(1-sh/0.45):0;lockIcon(x+w-ls*1.6+dx-(narrow?0:Math.min(190,w*0.3)*0.5),ry+(rh-ls)/2,ls,on?'#3a0a04':'rgba(255,210,31,0.6)')}
     ctx.textBaseline='alphabetic';ctx.textAlign='left';const ii=i;hits.push({x,y:ry,w,h:rh,st:ii,act:()=>{stageSel=ii;onPick(lv)}})}
   const hy=y+per*(rh+gap)+(narrow?10:12);ctx.font=`12px ${FB}`;ctx.fillStyle='rgba(240,228,204,0.55)';ctx.textAlign='center';ctx.fillText((touchMode&&!(GAMEPAD_V1&&padMode))?'Tap a mission to launch \u00b7 best = mission score':KH('\u25b2 \u25bc select   \u00b7   ENTER launch   \u00b7   best = mission score'),X+W0/2,hy);ctx.textAlign='left'}
 function stageButton(x,y,w,h,sel,t){const lockedB=!gameBeaten,sh=performance.now()/1000-lockFlash,dx=sh<0.45?Math.sin(sh*48)*5*(1-sh/0.45):0;
@@ -1884,12 +1885,12 @@ function stageButton(x,y,w,h,sel,t){const lockedB=!gameBeaten,sh=performance.now
   if(twoL){ctx.font=`${cs}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=sh<1.2?'#ffd27a':'rgba(200,215,230,0.55)';ctx.fillText('Beat the campaign to unlock',x+w/2,y+h*0.78)}ctx.textBaseline='alphabetic';ctx.restore()}
 function qMenu(){return BASECAMP_V1&&campOn()}/* after Quarters unlocks: START -> QUARTERS, STAGE SELECT moves into Quarters (mission board) */
 function menuAct(i){unlockAudio();menuSel=i;const it=MENU_ITEMS[i];if(it==='START'){if(qMenu()){SFX.click();campOpen('menu');return}startGame();return}if(it==='STAGE SELECT'&&qMenu())return;SFX.click();if(it==='STAGE SELECT'&&!gameBeaten){lockFlash=performance.now()/1000;return}if(it==='STAGE SELECT'){menuPage='stages';stageSel=clamp(stageSel,0,8);menuHits=[];if(H<520&&W>H)ap.style.display='none';return}menuPage=it==='ABOUT'?'about':'controls';if(it==='ABOUT')aboutTab='story';menuHits=[];if(H<520&&W>H)ap.style.display='none'}
-function menuBack(){if(campStageRet&&menuPage==='stages'){SFX.click();campStageRet=false;artView=-1;campOpen('menu');return}SFX.click();artView=-1;menuPage='main';menuHits=[];if(state==='menu')ap.style.display='flex'}
+function menuBack(){if(campStageRet&&menuPage==='stages'){SFX.click();campStageRet=false;artView=-1;stageCap=9;campOpen(QUARTERS_HATCH?campStageFrom:'menu');return}SFX.click();artView=-1;menuPage='main';menuHits=[];if(state==='menu')ap.style.display='flex'}
 function menuMove(d){menuSel=menuSel===3?(d<0?1:1):(menuSel+d+3)%3;SFX.click()}
 function menuVert(d){if(qMenu()){if(menuSel===3)menuSel=1;return}menuSel=d>0?3:(menuSel===3?1:menuSel);SFX.click()}
 function menuKey(k){if(menuPage==='main'){if(k==='arrowleft'||k==='a')menuMove(-1);else if(k==='arrowright'||k==='d')menuMove(1);else if(k==='arrowup'||k==='w')menuVert(-1);else if(k==='arrowdown'||k==='s')menuVert(1);else if(k==='tab'){menuSel=(menuSel+1)%(qMenu()?3:4);SFX.click()}else if(k==='enter'||k===' ')menuAct(menuSel)}
   else if(menuPage==='stages'&&(k==='arrowup'||k==='w'||k==='arrowdown'||k==='s')){SFX.click();stageSel=(stageSel+(k==='arrowup'||k==='w'?-1:1)+9)%9}
-  else if(menuPage==='stages'&&(k==='enter'||k===' '))launchStage(stageSel<8?stageSel+1:9)
+  else if(menuPage==='stages'&&(k==='enter'||k===' ')){const lv=stageSel<8?stageSel+1:9;QUARTERS_HATCH?hatchPick(lv):launchStage(lv)}
   else if(menuPage==='about'&&artView>=0)galKey(k)
   else if(menuPage==='about'&&(k==='tab'||k==='c')){SFX.click();const tb=ABOUT_TABS;aboutTab=tb[(tb.indexOf(aboutTab)+1)%tb.length];artPage=0}
   else if(menuPage==='about'&&aboutTab==='art'&&(k==='arrowleft'||k==='a'||k==='arrowright'||k==='d'||k==='arrowup'||k==='w'||k==='arrowdown'||k==='s'))artGridKey(k)
@@ -2039,7 +2040,7 @@ function drawMenu(t){if(menuPage==='main'){drawMainMenu(t);return}const L=boxLay
       let best=null;for(let fs=clamp(Math.min(iw/30,avail/13),12,20);fs>=8.5;fs-=0.5){for(const cols of cw0>560?[1,2]:[1]){const r=fit(cols,fs);if(r.h<=avail){best={...r,cols,fs};break}}if(best)break}
       if(!best){const c2=cw0>560?2:1;best={...fit(c2,8.5),cols:c2,fs:8.5}}const{lines,colW,cols,fs,split}=best;
       lines.forEach(([l,pi],i)=>{if(cols===2&&i===split)return;const c=cols===2&&i>split?1:0,r=c?i-split-1:i;ctx.fillStyle=pi===3?'#8fc':'#f0e4cc';ctx.font=(pi===3?'italic bold ':'')+`${fs}px ${FB}`;ctx.fillText(l,cx+c*(colW+24),y+fs+r*fs*1.42)})}}
-    else if(menuPage==='stages')drawStageList(cx,y,cw0,bottom-y,t,menuHits,lv=>launchStage(lv));
+    else if(menuPage==='stages')drawStageList(cx,y,cw0,bottom-y,t,menuHits,lv=>QUARTERS_HATCH?hatchPick(lv):launchStage(lv));
     else{let secs=touchMode?[['TOUCH',CTRL_TOUCH],['KEYBOARD',CTRL_KEYS]]:[['KEYBOARD',CTRL_KEYS],['TOUCH',CTRL_TOUCH]];const cols=cw0>=600?2:1;const colW=(cw0-(cols-1)*28)/cols;
       const rowsPerCol=cols===2?Math.max(...secs.map(s=>s[1].length+1.4)):secs.reduce((a,s)=>a+s[1].length+1.6,0);
       let fs=clamp(Math.min(avail/(rowsPerCol*1.55),colW/24),9,17);
@@ -2222,19 +2223,34 @@ const CAMP_TABS=['chars','creatures','msgs','scans','art'];
 let campStageRet=false,campFrom='done',campPage='room',campSel=1,campHits=[],campFade=-1,campDesk=false,campStars=null,campT0=0;
 function campOn(){return BASECAMP_V1&&!!(PROG.camp||gameBeaten||PROG.best[1])}
 function campUnlock(){if(!BASECAMP_V1||PROG.camp)return;PROG.camp=1;saveProg();toast('QUARTERS UNLOCKED',null,null,'#ffbe55')}
-function campOpen(from){campFrom=from;campPage='room';campDesk=false;campFade=-1;campHits=[];campT0=performance.now()/1000;artView=-1;if(CAMP_ART){campArtT0=0;campCap=null;campArtSel=touchMode?-1:CAMP_SPOTS.findIndex(s=>s.id==='cot');campDrag=null;campPan=campPanT=0.4;campArtOn()}setState('camp');ap.style.display='none'}
+function campOpen(from){campFrom=from;campPage='room';campDesk=false;campFade=-1;campHits=[];campT0=performance.now()/1000;artView=-1;if(CAMP_ART){campArtT0=0;campCap=null;campArtSel=touchMode?-1:CAMP_SPOTS.findIndex(s=>s.id===(QUARTERS_HATCH?'hangar':'cot'));campDrag=null;campPan=campPanT=0.4;campArtOn()}setState('camp');ap.style.display='none'}
 function campLeave(){SFX.click();campDesk=false;campPage='room';if(campFrom==='pause')setState('pause');else if(campFrom==='menu')setState('menu');else{setState('levelDone')}}
 function campNext(){if(gameBeaten&&(PROG.next||1)>8)return 9;let n=PROG.next||1;for(let l=1;l<=8;l++)if(PROG.best[l])n=Math.max(n,l+1);return gameBeaten&&n>8?9:Math.min(n,gameBeaten?9:8)}
 function campNextName(){const n=campNext();return n>8?'endless sectors':'mission '+n}
 function campStages(){SFX.click();if(!gameBeaten){lockFlash=performance.now()/1000;return}campStageRet=true;campDesk=false;campPage='room';setState('menu');menuPage='stages';stageSel=clamp(campNext()-1,0,8);menuHits=[];if(H<520&&W>H)ap.style.display='none'}
-function campStations(){const beat=gameBeaten;return[
+// QUARTERS_HATCH: the hangar hatch is the mission launcher (stage select; before the campaign is beaten only missions you've reached are open),
+// the cot is rest only, and the little table under the viewport is the WORKBENCH (ship paint, coming soon). Revert: QUARTERS_HATCH=false
+const QUARTERS_HATCH=true;
+let stageCap=9,campStageFrom='menu';
+function campHatch(){SFX.click();campCap=null;stageCap=gameBeaten?9:Math.min(8,campNext());campStageFrom=campFrom;campDesk=false;campPage='room';
+  if(campFrom==='pause'){setState('pause');pausePage='stages';stageSel=clamp(level<=8?level-1:8,0,stageCap-1);return}
+  campStageRet=true;setState('menu');menuPage='stages';stageSel=clamp(campNext()-1,0,stageCap-1);menuHits=[];if(H<520&&W>H)ap.style.display='none'}
+function hatchPick(lv){if(lv>stageCap){lockFlash=performance.now()/1000;SFX.click();return false}
+  if(campStageRet&&campStageFrom==='done'&&lv===level+1){campStageRet=false;stageCap=9;SFX.click();setState('levelDone');stateT=1;advance();return true}stageCap=9;launchStage(lv);return true}
+function campStations(){const beat=gameBeaten;if(QUARTERS_HATCH)return campStationsH(beat);return[
   {id:'comm',lb:'COMM STATION',sub:'talks coming soon',act:()=>{SFX.click();campPage='comm'}},
   {id:'cot',lb:'COT',sub:campFrom==='menu'?'rest \u00b7 '+campNextName():campFrom==='pause'?'rest \u00b7 back to the mission':level>=8?'rest \u00b7 continue':'rest \u00b7 next mission',hot:true,act:campRest},
   {id:'desk',lb:'DESK',sub:'datapad archive',hot:true,act:()=>{SFX.click();campPage='desk';campDesk=true;pausePage='archive';if(!CAMP_TABS.includes(aboutTab))aboutTab='msgs';msgScroll=0;artPage=0;menuHits=[]}},
   {id:'closet',lb:'LOCKER',sub:beat?'gear coming soon':'beat the campaign',lock:!beat,act:()=>{SFX.click();campPage='closet'}},
   {id:'hangar',lb:'HANGAR',sub:'ship paint coming soon',act:()=>{SFX.click();campPage='hangar'}}].concat(CAMP_ART&&campArtOn()?[{id:'board',lb:'MISSION BOARD',sub:beat?'stage select':'beat the campaign',lock:!beat,act:campStages}]:[])}
+function campStationsH(beat){const nx=campNext(),hs=beat?'stage select':nx>8?'endless sectors':'launch \u00b7 mission '+nx;return[
+  {id:'comm',lb:'COMM STATION',sub:'talks coming soon',act:()=>{SFX.click();campPage='comm'}},
+  {id:'cot',lb:'COT',sub:'rest a while',hot:true,act:campRest},
+  {id:'desk',lb:'DESK',sub:'datapad archive',hot:true,act:()=>{SFX.click();campPage='desk';campDesk=true;pausePage='archive';if(!CAMP_TABS.includes(aboutTab))aboutTab='msgs';msgScroll=0;artPage=0;menuHits=[]}},
+  {id:'closet',lb:'LOCKER',sub:beat?'gear coming soon':'beat the campaign',lock:!beat,act:()=>{SFX.click();campPage='closet'}},
+  {id:'hangar',lb:'HANGAR HATCH',sub:hs,hot:true,act:campHatch}].concat(CAMP_ART&&campArtOn()?[{id:'bench',lb:'WORKBENCH',sub:'ship paint coming soon',act:()=>{SFX.click();campPage='bench'}},{id:'board',lb:'MISSION BOARD',sub:hs,act:campHatch}]:[])}
 function campRest(){if(campFade>=0)return;SFX.click();campFade=0}
-function campRestDone(){campFade=-1;campDesk=false;campPage='room';if(campFrom==='menu'){launchStage(campNext())}else if(campFrom==='pause'){setState('play')}else{setState('levelDone');stateT=1;advance()}}
+function campRestDone(){campFade=-1;campDesk=false;campPage='room';if(QUARTERS_HATCH)return;if(campFrom==='menu'){launchStage(campNext())}else if(campFrom==='pause'){setState('play')}else{setState('levelDone');stateT=1;advance()}}
 function campLayout(){const land=W>=H*1.05,top=Math.max(8,Math.min(W,H)*0.02);let vp,st;
   if(land){vp={x:W*0.2,y:H*0.08,w:W*0.42,h:H*0.4};st={comm:[0.02,0.42,0.14,0.26],cot:[0.18,0.66,0.22,0.2],desk:[0.43,0.58,0.19,0.28],closet:[0.66,0.3,0.12,0.38],hangar:[0.81,0.22,0.17,0.46]}}
   else{vp={x:W*0.07,y:H*0.09,w:W*0.86,h:H*0.22};st={comm:[0.03,0.42,0.28,0.13],closet:[0.36,0.36,0.28,0.19],hangar:[0.69,0.34,0.28,0.21],cot:[0.04,0.68,0.44,0.14],desk:[0.53,0.64,0.43,0.18]}}
@@ -2303,10 +2319,13 @@ const CAMP_SPOTS=[
   {id:'viewport',r:[328,112,552,252],nm:'VIEWPORT',sub:'look out',tag:[440,112],line:'Naboo, a blue-green marble past the moons. Somewhere down there, Theed\u2019s lights run on the plasma you dig.'},
   {id:'grate',r:[412,482,534,576],nm:'FLOOR GRATE',line:'Warm air from the reactor deck below. It smells of ozone and old caf.'},
   {id:'cabinet',r:[358,342,562,472],nm:'CABINET',line:'Two clean shirts, spare filters, and a tin of Brakka\u2019s \u201cemergency\u201d sweets.'},
+  {id:'bench',r:[358,342,562,472],st:'bench',nm:'WORKBENCH',tag:[460,342],hatch:1},
   {id:'closet',r:[578,122,728,482],st:'closet',nm:'LOCKER',tag:[620,122]},
   {id:'hangar',r:[778,66,924,402],st:'hangar',nm:'HANGAR HATCH',tag:[850,66]},
   {id:'cot',r:[0,298,360,418],st:'cot',nm:'COT',tag:[250,330]},
   {id:'blanket',r:[0,418,348,576],nm:'THERMAL BLANKET',line:'Guild-issue thermal blanket. Scratchy, but warm. It still has a burn hole from a welding spark.'}];
+if(QUARTERS_HATCH){for(let i=CAMP_SPOTS.length-1;i>=0;i--)if(CAMP_SPOTS[i].id==='cabinet')CAMP_SPOTS.splice(i,1);const bd=CAMP_SPOTS.find(o=>o.id==='board');if(bd)bd.line='The Guild mission board. It mirrors the hatch: pick a shift, then head down to the hangar.'}
+else{for(let i=CAMP_SPOTS.length-1;i>=0;i--)if(CAMP_SPOTS[i].hatch)CAMP_SPOTS.splice(i,1)}
 function campArtFit(){const s=Math.max(W/CAMP_IW,H/CAMP_IH),dw=CAMP_IW*s,dh=CAMP_IH*s;return{s,dw,dh,ox:dw>W?-(dw-W)*campPan:(W-dw)/2,oy:dh>H?-(dh-H)*0.4:(H-dh)/2,pan:dw>W+4}}
 function campSpotScr(sp,F){const[a,b,c,d]=sp.r;return{x:F.ox+a*F.s,y:F.oy+b*F.s,w:(c-a)*F.s,h:(d-b)*F.s}}
 function campArtAt(x,y){const F=campArtFit();for(let i=0;i<CAMP_SPOTS.length;i++){const b=campSpotScr(CAMP_SPOTS[i],F);if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h)return i}return -1}
@@ -2366,15 +2385,16 @@ function drawCamp(t){const L=campLayout();campHits=[];if(campPage!=='desk')menuH
     campHits.push({x:Math.min(b.x,lx),y:b.y,w:Math.max(b.w,lw),h:ly+lh-b.y,i,act:s.act})});
   const tf=clamp(Math.min(W/16,H/14),18,36);padChrome('QUARTERS',L.top+6,L.top+tf,tf,'left');ctx.font=`${clamp(tf*0.4,10,14)}px ${FB}`;ctx.textAlign='left';ctx.fillStyle='rgba(255,210,150,0.7)';
   ctx.fillText('Guild hauler \u00b7 crew deck'+(PROG.cr!=null?'  \u00b7  CREDITS '+PROG.cr:''),L.top+6,L.top+tf+tf*0.55);
-  const bh=touchMode?44:34,bw=clamp(tf*4,96,150);const bx=W-bw-L.top,by=L.top;if(campPage==='room')padBtn(bx,by,bw,bh,'\u25c0 BACK',{},campLeave);if(campPage==='room'&&campFrom==='menu')padBtn(bx-bw-8,by,bw,bh,'STAGES',{lock:!gameBeaten},campStages);
+  const bh=touchMode?44:34,bw=clamp(tf*4,96,150);const bx=W-bw-L.top,by=L.top;if(campPage==='room')padBtn(bx,by,bw,bh,'\u25c0 BACK',{},campLeave);if(campPage==='room'&&campFrom==='menu')padBtn(bx-bw-8,by,bw,bh,'STAGES',{lock:!gameBeaten&&!QUARTERS_HATCH},QUARTERS_HATCH?campHatch:campStages);
   if(campPage==='room'){for(const h of pauseHits.splice(0))campHits.push(h);if(!touchMode&&H>420){ctx.font='11px '+FB;ctx.textAlign='center';ctx.fillStyle='rgba(255,230,200,0.45)';ctx.fillText('\u2190 \u2192 choose  \u00b7  ENTER use  \u00b7  ESC back',W/2,H-8)}}}
   if(campPage==='desk'){pauseHits=[];ctx.fillStyle='rgba(2,4,8,0.6)';ctx.fillRect(0,0,W,H);const P=padLayout();padFrame(P,t);const{sx,sy,sw,sh}=P;const ip=clamp(sw*0.03,10,22);ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();drawPadArchive(P,sx+ip,sw-ip*2,ip,t);ctx.restore();if(artView>=0)drawArtView(t)}
   else if(campPage!=='room')campPanel(campPage,t);
-  if(campFade>=0){campFade+=1/60;const a=clamp(campFade/1.1,0,1);ctx.fillStyle=`rgba(0,0,0,${a})`;ctx.fillRect(0,0,W,H);if(a>0.6){ctx.font=`${clamp(W/30,12,18)}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=`rgba(255,220,170,${(a-0.6)*2})`;ctx.fillText(campFrom==='pause'?'A few minutes of rest\u2026':'Lights out. The hauler hums on\u2026',W/2,H/2)}if(campFade>1.5)campRestDone()}}
+  if(campFade>=0){campFade+=1/60;const a=clamp(campFade/1.1,0,1);ctx.fillStyle=`rgba(0,0,0,${a})`;ctx.fillRect(0,0,W,H);if(a>0.6){ctx.font=`${clamp(W/30,12,18)}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=`rgba(255,220,170,${(a-0.6)*2})`;ctx.fillText(QUARTERS_HATCH||campFrom==='pause'?'A few minutes of rest\u2026':'Lights out. The hauler hums on\u2026',W/2,H/2)}if(campFade>1.5)campRestDone()}}
 function campPanel(id,t){pauseHits=[];ctx.fillStyle='rgba(2,4,8,0.62)';ctx.fillRect(0,0,W,H);const pw=Math.min(W-24,560),ph=Math.min(H-24,H<480?H-24:340),px=(W-pw)/2,py=(H-ph)/2,b=clamp(Math.min(pw,ph)*0.035,9,16);
   const P={px,py,pw,ph,b,sx:px+b,sy:py+b,sw:pw-2*b,sh:ph-2*b};padFrame(P,t);const ip=clamp(P.sw*0.04,10,20),cx=P.sx+ip,cw=P.sw-ip*2;let y=P.sy+ip;const tf=clamp(Math.min(pw/16,ph/9),16,28);
   const T={closet:['MINER LOCKER',gameBeaten?'Your locker is cleared for new gear. The outfitter is still unpacking crates: full outfits, colour schemes and a male or female miner, bought with credits you earn in the deep.':'The locker is sealed with a Guild requisition tag. Finish the campaign to unlock miner customisation: outfits, colours and a male or female miner, bought with credits.'],
     hangar:['HANGAR 3','Your hover-drill sits in the cradle, scorched and dented. The paint shop is coming soon: hull colour, hazard stripes and engine glow.'],
+    bench:['WORKBENCH','Your workbench under the viewport: paint pots, masking tape and a scale model of your hover-drill. The paint shop is coming soon: hull colour, hazard stripes and engine glow.'],
     comm:['COMM STATION','Coming soon: talk to the crew between missions and hear more of their stories each time you check in.']}[id];
   padChrome(T[0],cx,y+tf*0.9,tf,'left');const bh=touchMode?44:32,bw=clamp(tf*4,90,130);padBtn(cx+cw-bw,y+(tf-bh)/2+2,bw,bh,'\u25c0 BACK',{},()=>{SFX.click();campPage='room'});y+=Math.max(tf,bh)+ip*0.8;
   const fs=clamp(cw/30,12,15);ctx.font=`${fs}px ${FB}`;ctx.textAlign='left';ctx.fillStyle=PAD_MINT;for(const l of wrapLines(T[1],cw)){ctx.fillText(l,cx,y+fs);y+=fs*1.4}
@@ -2410,7 +2430,7 @@ function drawPause(t){pauseHits=[];if(PAUSE_DATAPAD&&(pausePage==='main'||pauseP
   if(pausePage==='stages'){const top=H<480?8:Math.max(14,H*0.06),ph=H-apH-top-(H<480?2:10);rrect(px,top,pw,ph,10);ctx.fillStyle='rgba(12,8,10,0.94)';ctx.fill();ctx.strokeStyle='#e8571c';ctx.lineWidth=3;ctx.stroke();
     const pad=H<480?10:16,tf=clamp(pw/22,16,26);ctx.font=boxFont(tf);ctx.textAlign='left';ctx.fillStyle='#3a0a04';ctx.fillText('STAGE SELECT',px+pad+2,top+pad+tf+2);ctx.fillStyle='#ffd21f';ctx.fillText('STAGE SELECT',px+pad,top+pad+tf);
     const bbw=clamp(tf*4,84,130),bbh=tf*1.35,bbx=px+pw-pad-bbw,bby=top+pad+tf*0.5-bbh/2;chunkyButton(bbx,bby,bbw,bbh,'\u25c0 BACK',true,t,true,false);pauseHits.push({x:bbx-6,y:bby-6,w:bbw+12,h:bbh+12,act:()=>{SFX.click();pausePage='main'}});
-    const ly=top+pad+tf+(H<480?10:16);drawStageList(px+pad,ly,pw-pad*2,top+ph-pad-ly,t,pauseHits,lv=>{SFX.click();pausePick=lv;pausePage='confirm'});return}
+    const ly=top+pad+tf+(H<480?10:16);drawStageList(px+pad,ly,pw-pad*2,top+ph-pad-ly,t,pauseHits,lv=>{if(lv>stageCap){lockFlash=performance.now()/1000;SFX.click();return}SFX.click();pausePick=lv;pausePage='confirm'});return}
   // confirm abandoning the current run
   const cw=Math.min(480,W-30),cx=(W-cw)/2,ch=H<480?150:178,cy=Math.max(10,(H-apH-ch)/2);rrect(cx,cy,cw,ch,10);ctx.fillStyle='rgba(12,8,10,0.96)';ctx.fill();ctx.strokeStyle='#e8571c';ctx.lineWidth=3;ctx.stroke();
   const info=stageInfo(pausePick),tf=clamp(cw/20,16,24);ctx.textAlign='center';ctx.font=boxFont(tf);ctx.fillStyle='#ffd21f';ctx.fillText('ABANDON THIS RUN?',W/2,cy+tf+14);
@@ -2422,7 +2442,7 @@ function drawPause(t){pauseHits=[];if(PAUSE_DATAPAD&&(pausePage==='main'||pauseP
 function pauseTap(x,y){if(PAUSE_DATAPAD&&padTap(x,y))return;for(const h of pauseHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return}
   if(pausePage==='main')setState('play');else if(pausePage==='stages')pausePage='main';else pausePage='stages'}
 function pauseKey(k){if(PAUSE_DATAPAD&&padKey(k))return;if(pausePage==='main'){if(k==='p'||k==='escape'||k==='enter')setState('play');else if(k==='q')setState('menu');else if(k==='s'||k==='l')pauseHits.length?pauseHits[0].act():null;return}
-  if(pausePage==='stages'){if(k==='arrowup'||k==='w'||k==='arrowdown'||k==='s'){SFX.click();stageSel=(stageSel+(k==='arrowup'||k==='w'?-1:1)+9)%9}else if(k==='enter'||k===' '){SFX.click();pausePick=stageSel<8?stageSel+1:9;pausePage='confirm'}else if(k==='escape'||k==='backspace'||k==='p'){SFX.click();pausePage='main'}return}
+  if(pausePage==='stages'){if(k==='arrowup'||k==='w'||k==='arrowdown'||k==='s'){SFX.click();stageSel=(stageSel+(k==='arrowup'||k==='w'?-1:1)+9)%9}else if(k==='enter'||k===' '){SFX.click();const lv=stageSel<8?stageSel+1:9;if(lv>stageCap){lockFlash=performance.now()/1000;return}pausePick=lv;pausePage='confirm'}else if(k==='escape'||k==='backspace'||k==='p'){SFX.click();pausePage='main'}return}
   if(k==='enter'||k==='y')launchStage(pausePick);else if(k==='escape'||k==='n'||k==='backspace'){SFX.click();pausePage='stages'}}
 function pauseLines(){const L=[`Mission ${level}  ·  Crystals ${got}/${need}`+(intelTotal?`  ·  Intel ${intelGot}/${intelTotal}`:'')+(rescueNeed?`  ·  Survivors ${rescued}/${rescueNeed}`:'')+(cratesTotal?`  ·  Crates ${cratesGot}/${cratesNeed}`:''),`SCORE ${score}   ·   HIGH SCORE ${Math.max(hi,score)}`];if(W<560){const a=L[0].split('  ·  ');return[a.slice(0,2).join('  ·  '),a.slice(2).join('  ·  '),`SCORE ${score}`,`HIGH SCORE ${Math.max(hi,score)}`].filter(Boolean)}return L}
 function overlay(title,sub,lines,col){ctx.fillStyle='rgba(2,4,10,0.72)';ctx.fillRect(0,0,W,H);ctx.textAlign='center';

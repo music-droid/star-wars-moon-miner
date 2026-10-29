@@ -448,7 +448,7 @@ let spawnT=0,flow=null,flowT=0,shake=0,cam={x:0,y:0},banner=0,hurtFlash=0,gameT=
 const passable=t=>t===FLOOR||t===PAD;
 // PICKUP_NOSTICK: pulled/dropped pickups never come to rest inside rock or bedrock. Revert: PICKUP_NOSTICK=false
 const PICKUP_NOSTICK=true;
-function itemUnstick(it){const tx=clamp(Math.floor(it.x/T),0,MW-1),ty=clamp(Math.floor(it.y/T),0,MH-1);if(!solidAt(Math.floor(it.x/T),Math.floor(it.y/T)))return true;
+function itemUnstick(it){const tx=clamp(Math.floor(it.x/T),0,MW-1),ty=clamp(Math.floor(it.y/T),0,MH-1);if(passable(tileAt(Math.floor(it.x/T),Math.floor(it.y/T))))return true;
   let best=null,bd=1e9;for(let r=1;r<=8&&!best;r++)for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++){if(Math.max(Math.abs(x-tx),Math.abs(y-ty))!==r||solidAt(x,y))continue;const cx=(x+0.5)*T,cy=(y+0.5)*T,dd=(cx-it.x)**2+(cy-it.y)**2;if(dd<bd){bd=dd;best=[cx,cy]}}
   if(best){it.x=best[0];it.y=best[1];return true}return false}
 function itemDrop(it){if(PICKUP_NOSTICK){it.loose=true;itemUnstick(it)}items.push(it)}
@@ -504,10 +504,37 @@ const EP_BONUS={mine:20,rescue:40,race:40,boss:75,maze:40,heavy:40};
 // 3 a pick of RESCUE / MAZE / RIVAL RACE (weights below), 4 a MONSTER-HEAVY rich vein (3-5 rich crystals, 5 cr each) or an extra RESCUE, 5 a procedural boss.
 // Picks are seeded by depth, so a resumed save lands on the same step. Revert: PIT_FLOW_V2=false (old mine,mine,rescue,boss/race cycle)
 const PIT_FLOW_V2=true;
-const EP_STEP3_W={rescue:1,maze:1,race:1},EP_STEP4_HEAVY=0.5,EP_RICH=5; // step-3 pick weights (equal), chance step 4 is the heavy rich vein, credits per rich crystal
+const EP_STEP3_W={rescue:1,maze:1,race:1},EP_STEP3_INTRO=['rescue','race','maze'],EP_STEP4_HEAVY=0.5,EP_RICH=5; // step-3 pick weights (equal), chance step 4 is the heavy rich vein, credits per rich crystal
 const EP_KNAME={mine:'MINING',quiet:'QUIET SEAM',rescue:'RESCUE',maze:'MAZE',race:'RIVAL RACE',heavy:'RICH VEIN',boss:'BOSS'};
 function epStep(c){return((c-1)%5)+1}
-function epPick3(c){const R=mulberry((Math.imul(c,40503)+7)>>>0);R();const w=Object.entries(EP_STEP3_W).filter(([k,v])=>v>0&&(k!=='maze'||(typeof MAZE_LEVELS!=='undefined'&&MAZE_LEVELS)));if(!w.length)return'rescue';let r=R()*w.reduce((a,b)=>a+b[1],0);for(const[k,v]of w)if((r-=v)<0)return k;return w[w.length-1][0]}
+// MAZE_LEVELS (Justin): Pit step-3 maze: monster-free, no timer, no hazards. A perfect labyrinth of 2-thick bedrock (2-wide corridors), 4-6 crystals in far dead ends
+// (quota = count-1), exactly 2-4 burrowable shortcut walls drawn as cracked rock. Solvable without shortcuts (BFS-checked at generation). Revert: MAZE_LEVELS=false (step 3 = rescue/race)
+const MAZE_LEVELS=true;
+let mazeCrack=null,mazeInfo=null;
+function mazeGen(R,cells,set){const N=cells*cells,link=new Uint8Array(N*4),vis=new Uint8Array(N),st=[0],DX=[1,0,-1,0],DY=[0,1,0,-1];vis[0]=1;
+  for(let y=2;y<MH-2;y++)for(let x=2;x<MW-2;x++)map[y*MW+x]=BED;
+  const room=(cx,cy)=>{const ox=3+cx*4,oy=3+cy*4;for(let a=0;a<2;a++)for(let b=0;b<2;b++)map[(oy+b)*MW+ox+a]=FLOOR};
+  const wall=(cx,cy,d)=>{const ox=3+cx*4,oy=3+cy*4,o=[];for(let j=2;j<4;j++)for(let k=0;k<2;k++)o.push(d===0?(oy+k)*MW+ox+j:d===1?(oy+j)*MW+ox+k:d===2?(oy+k)*MW+ox-j+1:(oy-j+1)*MW+ox+k);return o};
+  room(0,0);while(st.length){const c=st[st.length-1],cx=c%cells,cy=(c/cells)|0,nb=[];for(let d=0;d<4;d++){const nx=cx+DX[d],ny=cy+DY[d];if(nx>=0&&ny>=0&&nx<cells&&ny<cells&&!vis[ny*cells+nx])nb.push(d)}
+    if(!nb.length){st.pop();continue}const d=nb[(R()*nb.length)|0],n=(cy+DY[d])*cells+cx+DX[d];vis[n]=1;link[c*4+d]=1;link[n*4+(d+2)%4]=1;for(const i of wall(cx,cy,d))map[i]=FLOOR;room(n%cells,(n/cells)|0);st.push(n)}
+  const cbfs=s0=>{const D=new Int16Array(N).fill(-1),q=[s0];D[s0]=0;for(let h=0;h<q.length;h++){const c=q[h];for(let d=0;d<4;d++)if(link[c*4+d]){const n=c+(d===0?1:d===2?-1:d===1?cells:-cells);if(D[n]<0){D[n]=D[c]+1;q.push(n)}}}return D};
+  const D0=cbfs(0);let pc=0;for(let c=0;c<N;c++)if(D0[c]>D0[pc])pc=c;
+  // shortcuts: unlinked walls that cut the most off the routes from the start to the lift + dead ends (where crystals go), spread apart; 2-4 of them, bedrock -> cracked soft rock
+  const obj=[pc];for(let c=1;c<N;c++){let k=0;for(let d=0;d<4;d++)k+=link[c*4+d];if(k===1&&c!==pc)obj.push(c)}
+  const want=2+((R()*3)|0),cand=[];for(let c=0;c<N;c++){const cx=c%cells,cy=(c/cells)|0;for(const d of[0,1]){const nx=cx+DX[d],ny=cy+DY[d];if(nx>=cells||ny>=cells||link[c*4+d])continue;const n=ny*cells+nx;if(Math.abs(D0[n]-D0[c])<5)continue;link[c*4+d]=link[n*4+d+2]=1;const D1=cbfs(0);link[c*4+d]=link[n*4+d+2]=0;let save=0;for(const o of obj)save+=D0[o]-D1[o];if(save>0)cand.push({c,d,n,save,r:R()})}}
+  cand.sort((a,b)=>b.save-a.save||a.r-b.r);const cut=[];mazeCrack=new Set();
+  for(const sp of[cells*0.45,cells*0.3,2,0])for(const k of cand){if(cut.length>=want)break;if(cut.includes(k))continue;const kx=k.c%cells,ky=(k.c/cells)|0;if(!cut.every(o=>Math.abs(o.c%cells-kx)+Math.abs(((o.c/cells)|0)-ky)>=sp))continue;cut.push(k)}
+  for(const k of cut)for(const i of wall(k.c%cells,(k.c/cells)|0,k.d)){map[i]=ROCK;mazeCrack.add(i)}
+  // start chamber and lift chamber (4x4: opens half a wall at most, never a new connection)
+  for(let y=2;y<=5;y++)for(let x=2;x<=5;x++)map[y*MW+x]=FLOOR;const px=3+(pc%cells)*4,py=3+((pc/cells)|0)*4;for(let y=py-1;y<=py+2;y++)for(let x=px-1;x<=px+2;x++)map[y*MW+x]=FLOOR;
+  const ends=[];for(let c=1;c<N;c++){if(c===pc)continue;let k=0;for(let d=0;d<4;d++)k+=link[c*4+d];if(k===1)ends.push(c)}
+  mazeInfo={cells,link,pc,cut:cut.length,ends,D0};return py*MW+px}
+// cracked-rock look for the shortcut walls: dark fissures with pale chipped edges (no amber: these aren't seams)
+function crackMark(c,px,py,x,y){const h=hash(x*7+3,y*13+5),h2=hash(y*5+1,x*3+7);c.save();c.lineCap='round';c.lineJoin='round';
+  for(const[col,lw,ox]of[['rgba(225,235,250,0.35)',2.6,0.8],['rgba(4,5,8,0.95)',1.6,0]]){c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.moveTo(px+T*(0.1+h*0.3)+ox,py+ox);c.lineTo(px+T*(0.45+h2*0.2)+ox,py+T*(0.4+h*0.2)+ox);c.lineTo(px+T*(0.2+h2*0.3)+ox,py+T+ox);
+    c.moveTo(px+T*(0.45+h2*0.2)+ox,py+T*(0.4+h*0.2)+ox);c.lineTo(px+T+ox,py+T*(0.25+h2*0.5)+ox);c.moveTo(px+ox,py+T*(0.55+h*0.3)+ox);c.lineTo(px+T*(0.3+h*0.2)+ox,py+T*(0.65+h2*0.2)+ox);c.stroke()}
+  c.fillStyle='rgba(0,0,0,0.35)';for(let k=0;k<4;k++)c.fillRect(px+hash(x+k*3,y)*T*0.9,py+hash(y+k*5,x)*T*0.9,2,2);c.restore()}
+function epPick3(c){const R=mulberry((Math.imul(c,40503)+7)>>>0);R();const w=Object.entries(EP_STEP3_W).filter(([k,v])=>v>0&&(k!=='maze'||(typeof MAZE_LEVELS!=='undefined'&&MAZE_LEVELS)));if(!w.length)return'rescue';const intro=EP_STEP3_INTRO.filter(k=>w.some(x=>x[0]===k)),j=(c-3)/5;if(j>=0&&j<intro.length&&j===Math.floor(j))return intro[j];let r=R()*w.reduce((a,b)=>a+b[1],0);for(const[k,v]of w)if((r-=v)<0)return k;return w[w.length-1][0]}
 function epPick4(c){const R=mulberry((Math.imul(c,69069)+3)>>>0);R();return R()<EP_STEP4_HEAVY?'heavy':'rescue'}
 function epQuiet1(){return PIT_FLOW_V2&&EP_CYCLE&&!!ep&&ep.kind==='mine'&&epStep(ep.c)===1}
 function epCapNow(){const c=ep.c,k=epCap(c);if(!PIT_FLOW_V2)return k;if(ep.kind==='heavy')return Math.min(8,k+3);if(ep.kind==='maze')return 0;return epQuiet1()?Math.max(1,k-1):k}
@@ -522,7 +549,7 @@ function epCap(c){return Math.min(5,2+Math.floor((c-1)/6))}
 function epGap(c){return Math.max(9,16-0.35*(c-1))}
 function epVet(c){return Math.min(0.25,0.25*(c-1)/19)}
 function epMul(c){if(!EP_PEACE)return 1;return Math.min(1.3,1+0.03*Math.floor(c/4))}
-function epMods(c,kind){if(c<2||!EP_HAZARDS)return[];const R=mulberry((c*7919+101)>>>0);let pool=EP_HZ.filter(h=>h[1]<=c);
+function epMods(c,kind){if(c<2||!EP_HAZARDS||(kind==='maze'&&MAZE_LEVELS))return[];const R=mulberry((c*7919+101)>>>0);let pool=EP_HZ.filter(h=>h[1]<=c);
   if(kind==='race')pool=pool.filter(h=>['gas','quakes','dark','unstable','static'].includes(h[0]));if(kind==='boss')pool=pool.filter(h=>h[0]!=='collapse');
   const n=c<6?1:c<16?2:3,out=[],intro=pool.find(h=>h[1]===c);if(intro)out.push(intro);if(kind==='boss'&&c===(PIT_FLOW_V2?5:4)&&!out.some(h=>h[0]==='quakes'))out.push(EP_HZ[2]);
   const rest=pool.filter(h=>!out.includes(h));while(out.length<n&&rest.length)out.push(rest.splice((R()*rest.length)|0,1)[0]);return out.slice(0,3)}
@@ -536,12 +563,13 @@ function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),
   else if(kind==='rescue'){cfg.crystals=Math.round(Q*0.5);cfg.rescue=Math.min(5,3+Math.floor(c/10));cfg.name='Lost Crew \u00b7 '+SECTORS[(c+3)%SECTORS.length];
     cfg.rescueLines=['Pilot! Thought we\u2019d die down here.','Another one! Tell the Guild we\u2019re still breathing.','Get me out of this hole, I\u2019m done with mining.','Watch the nests on the way back, they\u2019re everywhere.','That\u2019s all of us. Go, go!']}
   else if(kind==='heavy'){const R=mulberry((Math.imul(c,2246822519)+11)>>>0);R();const n=3+((R()*3)|0);cfg.crystals=n;cfg.rich=n;cfg.richNeed=Math.max(3,n-1);cfg.name='Rich Vein \u00b7 '+SECTORS[(c+6)%SECTORS.length];cfg.music='tension';cfg.maxMobs=Math.min(8,epCap(c)+3)}
+  else if(kind==='maze'){const R=mulberry((Math.imul(c,1597334677)+5)>>>0);R();const n=4+((R()*3)|0);cfg.crystals=n;cfg.maze=true;cfg.mazeN=n;cfg.mazeNeed=n-1;cfg.cells=Math.min(13,9+Math.floor(c/12));cfg.name='The Warrens \u00b7 '+SECTORS[(c+2)%SECTORS.length];cfg.maxMobs=0}
   else if(kind==='boss'){cfg.crystals=Math.round(Q*0.4);cfg.boss=true;cfg.music='tension';if(EP_BOSSGEN){cfg.pit.boss=epBossGen(c);cfg.name='Lair of '+cfg.pit.boss.name.split(' ')[0].charAt(0)+cfg.pit.boss.name.split(' ')[0].slice(1).toLowerCase()}else cfg.name='The Hive Lair'}
   else{cfg.crystals=0;cfg.tunnel=true;cfg.timed=1;cfg.cells=15;cfg.music='tension';cfg.pad='TUNNEL EXIT';cfg.name='Collapsed Haul Tunnel';cfg.spawnMul=1.4;delete cfg.maxMobs}
   if(has('pockets')&&kind!=='race'&&kind!=='heavy'){cfg.pockets=true;cfg.epPockets=Math.min(5,2+Math.floor(c/6))}
   if(has('quakes'))cfg.quakes=true;if(has('static'))cfg.static=true;
   const hz=cfg.pit.names.length?' Hazards: '+cfg.pit.names.join(', ').toLowerCase()+'.':'';
-  const what=kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epStep(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
+  const what=kind==='maze'?`No bugs on the scope, sir. Only an old bedrock labyrinth, and ${cfg.mazeN} crystals tucked away in its dead ends. Bring up ${cfg.mazeNeed}. Bedrock won\u2019t drill, but a few walls are cracked through. Burrow those if you find them.`:kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epStep(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
   cfg.brief=[['D',`The Pit, depth ${c}. ${what}${hz}`]];
   if(c===1)cfg.brief.unshift(['F','The campaign\u2019s over, kid, but the Guild still pays. Every crystal you bring up is a credit in your account, and they\u2019re yours to keep even if you crash. Most of the bugs down here are asleep. Let \u2019em lie.']);
   if(c===1&&PIT_FLOW_V2&&EP_CYCLE)cfg.brief.push(['D','Shifts run in fives. Two seams, a wildcard, a rich vein or a rescue, then whatever is nesting at the bottom. Then you do it again, deeper.']);
@@ -558,6 +586,12 @@ function epGen(dd){const P=cfg.pit,c=P.c,has=k=>P.mods.includes(k),R=mulberry((D
   const fl=ep.floors.slice().sort(()=>R()-0.5),far=(arr,x,y,s)=>arr.every(o=>dist(o.x,o.y,x,y)>s);
   if(has('gas')){const n=Math.min(10,4+Math.floor(c/3));for(const i of fl){if(ep.gas.length>=n)break;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(dist(x,y,4*T,4*T)<10*T||!far(ep.gas,x,y,T*7))continue;ep.gas.push({x,y,r:T*(1.6+R()*0.8),ph:R()*6,fuse:-1})}}
   if(has('flood')){const n=Math.min(7,3+Math.floor(c/6));for(const i of fl){if(ep.flood.length>=n)break;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(dist(x,y,4*T,4*T)<7*T||!far(ep.flood,x,y,T*9))continue;ep.flood.push({x,y,r:T*(3+R()*2.5),ph:R()*6})}}
+  if(P.kind==='maze'&&mazeInfo){const M=mazeInfo,cl=M.cells,cx=c=>3+(c%cl)*4+1,cy=c=>3+((c/cl)|0)*4+1,dd2=bfs(4,4,9999);
+    items=items.filter(it=>it.type!=='crystal'&&passable(tileAt(Math.floor(it.x/T),Math.floor(it.y/T))));const E=M.ends.slice().sort((a,b)=>M.D0[b]-M.D0[a]),pick=[];
+    for(const sp of[cl*0.5,cl*0.3,2,0])for(const e of E){if(pick.length>=cfg.mazeN)break;if(pick.includes(e)||M.D0[e]<2||!pick.every(o=>Math.abs(o%cl-e%cl)+Math.abs(((o/cl)|0)-((e/cl)|0))>=sp))continue;pick.push(e)}
+    if(pick.length<cfg.mazeN){const C=[];for(let k=1;k<cl*cl;k++)if(k!==M.pc&&!pick.includes(k))C.push(k);C.sort((a,b)=>M.D0[b]-M.D0[a]);while(pick.length<cfg.mazeN&&C.length)pick.push(C.shift())}
+    for(const e of pick)items.push({x:cx(e)*T,y:cy(e)*T,type:'crystal',ph:R()*6,maze:1});need=Math.min(cfg.mazeNeed,pick.length);if(crystalPlan)crystalPlan.need=need;
+    ep.mazeOK=pick.every(e=>dd2[(cy(e))*MW+cx(e)]>0)&&dd2[Math.floor(padY/T)*MW+Math.floor(padX/T)]>0}
   if(P.kind==='heavy'&&cfg.rich){const cr=items.filter(it=>it.type==='crystal'&&!it.cache).sort((a,b)=>dist(b.x,b.y,4*T,4*T)-dist(a.x,a.y,4*T,4*T)),keep=new Set(cr.slice(0,cfg.rich));
     items=items.filter(it=>it.type!=='crystal'||it.cache||keep.has(it));for(const it of keep)it.rich=1;need=Math.min(cfg.richNeed,keep.size);if(crystalPlan)crystalPlan.need=need}
   if(has('unstable')){const cr=items.filter(it=>it.type==='crystal'&&!it.cache&&!it.rich);for(const it of cr)if(R()<0.22)it.unst=1}}
@@ -688,11 +722,13 @@ function genLevel(lv){
     const fl=[];for(let i=0;i<MW*MH;i++)if(map[i]===FLOOR)fl.push(i);
     for(const i of fl){const x=i%MW,y=(i/MW)|0;for(let b=-2;b<=2;b++)for(let a=-2;a<=2;a++){const X=x+a,Y=y+b;if(X>=2&&Y>=2&&X<MW-2&&Y<MH-2&&map[Y*MW+X]===BED)map[Y*MW+X]=ROCK}}
     tunPath=P}
+  mazeCrack=null;mazeInfo=null;const mazePad=MAZE_LEVELS&&cfg.maze?mazeGen(R,cells,set):-1;
   // extraction lift: farthest reachable point
   let d=bfs(4,4,9999),best=0,bi=0;for(let i=0;i<d.length;i++){if(d[i]<0)continue;const sc=d[i]+3*Math.hypot(i%MW-4,((i/MW)|0)-4);if(sc>best){best=sc;bi=i}}
   if(cfg.hall){const cx0=MW/2,cy0=(11+MH-3)/2;let bd=1e9;for(let i=0;i<d.length;i++){if(d[i]<0||map[i]!==FLOOR)continue;const x=i%MW,y=(i/MW)|0;if(y<14)continue;const q=Math.hypot(x-cx0,y-cy0);if(q<bd){bd=q;bi=i}}}
   if(tunPath){const e=tunPath[tunPath.length-1];bi=e[1]*MW+e[0]}
-  const ptx=bi%MW,pty=(bi/MW)|0;circ(ptx,pty,cfg.hall?4.6:tunPath?2.6:3.2);
+  if(mazePad>=0)bi=mazePad;
+  const ptx=bi%MW,pty=(bi/MW)|0;if(mazePad<0)circ(ptx,pty,cfg.hall?4.6:tunPath?2.6:3.2);
   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)set(ptx+a,pty+b,PAD);
   padX=(ptx+0.5)*T;padY=(pty+0.5)*T;
   // M6_V2 sealed pockets: a maze dead-end cell (2x2 floor) is sealed in a 2-thick bedrock shell; its one corridor becomes soft rock (the amber seam)
@@ -851,7 +887,8 @@ function drawTile(x,y){if(x<0||y<0||x>=MW||y>=MH)return;const c=mctx,px=x*T,py=y
     if(!solidAt(x,y+1)){c.fillStyle='rgba(0,0,0,0.5)';c.fillRect(px,py+T-4,T,4)}
   }
   if(ROCK_FX)rockDress(c,x,y,px,py,t,h,h2);
-  if(t===ROCK&&weakSet&&weakSet.has(y*MW+x))weakMark(c,px,py,x,y)}
+  if(t===ROCK&&weakSet&&weakSet.has(y*MW+x))weakMark(c,px,py,x,y);
+  if(t===ROCK&&MAZE_LEVELS&&mazeCrack&&mazeCrack.has(y*MW+x))crackMark(c,px,py,x,y)}
 function weakMark(c,px,py,x,y){const h=hash(x*13+5,y*7+1),h2=hash(y*3+2,x*11+9),mx=px+T*(0.3+h2*0.4),my=py+T*(0.35+h*0.3);c.save();c.lineCap='round';c.lineJoin='round';
   for(const[col,lw,bl]of[['rgba(255,150,40,0.5)',3.2,8],['rgba(255,205,120,0.95)',1.3,3]]){c.shadowColor='#ff9a30';c.shadowBlur=bl;c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.moveTo(px+T*h,py);c.lineTo(mx,my);c.lineTo(px+T*(1-h*0.7),py+T);c.moveTo(mx,my);c.lineTo(h2>0.5?px+T:px,py+T*(0.25+h*0.5));c.stroke()}c.restore()}
 function breakTile(tx,ty,quiet){const i=ty*MW+tx;if(map[i]!==ROCK)return;map[i]=FLOOR;

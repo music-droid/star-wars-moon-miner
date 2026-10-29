@@ -877,7 +877,7 @@ function burst(c){const tx=c.tx,ty=c.ty,cx=(tx+0.5)*T,cy=(ty+0.5)*T;
   const n=c.type==='crawler'&&level>2&&!midCalm()&&Math.random()<0.4?2:1;for(let k=0;k<n;k++)spawnMob(c.type,cx+rnd(-4,4),cy+rnd(-4,4))}
 function boom(x,y,sz,col){for(let k=0;k<14*sz+6;k++){const a=Math.random()*6.283,s=rnd(40,260)*Math.sqrt(sz);parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rnd(0.3,0.8)*(0.7+sz*0.3),max:0.8,c:col||'#fa4',s:rnd(2,4)*Math.min(2,sz+0.4),drag:2.5,g:1})}
   parts.push({x,y,vx:0,vy:0,life:0.25,max:0.25,c:'#fff',s:22*sz,drag:0,g:1,flash:1});SFX.boom(sz)}
-function kill(m){logCreature(m.type);if(epOn()&&ep)epOnKill(m);if(midCalm()&&m.type!=='boss')spawnT=Math.max(spawnT,MID_BREATHER[level]);const p=MOB[m.type].pts;score+=p;kills++;boom(m.x,m.y,m.type==='boss'?4:m.type==='worm'?1.3:0.8,m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':m.type==='boss'?'#e5f':'#f84');
+function kill(m){logCreature(m.type,m);if(epOn()&&ep)epOnKill(m);if(midCalm()&&m.type!=='boss')spawnT=Math.max(spawnT,MID_BREATHER[level]);const p=MOB[m.type].pts;score+=p;kills++;boom(m.x,m.y,m.type==='boss'?4:m.type==='worm'?1.3:0.8,m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':m.type==='boss'?'#e5f':'#f84');
   if(m.type==='worm')for(const s of m.seg)boom(s.x,s.y,0.3,'#c88');
   toast('+'+p,m.x,m.y,'#ffd27a');
   const r=Math.random();
@@ -905,7 +905,9 @@ function laneTick(){if(!laneQ.length||banner>0.8||toasts.some(q=>q.unl))return;c
 function noteLine(who,text){msgLog(who,text);if(who==='S')unlockDossier('Vm');if(who==='F'||who==='D'||who==='R')unlockDossier(who);if(/\bSykes\b/.test(text))unlockDossier('R');if(/\bVosh\b/i.test(text))unlockDossier('Vm')}
 function unlockDossier(k){if(k==='V'&&!PROG.d.Vm)PROG.d.Vm=1;if(PROG.d[k])return;const upd=k==='V';PROG.d[k]=1;saveProg();
   laneToast((upd?'DOSSIER UPDATED \u00b7 ':'DOSSIER UNLOCKED \u00b7 ')+({F:'FOREMAN BRAKKA TOLN',D:'PIK',R:'CAPT. GAVIN SYKES',Vm:'SURVEY CHIEF VOSH',V:'DELLAN VOSH'}[k]),'#ffd21f')}
-function logCreature(type){if(PROG.c[type])return;PROG.c[type]=1;saveProg();const c=CREATURES.find(c=>c.id===type);laneToast('CREATURE LOGGED \u00b7 '+(c?c.name:type.toUpperCase()),'#ff8f7a')}
+// BOSS_LOG_NAME: in the Endless Pit the creature-logged toast names the generated boss (e.g. NYXAMAR THE HOLLOW QUEEN), not THE HIVE MOTHER. Revert: BOSS_LOG_NAME=false
+const BOSS_LOG_NAME=true;
+function logCreature(type,m){if(PROG.c[type])return;PROG.c[type]=1;saveProg();const c=CREATURES.find(c=>c.id===type);laneToast('CREATURE LOGGED \u00b7 '+(BOSS_LOG_NAME&&m&&m.ep&&m.ep.name?m.ep.name:c?c.name:type.toUpperCase()),'#ff8f7a')}
 // GIMBAL_V1: belly cannon on a limited gimbal. Soft-locks the nearest visible enemy inside a forward cone and slews toward it at a capped rate; outside the cone it fires straight ahead.
 const GIM_MAX=0.7/* ~40 deg */,GIM_RATE=2.6/* rad/s, ~150 deg/s */,AIM_RANGE=360;
 function aimUpdate(dt){if(ship.gim==null){ship.gim=0;ship.tgt=null;ship.lk=0;ship.asc=0}if(!(ship.lk>=0))ship.lk=0;let want=0,manual=false;
@@ -1163,7 +1165,7 @@ function updatePlay(dt){
   let threat=0;
   if(cfg.hall)m7Tick(dt);
   for(const m of mobs){m.t+=dt;m.hf=Math.max(0,m.hf-dt);if(m.dormant){m.vx=m.vy=0;continue}m.stun=Math.max(0,m.stun-dt);const dx=ship.x-m.x,dy=ship.y-m.y,d=Math.hypot(dx,dy)||1;const EPM=epOn()&&ep?epMul(ep.c):0;if(EPM&&m.asleep&&epSleep(m,d))continue;if(EPM&&m.type!=='boss')m.cd-=dt*(EPM-1);
-    if(!PROG.c[m.type]&&d<300&&(m.type==='worm'||m.type==='boss'||los(m.x,m.y,ship.x,ship.y)))logCreature(m.type);
+    if(!PROG.c[m.type]&&d<300&&(m.type==='worm'||m.type==='boss'||los(m.x,m.y,ship.x,ship.y)))logCreature(m.type,m);
     if(d<420)threat+=m.type==='boss'?2:(1-d/420)*(m.type==='worm'?0.8:0.5);
     let tvx=0,tvy=0,spd=MOB[m.type].sp*(EPM?EPM:1+Math.min(0.5,(level-1)*0.05));if(m.type!=='boss')spd=Math.min(spd,CHASE_CAP);
     if(m.type==='crawler'){const[fx,fy]=flowDir(m);tvx=fx*spd;tvy=fy*spd}

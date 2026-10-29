@@ -556,7 +556,23 @@ function epMods(c,kind){if(c<2||!EP_HAZARDS||(kind==='maze'&&MAZE_LEVELS))return
 function epBossGen(c){const R=mulberry((c*2654435761+17)>>>0),pk=a=>a[(R()*a.length)|0];const atk=EP_ATK.slice();const A=[];while(A.length<3)A.push(atk.splice((R()*atk.length)|0,1)[0]);
   const bm=EP_BMOD.slice(),M=[];const nm=c>=12?2:1;while(M.length<nm)M.push(bm.splice((R()*bm.length)|0,1)[0]);
   const hue=Math.floor(R()*300)+30,rgbs=['255,90,60','90,200,255','255,210,70','120,255,140','255,90,200','180,120,255'];
-  return{name:(pk(EP_BN1)+pk(EP_BN2)).toUpperCase()+' '+pk(EP_BN3).toUpperCase(),short:'',atk:A,mods:M.map(m=>m[0]),modNames:M.map(m=>m[1]),hue,rgb:pk(rgbs)}}
+  const B={name:(pk(EP_BN1)+pk(EP_BN2)).toUpperCase()+' '+pk(EP_BN3).toUpperCase(),short:'',atk:A,mods:M.map(m=>m[0]),modNames:M.map(m=>m[1]),hue,rgb:pk(rgbs)};
+  if(BOSS_SHAPES){B.shape=bossShape(c,hue);const sg=BOSS_PLANS[B.shape.plan].sig;if(!A.includes(sg))A[2]=sg}return B}
+// BOSS_SHAPES (Justin): every Pit boss gets a procedural body from a data table: plan (worm / serpent / crab / spider / jelly), segment + limb counts, head type,
+// carapace pattern, colour from its hue. One vector renderer (bossBodyDraw) draws it in the Pit and in its Creaturepedia portrait; each plan swaps in a
+// signature attack that fits the body. Campaign Hive Mother keeps her sprite. Revert: BOSS_SHAPES=false
+const BOSS_SHAPES=true;
+// plan: seg/limb [min,max], len = body length behind centre (x r), f/b/side = extent for portraits, sig = signature attack, heads/pats allowed
+const BOSS_PLANS={worm:{seg:[6,9],limb:[0,0],f:1.05,b:2.1,side:0.62,sig:'charge',heads:['maw','mandible','horned'],noun:'tunnel worm'},
+  serpent:{seg:[9,13],limb:[0,0],f:1.05,b:2.7,side:0.55,sig:'spiral',heads:['horned','crest','maw'],noun:'rock serpent'},
+  crab:{seg:[1,1],limb:[3,4],f:1.35,b:0.95,side:1.45,sig:'strike',heads:['eyestalk','mandible'],noun:'carapace crab'},
+  spider:{seg:[2,2],limb:[4,4],f:1.0,b:1.15,side:1.55,sig:'brood',heads:['mandible','eyecluster'],noun:'cave spider'},
+  jelly:{seg:[1,1],limb:[5,9],f:0.85,b:1.95,side:0.9,sig:'nova',heads:['eyecluster','crest'],noun:'drifting jelly'}};
+const BOSS_PATS=['bands','spots','plates','veins'];
+function bossShape(c,hue){const R=mulberry((Math.imul(c,40503)+7717)>>>0),pk=a=>a[(R()*a.length)|0],rg=a=>a[0]+((R()*(a[1]-a[0]+1))|0);
+  const ks=Object.keys(BOSS_PLANS),k=ks[(c+((R()*ks.length)|0))%ks.length],P=BOSS_PLANS[k],seg=rg(P.seg),limb=rg(P.limb);
+  const desc=k==='worm'||k==='serpent'?seg+'-segmented':k==='jelly'?limb+'-tentacled':(limb*2)+'-legged';
+  return{plan:k,seg,limb,head:pk(P.heads),pat:pk(BOSS_PATS),hue,sat:35+((R()*30)|0),lit:30+((R()*14)|0),ph:R()*6.28,noun:desc+' '+P.noun}}
 function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),has=k=>mods.some(m=>m[0]===k);
   const cfg={moon:c%2?'OHMA-D\u2019UN':'RORI',name:'',spawnMul:1,music:'explore',intel:[],pit:{c,kind,Q,mods:mods.map(m=>m[0]),names:mods.map(m=>m[2])},cells:Math.min(20,10+Math.floor(c/2)),maxMobs:epCap(c)};
   if(kind==='mine'){cfg.crystals=Q;cfg.name=SECTORS[(c-1)%SECTORS.length]}
@@ -1532,6 +1548,43 @@ const EYECOL={crawler:'255,150,40',spitter:'90,150,210',worm:'255,90,70',scorpio
 // sprite scale per type so the painted body matches the hitbox (m.r)
 const MOB_SPR={crawler:['crawler',1],spitter:['mite',0.95],scorpion:['scorpion',1],boss:['boss',1]};
 const MITE_GLINT=[[-4,-3],[-1,2.5],[-6,1],[1,-1.5],[-2.5,-5]];
+// draws a BOSS_SHAPES body facing +x around (0,0) at size R (the boss radius); g = any 2d context; fl = hit-flash / phase-2 extra light
+function bossBodyDraw(g,S,t,R,rgb,ph2,fl){const P=BOSS_PLANS[S.plan],h=S.hue,col=(l,a)=>`hsla(${h},${S.sat}%,${l}%,${a==null?1:a})`,L=S.lit,tt=t+S.ph;
+  const blob=(x,y,rx,ry,a)=>{g.save();g.translate(x,y);g.rotate(a||0);const gr=g.createRadialGradient(-rx*0.3,-ry*0.35,1,0,0,Math.max(rx,ry));gr.addColorStop(0,col(L+22));gr.addColorStop(0.6,col(L));gr.addColorStop(1,col(L-16));
+    g.fillStyle=gr;g.beginPath();g.ellipse(0,0,rx,ry,0,0,6.283);g.fill();g.strokeStyle=col(L-22);g.lineWidth=Math.max(1,R*0.03);g.stroke();
+    // carapace pattern
+    g.globalAlpha=0.55;if(S.pat==='bands'){g.strokeStyle=col(L-20);g.lineWidth=Math.max(1,ry*0.16);for(const q of[-0.4,0.1])g.beginPath(),g.ellipse(rx*q,0,rx*0.18,ry*0.9,0,-1.5,1.5),g.stroke()}
+    else if(S.pat==='spots'){g.fillStyle=col(L+30);for(let i=0;i<4;i++){const a=i*2.4+S.ph;g.beginPath();g.arc(Math.cos(a)*rx*0.45,Math.sin(a)*ry*0.45,Math.max(1,Math.min(rx,ry)*0.13),0,6.283);g.fill()}}
+    else if(S.pat==='plates'){g.strokeStyle=col(L+18);g.lineWidth=Math.max(1,R*0.025);for(let i=-1;i<=1;i++)g.beginPath(),g.arc(rx*(i*0.35-0.4),0,ry*0.75,-0.9,0.9),g.stroke()}
+    else{g.globalAlpha=0.35+0.45*(ph2?0.5+0.5*Math.sin(tt*6):0.4);g.strokeStyle=`rgb(${rgb})`;g.lineWidth=Math.max(0.8,R*0.022);g.beginPath();g.moveTo(-rx*0.8,0);g.quadraticCurveTo(0,-ry*0.6,rx*0.7,-ry*0.1);g.moveTo(-rx*0.3,ry*0.1);g.quadraticCurveTo(rx*0.2,ry*0.6,rx*0.6,ry*0.3);g.stroke()}
+    g.globalAlpha=1;g.restore()};
+  const leg=(x,y,a,l1,l2,bend,w)=>{const kx=x+Math.cos(a)*l1,ky=y+Math.sin(a)*l1,a2=a+bend;g.strokeStyle=col(L-12);g.lineCap='round';g.lineWidth=w;g.beginPath();g.moveTo(x,y);g.lineTo(kx,ky);g.lineTo(kx+Math.cos(a2)*l2,ky+Math.sin(a2)*l2);g.stroke();
+    g.fillStyle=col(L+8);g.beginPath();g.arc(kx,ky,w*0.55,0,6.283);g.fill()};
+  const eyes=(x,y,n,sp,r)=>{for(let i=0;i<n;i++){const yy=y+(i-(n-1)/2)*sp,xx=x-Math.abs(i-(n-1)/2)*sp*0.5;g.fillStyle='rgba(0,0,0,0.7)';g.beginPath();g.arc(xx,yy,r*1.4,0,6.283);g.fill();g.fillStyle=`rgb(${rgb})`;g.beginPath();g.arc(xx,yy,r,0,6.283);g.fill();g.fillStyle='rgba(255,255,255,0.8)';g.fillRect(xx-r*0.3,yy-r*0.5,r*0.5,r*0.5)}};
+  let hx=R*0.62,hr=R*0.34;
+  if(S.plan==='worm'||S.plan==='serpent'){const n=S.seg,len=R*P.b,amp=R*(S.plan==='serpent'?0.32:0.18),sr=S.plan==='serpent'?0.42:0.55;const pts=[];
+    for(let i=n;i>=0;i--){const u=i/n,x=hx-u*(len+hx)+R*0.1,y=Math.sin(tt*2.4-i*0.75)*amp*u,r=R*sr*(1-u*(S.plan==='serpent'?0.72:0.45));pts.push([x,y,r,u])}
+    for(const[x,y,r,u]of pts){if(u===0)continue;blob(x,y,r*1.05,r,Math.sin(tt*2.4)*0.1);if(S.pat==='plates'||S.plan==='serpent'){g.fillStyle=col(L-18);g.beginPath();g.moveTo(x-r*0.4,y-r*0.85);g.lineTo(x,y-r*1.35);g.lineTo(x+r*0.4,y-r*0.85);g.fill()}}
+    hr=R*sr*1.08}
+  else if(S.plan==='crab'){const n=S.limb;for(let i=0;i<n;i++)for(const sd of[-1,1]){const a=sd*(1.25+i*0.42)+Math.sin(tt*7+i*1.7+sd)*0.12;leg(-R*0.1+i*-R*0.12,sd*R*0.45,a,R*0.62,R*0.55,sd*0.9,R*0.1)}
+    for(const sd of[-1,1]){const a=sd*0.55+Math.sin(tt*2+sd)*0.12,ex=R*0.35+Math.cos(a)*R*0.6,ey=sd*R*0.5+Math.sin(a)*R*0.6;leg(R*0.35,sd*R*0.5,a,R*0.6,R*0.3,-sd*0.8,R*0.15);
+      const op=0.35+0.25*Math.sin(tt*3+sd);g.fillStyle=col(L+4);g.strokeStyle=col(L-22);g.lineWidth=1;for(const s2 of[-1,1]){g.beginPath();g.ellipse(ex+R*0.18,ey+s2*R*0.08,R*0.26,R*0.1,s2*op,0,6.283);g.fill();g.stroke()}}
+    blob(0,0,R*0.7,R*0.92,0);hx=R*0.66;hr=R*0.24}
+  else if(S.plan==='spider'){for(let i=0;i<S.limb;i++)for(const sd of[-1,1]){const a=sd*(0.55+i*0.55)+Math.sin(tt*8+i*1.3+sd*2)*0.1;leg(R*0.2,sd*R*0.18,a,R*0.78,R*0.82,-sd*(0.7+i*0.1),R*0.08)}
+    blob(-R*0.5,0,R*0.62,R*0.52,0);blob(R*0.28,0,R*0.36,R*0.32,0);hx=R*0.62;hr=R*0.2}
+  else{// jelly: tentacles trail behind a pulsing bell
+    const n=S.limb,pu=1+Math.sin(tt*3)*0.07;g.lineCap='round';for(let i=0;i<n;i++){const y0=((i+0.5)/n-0.5)*R*1.1,ln=R*(1.3+0.5*((i*7)%3)/2);g.strokeStyle=col(L+10,0.75);
+      for(let w=3;w>=1;w--){g.lineWidth=R*0.035*w;g.beginPath();g.moveTo(-R*0.3,y0);for(let k=1;k<=6;k++){const u=k/6;g.lineTo(-R*0.3-u*ln*(w===3?0.55:w===2?0.8:1),y0*(1+u*0.4)+Math.sin(tt*3.5-k*0.9+i)*R*0.12*u)}g.stroke()}}
+    g.save();g.globalAlpha=0.9;blob(0,0,R*0.62*pu,R*0.72/pu,0);g.restore();g.fillStyle=`rgba(${rgb},${0.25+0.2*Math.sin(tt*3)})`;g.beginPath();g.arc(-R*0.05,0,R*0.3,0,6.283);g.fill();hx=R*0.42;hr=R*0.22}
+  // head
+  const hd=S.head;if(S.plan==='worm'||S.plan==='serpent')blob(hx,0,hr*1.15,hr,0);
+  if(hd==='maw'){const n=10;g.fillStyle='#1a0d10';g.beginPath();g.arc(hx+hr*0.6,0,hr*0.6,0,6.283);g.fill();g.fillStyle='#e8dcc0';for(let i=0;i<n;i++){const a=i/n*6.283+tt*0.6;g.beginPath();g.moveTo(hx+hr*0.6+Math.cos(a)*hr*0.6,Math.sin(a)*hr*0.6);g.lineTo(hx+hr*0.6+Math.cos(a+0.25)*hr*0.25,Math.sin(a+0.25)*hr*0.25);g.lineTo(hx+hr*0.6+Math.cos(a+0.5)*hr*0.6,Math.sin(a+0.5)*hr*0.6);g.fill()}eyes(hx-hr*0.3,0,2,hr*1.1,Math.max(1.2,hr*0.12))}
+  else if(hd==='mandible'){const op=0.35+0.3*Math.sin(tt*4);g.strokeStyle=col(L-24);g.fillStyle=col(L+12);g.lineWidth=Math.max(1,R*0.03);for(const sd of[-1,1]){g.beginPath();g.moveTo(hx+hr*0.5,sd*hr*0.35);g.quadraticCurveTo(hx+hr*1.6,sd*hr*(0.9+op),hx+hr*1.9,sd*hr*(0.1+op*0.4));g.quadraticCurveTo(hx+hr*1.2,sd*hr*0.45,hx+hr*0.5,sd*hr*0.1);g.fill();g.stroke()}eyes(hx+hr*0.3,0,2,hr*0.8,Math.max(1.2,hr*0.14))}
+  else if(hd==='horned'){g.fillStyle=col(L+28);for(const sd of[-1,1]){g.beginPath();g.moveTo(hx,sd*hr*0.5);g.quadraticCurveTo(hx-hr*0.4,sd*hr*1.9,hx-hr*1.5,sd*hr*1.6);g.quadraticCurveTo(hx-hr*0.5,sd*hr*1.1,hx-hr*0.3,sd*hr*0.3);g.fill()}eyes(hx+hr*0.55,0,2,hr*0.7,Math.max(1.2,hr*0.14))}
+  else if(hd==='crest'){g.fillStyle=col(L+20,0.9);for(let i=-2;i<=2;i++){const a=Math.PI+i*0.32;g.beginPath();g.moveTo(hx-hr*0.2,i*hr*0.15);g.lineTo(hx+Math.cos(a)*hr*1.6,Math.sin(a)*hr*1.6);g.lineTo(hx+Math.cos(a+0.12)*hr*1.1,Math.sin(a+0.12)*hr*1.1);g.fill()}if(S.plan!=='jelly')blob(hx,0,hr*0.9,hr*0.8,0);eyes(hx+hr*0.35,0,3,hr*0.45,Math.max(1.2,hr*0.12))}
+  else if(hd==='eyestalk'){g.strokeStyle=col(L-10);g.lineWidth=Math.max(1,R*0.05);for(const sd of[-1,1]){const ex=hx+hr*0.9,ey=sd*hr*(1.2+0.15*Math.sin(tt*2+sd));g.beginPath();g.moveTo(hx,sd*hr*0.4);g.lineTo(ex,ey);g.stroke();eyes(ex,ey,1,0,Math.max(1.5,hr*0.28))}}
+  else{blob(hx,0,hr,hr*0.9,0);eyes(hx+hr*0.35,0,3,hr*0.5,Math.max(1.1,hr*0.13));eyes(hx-hr*0.1,0,2,hr*0.9,Math.max(1,hr*0.1))}
+  if(fl>0){g.save();g.globalCompositeOperation='lighter';g.globalAlpha=Math.min(1,fl);g.fillStyle=`rgba(${rgb},0.5)`;g.beginPath();g.arc(-R*0.2,0,R*0.8,0,6.283);g.fill();g.restore()}}
 function drawMob(m,t){ctx.save();ctx.translate(m.x,m.y);
   // soft contact shadow keeps the creatures grounded in the tunnel floor
   ctx.fillStyle='rgba(0,0,0,0.38)';ctx.beginPath();ctx.ellipse(2,3,m.r*1.25,m.r*1.0,0,0,6.283);ctx.fill();
@@ -1546,6 +1599,7 @@ function drawMob(m,t){ctx.save();ctx.translate(m.x,m.y);
       ctx.globalCompositeOperation='lighter';for(let k=0;k<MITE_GLINT.length;k++){const ph=(t*1.3+k*0.37+m.t*0.1)%1.6;if(ph>0.35)continue;const a=Math.sin(ph/0.35*Math.PI),[gx,gy]=MITE_GLINT[k];
         ctx.fillStyle=`rgba(200,240,255,${0.85*a})`;ctx.fillRect(gx-1.8*a,gy-0.25,3.6*a,0.5);ctx.fillRect(gx-0.25,gy-1.8*a,0.5,3.6*a)}ctx.globalCompositeOperation='source-over'}
     else if(m.type==='scorpion'){const w=m.wind>0?1+Math.sin(t*40)*0.025:1,l=m.lunge>0?1.07:1;spr(S[0],0,0,0,S[1]*l*w,S[1]/l*w)}
+    else if(m.type==='boss'&&BOSS_SHAPES&&m.ep&&m.ep.shape){bossBodyDraw(ctx,m.ep.shape,t+m.t*0,m.r,m.ep.rgb,m.hp<m.max/2,(m.hf>0?Math.min(1,m.hf*8)*0.5:0)+(m.hp<m.max/2?0.12+0.1*Math.sin(t*6):0));ctx.restore();return}
     else if(m.type==='boss'){const ph2=m.hp<m.max/2,pul=1+Math.sin(t*4)*0.025;if(m.ep)ctx.filter=`hue-rotate(${m.ep.hue}deg)`;spr(S[0],0,0,Math.sin(t*1.3)*0.04,pul,pul);if(m.ep)ctx.filter='none';
       if(ph2){ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.18+0.1*Math.sin(t*6);spr(S[0],0,0,Math.sin(t*1.3)*0.04,pul,pul);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over'}}
     // hit flash: re-draw the sprite additively instead of a white disc
@@ -1679,7 +1733,7 @@ function drawWorld(t){
   for(const g of globs)if(vis(g.x,g.y))glowAt(ctx,g.x,g.y,g.r*3.2,'170,255,60',0.45);
   if(weakSet){const pu=0.75+0.25*Math.sin(t*2.6);for(const i of weakSet)if(map[i]===ROCK){const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(vis(x,y))glowAt(ctx,x,y,26,'255,150,50',0.1*pu)}}
   for(const it of items)if(vis(it.x,it.y)){const rgb=it.type==='crystal'?'70,225,255':it.type==='intel'?'255,150,50':it.type==='baradium'?HC.crate:it.type==='energy'?'255,220,80':'80,255,140';glowAt(ctx,it.x,it.y,it.type==='crystal'?24:20,rgb,0.22+0.08*Math.sin(t*3+it.ph))}
-  for(const m of mobs){if(!vis(m.x,m.y,120))continue;const E=EYES[m.type];if(!E)continue;const ca=Math.cos(m.a),sa=Math.sin(m.a),rgb=EYECOL[m.type];
+  for(const m of mobs){if(!vis(m.x,m.y,120))continue;const E=BOSS_SHAPES&&m.type==='boss'&&m.ep&&m.ep.shape?[]:EYES[m.type];if(!E)continue;const ca=Math.cos(m.a),sa=Math.sin(m.a),rgb=EYECOL[m.type];
     if(m.type==='boss'){const pu=0.6+0.4*Math.sin(t*2.2),ph2=m.hp<m.max/2;glowAt(ctx,m.x,m.y,150,ph2?'255,60,150':'170,60,255',0.16*pu);glowAt(ctx,m.x,m.y,95,'60,255,220',0.08+0.06*Math.sin(t*3.1))}
     const fl=(m.asleep?0.25:0.55)+0.25*Math.sin(t*3+m.x*0.01);for(const[ex2,ey2]of E){const wx=m.x+ex2*ca-ey2*sa,wy=m.y+ex2*sa+ey2*ca;glowAt(ctx,wx,wy,m.type==='boss'?14:7,rgb,fl);ctx.fillStyle=`rgba(${rgb},${fl})`;ctx.fillRect(wx-0.8,wy-0.8,1.6,1.6)}}
   if(epOn())epDrawGlow(t,vis);
@@ -2111,10 +2165,12 @@ function bossPediaEntry(B,c,img){const R=mulberry((Math.imul(c,2654435761)+911)>
   const threat=Math.max(3,Math.min(5,3+(hp>=220?1:0)+(B.mods.length>=2||B.mods.includes('frenzied')||B.mods.includes('regen')?1:0)+(heavy>=2?1:0)));
   const a=B.atk.map(k=>BP_ATK[k][0]),glow=BP_GLOW[B.rgb]||'pale';
   const adj=B.mods.map(k=>BP_MOD[k]).filter(Boolean),desc=(adj.length?adj.join(', ')+' ':'')+glow,art=/^[aeiou]/.test(desc)?'an':'a';
-  const body=`Field note: ${sn} ${title}, first logged at depth ${c}, is ${art} ${desc} hive queen ${pk(['bigger than any brood mother on record','grown huge on the deep veins','older than the Guild\u2019s first shafts','unknown to every Guild survey'])}.`;
+  const body=`Field note: ${sn} ${title}, first logged at depth ${c}, is ${art} ${desc} ${BOSS_SHAPES&&B.shape?B.shape.noun:'hive queen'} ${pk(['bigger than any brood mother on record','grown huge on the deep veins','older than the Guild\u2019s first shafts','unknown to every Guild survey'])}.`;
   const atk=` It ${a[0]}, ${a[1]}, and ${a[2]}.`,tip=` Tip: ${BP_ATK[B.atk[0]][1]}${B.mods.includes('regen')?', keep up the fire so it never gets a few seconds to heal':B.mods.includes('armored')?', bring full energy because its plates soak up fire':''}, and aim for the amber weak spot on its back.`;
   return{id:'bp'+c,img,name:B.name,role:pk(BP_ROLE)+' \u00b7 depth '+c+(B.modNames.length?' \u00b7 '+B.modNames.join(' / ').toLowerCase():''),col:'rgb('+B.rgb+')',threat,bio:body+atk+tip,hue:B.hue,c,nw:1}}
 function bossPortrait(B){try{const W=88,H=112,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d'),gr=g.createRadialGradient(W/2,H/2,2,W/2,H/2,W*0.6);gr.addColorStop(0,`rgba(${B.rgb},0.55)`);gr.addColorStop(1,`rgba(${B.rgb},0)`);g.fillStyle=gr;g.fillRect(0,0,W,H);
+  if(BOSS_SHAPES&&B.shape){const P=BOSS_PLANS[B.shape.plan],R=Math.min(H*0.92/(P.f+P.b),W*0.94/(2*P.side));g.translate(W/2,H/2+(P.f-P.b)/2*R);g.rotate(-Math.PI/2);bossBodyDraw(g,B.shape,1.3,R,B.rgb,false,0);
+    let u=cv.toDataURL('image/webp',0.8);if(u.indexOf('data:image/webp')!==0)u=cv.toDataURL('image/jpeg',0.82);return u}
   const n=MOB_SPR.boss[0];if(!sprOK(n))return null;const S=SPR[n],k=Math.min(W*0.92/S.h,H*0.9/S.w);g.translate(W/2,H/2);g.rotate(-Math.PI/2);g.filter=`hue-rotate(${B.hue}deg)`;g.drawImage(S.img,-S.w*k/2,-S.h*k/2,S.w*k,S.h*k);g.filter='none';
   let u=cv.toDataURL('image/webp',0.8);if(u.indexOf('data:image/webp')!==0)u=cv.toDataURL('image/jpeg',0.82);return u}catch(e){return null}}
 function bossPedia(m){m.bpDone=1;const B=m.ep,c=epOn()&&ep?ep.c:(cfg.pit&&cfg.pit.c)||0;if(!B||!B.name||!c)return;if(!Array.isArray(PROG.bp))PROG.bp=[];if(PROG.bp.some(e=>e.id==='bp'+c||e.name===B.name&&e.c===c))return;

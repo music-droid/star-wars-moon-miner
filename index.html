@@ -1119,7 +1119,7 @@ function updatePlay(dt){
   // drill deploy (about 0.2s), spin, engine thrust
   ship.dp=clamp(ship.dp+(hov?-dt:dt)*5,0,1);ship.spin+=dt*(ship.drilling?42:ship.dp>0.9?16:6*ship.dp);ship.chomp=ship.drilling?Math.sin(gameT*30)*0.08:0;ship.thr=lerp(ship.thr,im,Math.min(1,dt*6));ship.mf=Math.max(0,ship.mf-dt);
   // faint mint engine trail from the ring
-  ship.trail+=dt;if(ship.trail>0.035&&sp>25){ship.trail=0;const ca=Math.cos(ship.a),sa=Math.sin(ship.a);parts.push({x:ship.x-ca*35*HANDLING.vis+rnd(-1.5,1.5),y:ship.y-sa*35*HANDLING.vis+rnd(-1.5,1.5),vx:-ca*40-ship.vx*0.1,vy:-sa*40-ship.vy*0.1,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1})}
+  ship.trail+=dt;if(ship.trail>0.035&&sp>25){ship.trail=0;const ca=Math.cos(ship.a),sa=Math.sin(ship.a);parts.push({x:ship.x-ca*35*HANDLING.vis*shipFitS()+rnd(-1.5,1.5),y:ship.y-sa*35*HANDLING.vis*shipFitS()+rnd(-1.5,1.5),vx:-ca*40-ship.vx*0.1,vy:-sa*40-ship.vy*0.1,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1})}
   // fire
   const firing=K.fire||mouse.down||tFire||(GAMEPAD_V1&&gpFire);
   // belly cannon on a limited gimbal (GIMBAL_V1): bolts leave the barrel tip under the nose
@@ -1360,7 +1360,7 @@ function texBuild(){const iw=shipTexImg.naturalWidth,ih=shipTexImg.naturalHeight
   const mk=col=>{const c=document.createElement('canvas');c.width=iw;c.height=ih;const g=c.getContext('2d');g.drawImage(shipTexImg,0,0);g.globalCompositeOperation='source-in';g.fillStyle=col;g.fillRect(0,0,iw,ih);return c};
   texSil=mk('rgb(150,172,200)');const P=36,s=document.createElement('canvas');s.width=iw+P*2;s.height=ih+P*2;const g=s.getContext('2d');g.filter='blur(9px)';g.drawImage(mk('#000'),P,P);texShad={c:s,P};texOC=document.createElement('canvas')}
 // ground shadow: world-space offset down-right (same light as the tiles); called before the hull rotates
-function texShadow(a){if(!texSil)texBuild();const S=SHIP_TEX,P=texShad.P*S.w/shipTexImg.naturalWidth;ctx.save();ctx.translate(4,7);ctx.rotate(a);ctx.globalAlpha*=0.5;ctx.drawImage(texShad.c,-S.ox-P,-S.oy-P,S.w+2*P,S.h+2*P);ctx.restore()}
+function texShadow(a,F){if(!texSil)texBuild();const S=SHIP_TEX,P=texShad.P*S.w/shipTexImg.naturalWidth;ctx.save();ctx.translate(4,7);ctx.rotate(a);if(F)ctx.scale(F.s,F.s*F.y);ctx.globalAlpha*=0.5;ctx.drawImage(texShad.c,-S.ox-P,-S.oy-P,S.w+2*P,S.h+2*P);ctx.restore()}
 // weathered drill bit: worn steel cone, spiral flutes scroll with ph while spinning, rust/grime flecks
 function texDrill(g,cx,cy,len,r,ph,spinning){g.save();g.beginPath();g.moveTo(cx,cy-r);g.lineTo(cx+len,cy);g.lineTo(cx,cy+r);g.closePath();
   const gr=g.createLinearGradient(0,cy-r,0,cy+r);gr.addColorStop(0,'#9a9b9e');gr.addColorStop(0.4,'#5d5f63');gr.addColorStop(1,'#1d1e21');g.fillStyle=gr;g.fill();g.clip();
@@ -1371,7 +1371,7 @@ function texDrill(g,cx,cy,len,r,ph,spinning){g.save();g.beginPath();g.moveTo(cx,
 function texHull(t,o,dp){if(!texSil)texBuild();const S=SHIP_TEX,M=ctx.getTransform(),k=Math.hypot(M.a,M.b),ang=Math.atan2(M.b,M.a),sz=Math.ceil(80*k)+4;
   if(texOC.width<sz||texOC.width>sz*2||texOC.height!==texOC.width){texOC.width=texOC.height=sz}const g=texOC.getContext('2d'),c=Math.cos(ang)*k,s=Math.sin(ang)*k,h=texOC.width/2;
   g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;g.clearRect(0,0,texOC.width,texOC.height);
-  g.setTransform(c,s,-s,c,h,h);
+  const NU=!!o.fit&&Math.abs(Math.hypot(M.c,M.d)-k)>1e-6,TF=(dx,dy)=>NU?g.setTransform(M.a,M.b,M.c,M.d,h+dx,h+dy):g.setTransform(c,s,-s,c,h+dx,h+dy);TF(0,0);
   const spinning=!!o.drilling||dp>0.3,ph=spinning?t*(o.drilling?30:14):0;
   for(const sd of[-1,1]){const jit=o.drilling?Math.sin(t*90+sd)*0.15:0;texDrill(g,S.sock[0]+jit,sd*S.sock[1],S.drL,S.drR,ph,spinning)}
   g.drawImage(shipTexImg,-S.ox,-S.oy,S.w,S.h);
@@ -1379,21 +1379,28 @@ function texHull(t,o,dp){if(!texSil)texBuild();const S=SHIP_TEX,M=ctx.getTransfo
   g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='source-atop';const L=g.createLinearGradient(h-38*k,h-38*k,h+38*k,h+38*k);
   L.addColorStop(0,'rgba(170,190,220,0.14)');L.addColorStop(0.42,'rgba(0,0,0,0)');L.addColorStop(1,'rgba(0,0,0,0.32)');g.fillStyle=L;g.fillRect(0,0,texOC.width,texOC.height);
   // cool cave rim light on the lit edges: tinted silhouette nudged toward the light, behind the hull
-  const rk=Math.max(0.8,0.32*k);g.globalCompositeOperation='destination-over';g.globalAlpha=0.6;g.setTransform(c,s,-s,c,h-rk,h-rk);g.drawImage(texSil,-S.ox,-S.oy,S.w,S.h);
+  const rk=Math.max(0.8,0.32*k);g.globalCompositeOperation='destination-over';g.globalAlpha=0.6;TF(-rk,-rk);g.drawImage(texSil,-S.ox,-S.oy,S.w,S.h);
   g.globalAlpha=1;g.globalCompositeOperation='source-over';
-  if(o.drilling){g.setTransform(c,s,-s,c,h,h);g.globalCompositeOperation='lighter';for(const sd of[-1,1]){const tx=S.sock[0]+S.drL,cy=sd*S.sock[1],gg=g.createRadialGradient(tx,cy,0,tx,cy,5.5);gg.addColorStop(0,'rgba(200,235,255,0.5)');gg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gg;g.beginPath();g.arc(tx,cy,5.5,0,6.283);g.fill()}g.globalCompositeOperation='source-over'}
+  if(o.drilling){TF(0,0);g.globalCompositeOperation='lighter';for(const sd of[-1,1]){const tx=S.sock[0]+S.drL,cy=sd*S.sock[1],gg=g.createRadialGradient(tx,cy,0,tx,cy,5.5);gg.addColorStop(0,'rgba(200,235,255,0.5)');gg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gg;g.beginPath();g.arc(tx,cy,5.5,0,6.283);g.fill()}g.globalCompositeOperation='source-over'}
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(texOC,M.e-h,M.f-h);ctx.restore()}
 // SHIP_NOSE_TUCK (Justin: "why are the lights protruding so far from the front?"): with the painted SHIP_TEXTURE hull, the cannon stub and headlamps sit on the sprite's real nose
 // (tip ~16.7u) instead of floating at the old vector nose (gun 26.2u, lamps 19.7u). Visual only: laser spawn (shipMuzzle), aim, hitbox unchanged; the headlight cone is drawn from the lamps with the same far reach. Revert: SHIP_NOSE_TUCK=false
 const SHIP_NOSE_TUCK=true;
+// SHIP_FIT (Justin: the hauler barely fits a burrowed block): in the mines the painted hull is drawn at 0.8 scale with the arm spread
+// narrowed to 0.84, so it is ~21px across (tile 28px, hitbox circle r=11 unchanged) and sits inside a one-block passage with ~3px clear on each side.
+// Visual only: hitbox, speed, handling, laser spawn unchanged. Menus/cinematics keep their art scale. Revert: SHIP_FIT=false
+const SHIP_FIT=true;
+const SHIP_FIT_K={s:0.8,y:0.84};
+function shipFitK(o){return SHIP_FIT&&o&&o.fit&&shipTexOn()?SHIP_FIT_K:null}
+function shipFitS(){return SHIP_FIT&&shipTexOn()?SHIP_FIT_K.s:1}
 const SHIP_TUCK={tip:16.6,lamp:[15.0,2.35]};
 function shipTuckOn(){return SHIP_NOSE_TUCK&&shipTexOn()}
 const SHIP_NOSE=22.4,SHIP_RING=-33.6,SHIP_GUN=26.2,SHIP_WING=[-7.3,15.5];/* SHIP2: armored working hauler, 56u ring-to-nose */
 function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const dp=clamp(o.drill!=null?o.drill:(hov?0:1),0,1);
   const thr=o.thr!=null?o.thr:0.35,spin=o.spin!=null?o.spin:t*12;
   ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
-  const TX=shipTexOn();if(hov&&o.shadow!==false&&TX)texShadow(a);else if(hov&&o.shadow!==false){ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(4,7,29,14.5,a,0,6.283);ctx.fill()}
-  ctx.rotate(a);ctx.translate(0,hov?Math.sin(t*5)*0.5:0);
+  const TX=shipTexOn(),FK=shipFitK(o);if(hov&&o.shadow!==false&&TX)texShadow(a,FK);else if(hov&&o.shadow!==false){ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(4,7,29,14.5,a,0,6.283);ctx.fill()}
+  ctx.rotate(a);ctx.translate(0,hov?Math.sin(t*5)*0.5:0);if(FK)ctx.scale(FK.s,FK.s*FK.y);
   const pulse=(0.62+0.18*Math.sin(t*4.2)+0.06*Math.sin(t*11.7)+0.4*thr)*(o.en!=null?enGlow(t,o.en):1);
   // mint exhaust plume
   ctx.globalCompositeOperation='lighter';
@@ -1538,7 +1545,7 @@ function drawWorld(t){
   for(const it of items)if(vis(it.x,it.y))drawItem(it,t);
   for(const mn of miners)if(vis(mn.x,mn.y))drawMiner(mn,t);
   for(const m of mobs)if(vis(m.x,m.y,120))drawMob(m,t);
-  if(state==='play'||state==='pause'||state==='levelDone'||state==='cockpitIn'||state==='docking'||state==='caveIn'){if(!(ship.inv>0&&state==='play'&&!ship.arrProt&&((t*20)|0)%2&&ship.inv<2))drawShip(ship.x,ship.y,ship.a,ship.mode,t,HANDLING.vis,{plume:HANDLING.plume,en:ship.en,drill:ship.dp,thr:ship.thr,spin:ship.spin,mf:ship.mf,chomp:ship.chomp,drilling:ship.drilling});if(COCKPIT_CINE)arrShimmer(t)}
+  if(state==='play'||state==='pause'||state==='levelDone'||state==='cockpitIn'||state==='docking'||state==='caveIn'){if(!(ship.inv>0&&state==='play'&&!ship.arrProt&&((t*20)|0)%2&&ship.inv<2))drawShip(ship.x,ship.y,ship.a,ship.mode,t,HANDLING.vis,{fit:1,plume:HANDLING.plume,en:ship.en,drill:ship.dp,thr:ship.thr,spin:ship.spin,mf:ship.mf,chomp:ship.chomp,drilling:ship.drilling});if(COCKPIT_CINE)arrShimmer(t)}
   ctx.globalCompositeOperation='lighter';
   for(const b of bolts){const a=Math.atan2(b.vy,b.vx);ctx.save();ctx.translate(b.x,b.y);ctx.rotate(a);const g=ctx.createLinearGradient(-16,0,4,0);g.addColorStop(0,'rgba(80,160,255,0)');g.addColorStop(1,'rgba(160,230,255,1)');ctx.fillStyle=g;ctx.fillRect(-16,-2,20,4);ctx.fillStyle='#fff';ctx.fillRect(-4,-1,6,2);ctx.restore()}
   if(rfx.length)rfDraw(t);
@@ -1554,7 +1561,7 @@ function drawWorld(t){
   const light=(x,y,r,a=1)=>{if(!vis(x,y,r))return;lctx.globalAlpha=Math.min(1,a);lctx.drawImage(CUT,x-r,y-r,r*2,r*2)};
   const alive=ship&&state!=='dying'&&state!=='over';const hov=ship&&ship.mode==='hover';
   const cone=(c,x,y,a,R,sp,al,rgb)=>{const g=c.createRadialGradient(x,y,0,x,y,R);g.addColorStop(0,`rgba(${rgb},${al})`);g.addColorStop(0.5,`rgba(${rgb},${al*0.6})`);g.addColorStop(1,`rgba(${rgb},0)`);c.fillStyle=g;c.beginPath();c.moveTo(x-Math.cos(a)*4,y-Math.sin(a)*4);c.arc(x,y,R,a-sp,a+sp);c.closePath();c.fill()};
-  let nx=0,ny=0,ex=0,ey=0;const NC=alive&&shipTuckOn()?SHIP_TUCK.lamp[0]*HANDLING.vis+0.4:19,dR=19-NC;
+  let nx=0,ny=0,ex=0,ey=0;const NC=alive&&shipTuckOn()?SHIP_TUCK.lamp[0]*HANDLING.vis*shipFitS()+0.4:19,dR=19-NC;
   if(alive){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);nx=ship.x+ca*NC;ny=ship.y+sa*NC;ex=ship.x-ca*33.6;ey=ship.y-sa*33.6;
     light(ship.x,ship.y,600,epOn()&&epDark()?0.12:0.4);            // faint wide falloff: walls stay readable near the ship
     light(ship.x,ship.y,hov?92:80,0.95);     // close ambient (about 1.5x the ship)

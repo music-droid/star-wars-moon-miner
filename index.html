@@ -254,6 +254,9 @@ const SFX={last:{},
     const g2=Gn(sfxBus,0),f2=Fl(g2,'bandpass',open?600:900,4);g2.gain.setValueAtTime(0.001,t+0.03);g2.gain.exponentialRampToValueAtTime(0.06,t+0.09);g2.gain.exponentialRampToValueAtTime(0.001,t+0.32);const o=O('sawtooth',open?90:220,t+0.03,t+0.34,f2);o.frequency.exponentialRampToValueAtTime(open?260:80,t+0.3);f2.frequency.exponentialRampToValueAtTime(open?1700:400,t+0.3)},
   click(){if(!this.ok('k',0.05))return;const t=ac.currentTime,g=Gn(sfxBus,0);g.gain.setValueAtTime(0.06,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.08);O('square',660,t,t+0.09,g)}
 };
+// BURROW_DROP: low hull thunk as the skids hit the shaft floor
+SFX.thunk=function(){if(!this.ok('thunk',0.1))return;const t=ac.currentTime,g=Gn(sfxBus,0);g.gain.setValueAtTime(0.32,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);const o=O('sine',95,t,t+0.22,g);o.frequency.exponentialRampToValueAtTime(42,t+0.18);
+  const g2=Gn(sfxBus,0),f=Fl(g2,'lowpass',380,1.2);g2.gain.setValueAtTime(0.2,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.09);Nz(t,0.1,f)};
 // ================= STORY =================
 const QS=new URLSearchParams(location.search);const START_LV=Math.max(1,parseInt(QS.get('level'))||1);
 const CHARS={F:{name:'FOREMAN BRAKKA TOLN',sub:'Mining Guild, Ohma-D\u2019un Station',col:'#d98a3a'},D:{name:'PIK',sub:'PK-4 ship\u2019s droid',col:'#62ff98'},
@@ -890,7 +893,7 @@ function hurtShip(d){if(ship.inv>0||state!=='play')return;if(ship.mode==='burrow
   if(ship.sh<=0){ship.sh=0;die('Your hover-drill was destroyed.')}}
 function die(reason){overReason=reason;if(epOn()&&ep)epRunEnd(false);boom(ship.x,ship.y,3,'#9df');boom(ship.x,ship.y,2,'#fd8');shake=30;setState('dying')}
 function toast(text,x,y,c){if(x==null){const o=toasts.find(q=>q.x==null&&q.text===text);if(o){o.t=Math.min(o.t,0.3);return}}toasts.push({text,x,y,c:c||'#fff',t:0,max:x==null?2.8:1.1})}
-function setMode(m){if(ship.mode===m)return;if(m==='burrow'&&ship.en<4){toast('Not enough energy to drill',null,null,'#f96');return}ship.mode=m;SFX.mode(m==='hover');SFX.mech(m==='burrow');
+function setMode(m){if(ship.mode===m)return;if(m==='burrow'&&ship.en<4){toast('Not enough energy to drill',null,null,'#f96');return}ship.mode=m;if(BURROW_DROP){ship.mt=gameT;ship.dropPend=m==='burrow'}SFX.mode(m==='hover');SFX.mech(m==='burrow');
   for(let k=0;k<12;k++){const a=Math.random()*6.283;parts.push({x:ship.x,y:ship.y,vx:Math.cos(a)*120,vy:Math.sin(a)*120,life:0.35,max:0.35,c:m==='hover'?'#7ee8d0':'#9a948c',s:2,drag:3,g:m==='hover'?1:0})}
   if(m==='burrow'){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);for(let k=0;k<16;k++){const a=ship.a+rnd(-1.3,1.3),v=rnd(40,150);parts.push({x:ship.x+ca*18,y:ship.y+sa*18,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.4,0.8),max:0.8,c:Math.random()<0.5?'#8d8882':'#615c56',s:rnd(2,4),drag:4,g:0})}}}
 
@@ -1117,6 +1120,7 @@ function updatePlay(dt){
   if(!hov){ship.en-=(sp>15?1.2:0.5)*dt+(ship.drilling?2*dt:0);if(ship.en<=0){ship.en=0;setMode('hover');toast('Energy depleted — drill offline',null,null,'#f96')}}
   else if(ship.en<40)ship.en=Math.min(40,ship.en+1.6*dt);
   // drill deploy (about 0.2s), spin, engine thrust
+  if(BURROW_DROP&&ship.dropPend&&gameT-ship.mt>=DROP_T){ship.dropPend=false;if(!hov){if(SFX.thunk)SFX.thunk();dropPuff();shake=Math.max(shake,2.2)}}
   ship.dp=clamp(ship.dp+(hov?-dt:dt)*5,0,1);ship.spin+=dt*(ship.drilling?42:ship.dp>0.9?16:6*ship.dp);ship.chomp=ship.drilling?Math.sin(gameT*30)*0.08:0;ship.thr=lerp(ship.thr,im,Math.min(1,dt*6));ship.mf=Math.max(0,ship.mf-dt);
   // faint mint engine trail from the ring
   ship.trail+=dt;if(ship.trail>0.035&&sp>25){ship.trail=0;const ca=Math.cos(ship.a),sa=Math.sin(ship.a);parts.push({x:ship.x-ca*35*HANDLING.vis*shipFitS()+rnd(-1.5,1.5),y:ship.y-sa*35*HANDLING.vis*shipFitS()+rnd(-1.5,1.5),vx:-ca*40-ship.vx*0.1,vy:-sa*40-ship.vy*0.1,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?'#7fe9cf':'#4fc9b0',s:2.2,drag:1.5,g:1})}
@@ -1400,6 +1404,15 @@ const SHIP_NOSE_TUCK=true;
 // narrowed to 0.84, so it is ~21px across (tile 28px, hitbox circle r=11 unchanged) and sits inside a one-block passage with ~3px clear on each side.
 // Visual only: hitbox, speed, handling, laser spawn unchanged. Menus/cinematics keep their art scale. Revert: SHIP_FIT=false
 const SHIP_FIT=true;
+// BURROW_DROP (Justin): entering burrow reads as a drop onto the shaft floor: over ~0.12s the hull settles toward its shadow and shrinks a touch
+// (further from the camera), the shadow tightens under it, a quick squash + bounce, a dust ring and a thunk at contact, engine and lamp glow dim;
+// leaving burrow lifts it back (0.25s) into the hover bob. Visual + SFX only (ship.mt is a timestamp; movement physics untouched). Revert: BURROW_DROP=false
+const BURROW_DROP=true;
+const DROP_T=0.12,LIFT_T=0.25;
+function shipLand(){if(!BURROW_DROP||!ship||ship.mt==null)return ship&&ship.mode!=='hover'&&BURROW_DROP?{L:1,b:0}:null;const u=gameT-ship.mt;
+  if(ship.mode!=='hover'){if(u<DROP_T){const k=u/DROP_T;return{L:k*k,b:0}}const v=u-DROP_T;return{L:1,b:v<0.3?Math.exp(-v*14)*Math.cos(v*34):0}}
+  if(u<LIFT_T){const k=u/LIFT_T;return{L:1-(1-(1-k)*(1-k)),b:0}}return{L:0,b:0}}
+function dropPuff(){const n=18;for(let k=0;k<n;k++){const a=k/n*6.283+rnd(-0.15,0.15),v=rnd(45,85),r=rnd(9,13);parts.push({x:ship.x+Math.cos(a)*r,y:ship.y+Math.sin(a)*r,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.35,0.6),max:0.6,c:Math.random()<0.5?'rgba(150,140,125,0.75)':'rgba(105,98,90,0.7)',s:rnd(2.5,4.5),drag:5})}}
 const SHIP_FIT_K={s:0.8,y:0.84};
 function shipFitK(o){return SHIP_FIT&&o&&o.fit&&shipTexOn()?SHIP_FIT_K:null}
 function shipFitS(){return SHIP_FIT&&shipTexOn()?SHIP_FIT_K.s:1}
@@ -1409,9 +1422,12 @@ const SHIP_NOSE=22.4,SHIP_RING=-33.6,SHIP_GUN=26.2,SHIP_WING=[-7.3,15.5];/* SHIP
 function drawShip(x,y,a,mode,t,scale=1,o){o=o||{};const hov=mode==='hover';const dp=clamp(o.drill!=null?o.drill:(hov?0:1),0,1);
   const thr=o.thr!=null?o.thr:0.35,spin=o.spin!=null?o.spin:t*12;
   ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
-  const TX=shipTexOn(),FK=shipFitK(o);if(hov&&o.shadow!==false&&TX)texShadow(a,FK);else if(hov&&o.shadow!==false){ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(4,7,29,14.5,a,0,6.283);ctx.fill()}
-  ctx.rotate(a);ctx.translate(0,hov?Math.sin(t*5)*0.5:0);if(FK)ctx.scale(FK.s,FK.s*FK.y);
-  const pulse=(0.62+0.18*Math.sin(t*4.2)+0.06*Math.sin(t*11.7)+0.4*thr)*(o.en!=null?enGlow(t,o.en):1);
+  const TX=shipTexOn(),FK=shipFitK(o),LD=BURROW_DROP&&TX&&o.land?o.land:null,LL=LD?LD.L:0;
+  if(LD&&o.shadow!==false&&(hov||LL>0)){ctx.save();const k=1-0.72*LL;ctx.translate(4*(k-1),7*(k-1));ctx.globalAlpha*=1+0.3*LL;texShadow(a,FK);ctx.restore()}
+  else if(hov&&o.shadow!==false&&TX)texShadow(a,FK);else if(hov&&o.shadow!==false){ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(4,7,29,14.5,a,0,6.283);ctx.fill()}
+  if(LD){ctx.translate(1.3*LL,2.3*LL);const sc=1-0.05*LL;ctx.scale(sc,sc)}
+  ctx.rotate(a);ctx.translate(0,hov?Math.sin(t*5)*0.5*(1-LL):0);if(FK)ctx.scale(FK.s,FK.s*FK.y);if(LD&&LD.b){ctx.scale(1+0.07*LD.b,1-0.09*LD.b)}
+  const pulse=(0.62+0.18*Math.sin(t*4.2)+0.06*Math.sin(t*11.7)+0.4*thr)*(o.en!=null?enGlow(t,o.en):1)*(1-0.3*LL);
   // mint exhaust plume
   ctx.globalCompositeOperation='lighter';
   {const L=18+thr*18;ctx.save();ctx.translate(SHIP_RING-3,0);ctx.scale((1.7+thr*0.8)*(o.plume!=null?o.plume:1),0.42);const g=ctx.createRadialGradient(-4,0,0,-4,0,L);g.addColorStop(0,`rgba(170,255,225,${0.5*pulse})`);g.addColorStop(0.35,`rgba(70,225,190,${0.22*pulse})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(-4,0,L,0,6.283);ctx.fill();ctx.restore()}
@@ -1555,7 +1571,7 @@ function drawWorld(t){
   for(const it of items)if(vis(it.x,it.y))drawItem(it,t);
   for(const mn of miners)if(vis(mn.x,mn.y))drawMiner(mn,t);
   for(const m of mobs)if(vis(m.x,m.y,120))drawMob(m,t);
-  if(state==='play'||state==='pause'||state==='levelDone'||state==='cockpitIn'||state==='docking'||state==='caveIn'){if(!(ship.inv>0&&state==='play'&&!ship.arrProt&&((t*20)|0)%2&&ship.inv<2))drawShip(ship.x,ship.y,ship.a,ship.mode,t,HANDLING.vis,{fit:1,plume:HANDLING.plume,en:ship.en,drill:ship.dp,thr:ship.thr,spin:ship.spin,mf:ship.mf,chomp:ship.chomp,drilling:ship.drilling});if(COCKPIT_CINE)arrShimmer(t)}
+  if(state==='play'||state==='pause'||state==='levelDone'||state==='cockpitIn'||state==='docking'||state==='caveIn'){if(!(ship.inv>0&&state==='play'&&!ship.arrProt&&((t*20)|0)%2&&ship.inv<2))drawShip(ship.x,ship.y,ship.a,ship.mode,t,HANDLING.vis,{fit:1,land:shipLand(),plume:HANDLING.plume,en:ship.en,drill:ship.dp,thr:ship.thr,spin:ship.spin,mf:ship.mf,chomp:ship.chomp,drilling:ship.drilling});if(COCKPIT_CINE)arrShimmer(t)}
   ctx.globalCompositeOperation='lighter';
   for(const b of bolts){const a=Math.atan2(b.vy,b.vx);ctx.save();ctx.translate(b.x,b.y);ctx.rotate(a);const g=ctx.createLinearGradient(-16,0,4,0);g.addColorStop(0,'rgba(80,160,255,0)');g.addColorStop(1,'rgba(160,230,255,1)');ctx.fillStyle=g;ctx.fillRect(-16,-2,20,4);ctx.fillStyle='#fff';ctx.fillRect(-4,-1,6,2);ctx.restore()}
   if(rfx.length)rfDraw(t);
@@ -1575,7 +1591,7 @@ function drawWorld(t){
   if(alive){const ca=Math.cos(ship.a),sa=Math.sin(ship.a);nx=ship.x+ca*NC;ny=ship.y+sa*NC;ex=ship.x-ca*33.6;ey=ship.y-sa*33.6;
     light(ship.x,ship.y,600,epOn()&&epDark()?0.12:0.4);            // faint wide falloff: walls stay readable near the ship
     light(ship.x,ship.y,hov?92:80,0.95);     // close ambient (about 1.5x the ship)
-    const R=(hov?420:300)+dR;lctx.globalAlpha=1;cone(lctx,nx,ny,ship.a,R,0.5,0.3,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.97,0.36,0.45,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.9,0.2,0.4,'0,0,0');
+    const R=(hov?420:300)+dR;lctx.globalAlpha=1;const LDm=BURROW_DROP&&shipTexOn()?shipLand():null;if(LDm&&LDm.L>0)lctx.globalAlpha=1-0.12*LDm.L;cone(lctx,nx,ny,ship.a,R,0.5,0.3,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.97,0.36,0.45,'0,0,0');cone(lctx,nx,ny,ship.a,R*0.9,0.2,0.4,'0,0,0');
     light(ex,ey,70,0.45+ship.thr*0.2);
     for(const s of[-1,1])light(ship.x+ca*SHIP_WING[0]-sa*s*SHIP_WING[1],ship.y+sa*SHIP_WING[0]+ca*s*SHIP_WING[1],26,0.28)}
   const act=padIsActive();light(padX,padY,act?(level===8?260:190):125,0.85);

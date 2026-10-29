@@ -452,7 +452,8 @@ function itemUnstick(it){const tx=clamp(Math.floor(it.x/T),0,MW-1),ty=clamp(Math
   let best=null,bd=1e9;for(let r=1;r<=8&&!best;r++)for(let y=ty-r;y<=ty+r;y++)for(let x=tx-r;x<=tx+r;x++){if(Math.max(Math.abs(x-tx),Math.abs(y-ty))!==r||solidAt(x,y))continue;const cx=(x+0.5)*T,cy=(y+0.5)*T,dd=(cx-it.x)**2+(cy-it.y)**2;if(dd<bd){bd=dd;best=[cx,cy]}}
   if(best){it.x=best[0];it.y=best[1];return true}return false}
 function itemDrop(it){if(PICKUP_NOSTICK){it.loose=true;itemUnstick(it)}items.push(it)}
-const solidAt=(x,y)=>x<0||y<0||x>=MW||y>=MH||(map[y*MW+x]===ROCK||map[y*MW+x]===BED);
+let wDeep=null; // WATER_REWORK: released flood water is a temporary wall (tiles = 1)
+const solidAt=(x,y)=>x<0||y<0||x>=MW||y>=MH||(map[y*MW+x]===ROCK||map[y*MW+x]===BED)||wDeep!==null&&wDeep[y*MW+x]===1;
 const tileAt=(x,y)=>(x<0||y<0||x>=MW||y>=MH)?BED:map[y*MW+x];
 function bfs(sx,sy,maxD){const N=MW*MH,d=new Int16Array(N).fill(-1),q=new Int32Array(N);let h=0,tl=0;const s=sy*MW+sx;if(s<0||s>=N||!passable(map[s]))return d;d[s]=0;q[tl++]=s;
   while(h<tl){const c=q[h++],cd=d[c];if(cd>=maxD)continue;const x=c%MW;
@@ -601,7 +602,7 @@ function epGen(dd){const P=cfg.pit,c=P.c,has=k=>P.mods.includes(k),R=mulberry((D
     for(let k=0;k<3;k++)items.push({x:(p.x+0.5+(k%2))*T,y:(p.y+0.5+(k>1?1:0))*T,type:'crystal',ph:Math.random()*6,cache:1});
   const fl=ep.floors.slice().sort(()=>R()-0.5),far=(arr,x,y,s)=>arr.every(o=>dist(o.x,o.y,x,y)>s);
   if(has('gas')){const n=Math.min(10,4+Math.floor(c/3));for(const i of fl){if(ep.gas.length>=n)break;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(dist(x,y,4*T,4*T)<10*T||!far(ep.gas,x,y,T*7))continue;ep.gas.push({x,y,r:T*(1.6+R()*0.8),ph:R()*6,fuse:-1})}}
-  if(has('flood')){const n=Math.min(7,3+Math.floor(c/6));for(const i of fl){if(ep.flood.length>=n)break;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(dist(x,y,4*T,4*T)<7*T||!far(ep.flood,x,y,T*9))continue;ep.flood.push({x,y,r:T*(3+R()*2.5),ph:R()*6})}}
+  if(has('flood')&&!WATER_REWORK){const n=Math.min(7,3+Math.floor(c/6));for(const i of fl){if(ep.flood.length>=n)break;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(dist(x,y,4*T,4*T)<7*T||!far(ep.flood,x,y,T*9))continue;ep.flood.push({x,y,r:T*(3+R()*2.5),ph:R()*6})}}
   if(P.kind==='maze'&&mazeInfo){const M=mazeInfo,cl=M.cells,cx=c=>3+(c%cl)*4+1,cy=c=>3+((c/cl)|0)*4+1,dd2=bfs(4,4,9999);
     items=items.filter(it=>it.type!=='crystal'&&passable(tileAt(Math.floor(it.x/T),Math.floor(it.y/T))));const E=M.ends.slice().sort((a,b)=>M.D0[b]-M.D0[a]),pick=[];
     for(const sp of[cl*0.5,cl*0.3,2,0])for(const e of E){if(pick.length>=cfg.mazeN)break;if(pick.includes(e)||M.D0[e]<2||!pick.every(o=>Math.abs(o%cl-e%cl)+Math.abs(((o/cl)|0)-((e/cl)|0))>=sp))continue;pick.push(e)}
@@ -610,7 +611,67 @@ function epGen(dd){const P=cfg.pit,c=P.c,has=k=>P.mods.includes(k),R=mulberry((D
     ep.mazeOK=pick.every(e=>dd2[(cy(e))*MW+cx(e)]>0)&&dd2[Math.floor(padY/T)*MW+Math.floor(padX/T)]>0}
   if(P.kind==='heavy'&&cfg.rich){const cr=items.filter(it=>it.type==='crystal'&&!it.cache).sort((a,b)=>dist(b.x,b.y,4*T,4*T)-dist(a.x,a.y,4*T,4*T)),keep=new Set(cr.slice(0,cfg.rich));
     items=items.filter(it=>it.type!=='crystal'||it.cache||keep.has(it));for(const it of keep)it.rich=1;need=Math.min(cfg.richNeed,keep.size);if(crystalPlan)crystalPlan.need=need}
-  if(has('unstable')){const cr=items.filter(it=>it.type==='crystal'&&!it.cache&&!it.rich);for(const it of cr)if(R()<0.22)it.unst=1}}
+  if(has('unstable')){const cr=items.filter(it=>it.type==='crystal'&&!it.cache&&!it.rich);for(const it of cr)if(R()<0.22)it.unst=1}if(WATER_REWORK&&has('flood'))waterGen(R,c)}
+// WATER_REWORK (Justin): flooded levels are wet from the walls. Seeps: water weeps out of a wall face (streaks + droplets, wider ones as falls) and pools
+// across the tunnel floor next to it (tile pools, slow you like the old blobs). Weeping rock: marked wet rock on flood levels; burrow it and the water
+// behind it floods a stretch of tunnel to wall depth for hold s (a real wall to ships and bugs), then drains back to a pool. Every flood set is checked
+// by BFS when generated: with ALL of them flooded at once, start -> lift and every item stays reachable; water never fills a tile your hull is on.
+// Revert: WATER_REWORK=false (old round pools)
+const WATER_REWORK=true,WATER={seepN:c=>Math.min(7,3+Math.floor(c/6)),vol:[5,12],reach:3.5,fall:0.35,weepN:c=>Math.min(4,1+Math.floor(c/10)),fvol:[9,16],fill:1.6,hold:30,drain:4,gapStart:8,gapPad:5};
+function waterPool(i0,vol,reach,bad){const x0=i0%MW,y0=(i0/MW)|0,out=[i0],seen=new Set(out);for(let h=0;h<out.length&&out.length<vol;h++){const c=out[h],x=c%MW;
+  for(const n of[x>0?c-1:-1,x<MW-1?c+1:-1,c-MW,c+MW]){if(n<0||n>=MW*MH||seen.has(n)||map[n]!==FLOOR||(bad&&bad(n)))continue;if(Math.hypot(n%MW-x0,((n/MW)|0)-y0)>reach)continue;seen.add(n);out.push(n);if(out.length>=vol)break}}return out}
+function waterGen(R,c){const rg=a=>a[0]+((R()*(a[1]-a[0]+1))|0),sx=4,sy=4,px=Math.floor(padX/T),py=Math.floor(padY/T),D4=[1,-1,MW,-MW];
+  ep.seeps=[];ep.weeps=[];ep.wet=new Set();ep.wmap=new Map();wDeep=new Uint8Array(MW*MH);ep.wnear=null;
+  const fl=ep.floors.slice().sort(()=>R()-0.5),near=(x,y,a,b,r)=>Math.hypot(x-a,y-b)<r;
+  // seeps
+  for(const i of fl){if(ep.seeps.length>=WATER.seepN(c))break;const x=i%MW,y=(i/MW)|0;if(near(x,y,sx,sy,7)||near(x,y,px,py,3))continue;if(!ep.seeps.every(s=>!near(x,y,s.x,s.y,9)))continue;
+    const wd=D4.filter(d=>map[i+d]===ROCK||map[i+d]===BED);if(!wd.length)continue;const d=wd[(R()*wd.length)|0],tiles=waterPool(i,rg(WATER.vol),WATER.reach,n=>near(n%MW,(n/MW)|0,px,py,2.5));
+    const sp={x,y,dx:d===1?1:d===-1?-1:0,dy:d===MW?1:d===-MW?-1:0,tiles,fall:R()<WATER.fall,ph:R()*6};ep.seeps.push(sp);for(const t of tiles)ep.wet.add(t);
+    ep.flood.push({x:(x+0.5)*T,y:(y+0.5)*T,r:T*0.5,ph:sp.ph,seep:1})}
+  // weeping rock + validated flood sets
+  const need=items.filter(it=>it.type!=='crystal'||!it.dead).map(it=>Math.floor(it.y/T)*MW+Math.floor(it.x/T)).concat(miners.map(m=>m.ty*MW+m.tx)),blocked=new Uint8Array(MW*MH);if(bArena)need.push(bArena.ty*MW+bArena.tx);const needSet=new Set(need);
+  const okAll=()=>{const d=bfs(sx,sy,9999);let ok=false;for(let a=-1;a<=1&&!ok;a++)for(let b=-1;b<=1;b++){const q=(py+b)*MW+px+a;if(d[q]>=0&&!blocked[q]){ok=true;break}}if(!ok)return false;
+    // flood-blocked tiles must not be on the start->lift route; re-run a BFS that treats them as walls, and a drill BFS for the items
+    const N=MW*MH,q=new Int32Array(N),v=new Uint8Array(N);let h=0,tl=0;const s0=sy*MW+sx;v[s0]=1;q[tl++]=s0;let lift=false;
+    while(h<tl){const c2=q[h++];if(map[c2]===PAD)lift=true;const x=c2%MW;for(const n of[x>0?c2-1:-1,x<MW-1?c2+1:-1,c2-MW,c2+MW])if(n>=0&&n<N&&!v[n]&&!blocked[n]&&passable(map[n])){v[n]=1;q[tl++]=n}}if(!lift)return false;
+    h=0;tl=0;const v2=new Uint8Array(N);v2[s0]=1;q[tl++]=s0;while(h<tl){const c2=q[h++],x=c2%MW;for(const n of[x>0?c2-1:-1,x<MW-1?c2+1:-1,c2-MW,c2+MW])if(n>=0&&n<N&&!v2[n]&&!blocked[n]&&map[n]!==BED){v2[n]=1;q[tl++]=n}}
+    return need.every(i=>v2[i])};
+  const rocks=[];for(let y=3;y<MH-3;y++)for(let x=3;x<MW-3;x++){const i=y*MW+x;if(map[i]!==ROCK||(weakSet&&weakSet.has(i))||near(x,y,sx,sy,WATER.gapStart)||near(x,y,px,py,WATER.gapPad))continue;if(D4.some(d=>map[i+d]===FLOOR))rocks.push(i)}
+  rocks.sort(()=>R()-0.5);
+  for(const w of rocks){if(ep.weeps.length>=WATER.weepN(c))break;const x=w%MW,y=(w/MW)|0;if(!ep.weeps.every(o=>!near(x,y,o.x,o.y,10))||ep.seeps.some(s=>near(x,y,s.x,s.y,3))||bArena&&near(x,y,bArena.tx,bArena.ty,bArena.r+3))continue;
+    const f0=D4.map(d=>w+d).find(n=>map[n]===FLOOR),tiles=[w].concat(waterPool(f0,rg(WATER.fvol),5,n=>needSet.has(n)||ep.wet.has(n)||near(n%MW,(n/MW)|0,px,py,WATER.gapPad)||near(n%MW,(n/MW)|0,sx,sy,WATER.gapStart)));
+    if(tiles.length<6||tiles.some(t=>needSet.has(t)))continue;for(const t of tiles)blocked[t]=1;if(!okAll()){for(const t of tiles)blocked[t]=0;continue}
+    const wp={i:w,x,y,tiles,on:0,t:0,st:0,ph:R()*6};ep.weeps.push(wp);ep.wmap.set(w,wp)}
+  ep.waterOK=okAll()}
+function waterRelease(w){if(w.on)return;w.on=1;w.t=0;w.st=0;ep.wmap.delete(w.i);shake=Math.max(shake,9);SFX.crack();toast('FLOOD!',(w.x+0.5)*T,(w.y+0.5)*T-20,'#7cc8ff');
+  for(let k=0;k<26;k++){const a=Math.random()*6.283,v=rnd(40,200);parts.push({x:(w.x+0.5)*T,y:(w.y+0.5)*T,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.4,0.9),max:0.9,c:k%2?'rgba(150,210,255,0.8)':'#dff2ff',s:rnd(2,3.5),drag:2.5})}
+  if(!ep.floodSaid){ep.floodSaid=1;sayComm('D','Sir! That rock was holding back water. The tunnel is flooding behind you. It should drain in half a minute, or burrow around it.')}}
+function waterTick(dt){let any=false;const hull=(i)=>{const x=(i%MW)*T,y=((i/MW)|0)*T,hit=(ex,ey,r)=>{const nx=clamp(ex,x,x+T),ny=clamp(ey,y,y+T);return(nx-ex)**2+(ny-ey)**2<r*r};
+    if(hit(ship.x,ship.y,14))return true;for(const m of mobs)if(!m.dead&&hit(m.x,m.y,(m.r||10)+1))return true;return false};
+  for(const w of ep.weeps){if(!w.on)continue;w.t+=dt;const n=w.tiles.length;
+    if(w.st===0){for(let k=0;k<n;k++){const i=w.tiles[k];if(!wDeep[i]&&w.t>=k/n*WATER.fill&&!hull(i)){wDeep[i]=1;ep.wet.delete(i)}}if(w.t>WATER.fill+WATER.hold){w.st=1;w.t=0}}
+    else if(w.st===1){for(let k=n-1;k>=0;k--){const i=w.tiles[k];if(wDeep[i]&&w.t>=(n-1-k)/n*WATER.drain){wDeep[i]=0;ep.wet.add(i)}}if(w.t>WATER.drain){w.st=2;for(const i of w.tiles)if(map[i]===FLOOR){wDeep[i]=0;ep.wet.add(i)}}}
+    if(w.st<2)any=true}
+  // a released flood keeps the bank next to it slow
+  if(any){if(!ep.wnear)ep.wnear=new Uint8Array(MW*MH);ep.wnear.fill(0);for(const w of ep.weeps)if(w.on&&w.st<2)for(const i of w.tiles)if(wDeep[i])for(const d of[1,-1,MW,-MW])ep.wnear[i+d]=1}else ep.wnear=null}
+function waterDraw(t,vis){const pool=(tiles,a,deep)=>{ctx.beginPath();for(const i of tiles){const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T;if(!vis(x,y,T))continue;ctx.moveTo(x+T*0.74,y);ctx.arc(x,y,T*0.74,0,6.283)}
+    ctx.fillStyle=deep?`rgba(25,80,150,${a})`:`rgba(45,120,200,${a})`;ctx.fill()};
+  ctx.save();
+  // shallow pools + seeps
+  for(const s of ep.seeps){const wx=(s.x+0.5+s.dx*0.5)*T,wy=(s.y+0.5+s.dy*0.5)*T;if(!vis(wx,wy,T*5))continue;pool(s.tiles.filter(i=>ep.wet.has(i)),0.3);
+    for(const i of s.tiles){if(!ep.wet.has(i)||i%3)continue;const x=(i%MW+0.5)*T,y=(((i/MW)|0)+0.5)*T,rr=((t*10+i*7)%(T*0.9));ctx.strokeStyle=`rgba(170,220,255,${0.16*(1-rr/(T*0.9))})`;ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,rr,0,6.283);ctx.stroke()}
+    // wet streak on the wall face + droplets running into the pool (a fall is a wider, brighter sheet)
+    const tx=-s.dy,ty=s.dx,wd=s.fall?T*0.42:T*0.16;ctx.fillStyle=s.fall?'rgba(150,210,255,0.35)':'rgba(120,180,240,0.25)';ctx.beginPath();ctx.moveTo(wx+tx*wd,wy+ty*wd);ctx.lineTo(wx-tx*wd,wy-ty*wd);ctx.lineTo(wx-tx*wd*0.6-s.dx*T*0.55,wy-ty*wd*0.6-s.dy*T*0.55);ctx.lineTo(wx+tx*wd*0.6-s.dx*T*0.55,wy+ty*wd*0.6-s.dy*T*0.55);ctx.fill();
+    const nd=s.fall?7:3;for(let k=0;k<nd;k++){const u=((t*(s.fall?1.6:0.9)+k/nd+s.ph)%1),o=((k*0.37+s.ph)%1-0.5)*wd*1.6,x=wx+tx*o-s.dx*u*T*0.9,y=wy+ty*o-s.dy*u*T*0.9;
+      ctx.strokeStyle=`rgba(200,235,255,${0.75*(1-u)})`;ctx.lineWidth=s.fall?1.6:1.2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-s.dx*5,y-s.dy*5);ctx.stroke()}
+    if(s.fall){const sx2=wx-s.dx*T*0.9,sy2=wy-s.dy*T*0.9,rr=(t*30+s.ph*10)%14;ctx.strokeStyle=`rgba(220,240,255,${0.5*(1-rr/14)})`;ctx.beginPath();ctx.arc(sx2,sy2,rr,0,6.283);ctx.stroke()}}
+  for(const w of ep.weeps){const x=(w.x+0.5)*T,y=(w.y+0.5)*T;if(!vis(x,y,T*6))continue;
+    if(!w.on){// weeping rock: wet sheen + beading drips
+      const gw=ctx.createRadialGradient(x,y,2,x,y,T*0.9);gw.addColorStop(0,`rgba(90,170,255,${0.5+0.12*Math.sin(t*2+w.ph)})`);gw.addColorStop(1,'rgba(90,170,255,0)');ctx.fillStyle=gw;ctx.fillRect(x-T*0.9,y-T*0.9,T*1.8,T*1.8);ctx.strokeStyle='rgba(170,225,255,0.8)';ctx.lineWidth=1.4;ctx.strokeRect(x-T*0.42,y-T*0.42,T*0.84,T*0.84);ctx.lineWidth=1.3;
+      for(let k=0;k<3;k++){const u=(t*0.7+k/3+w.ph)%1,dx2=(k-1)*T*0.25;ctx.beginPath();ctx.moveTo(x+dx2,y-T*0.4+u*T*0.7);ctx.lineTo(x+dx2,y-T*0.4+u*T*0.7+4);ctx.stroke()}continue}
+    const deep=w.tiles.filter(i=>wDeep[i]),sh=w.tiles.filter(i=>!wDeep[i]&&ep.wet.has(i));if(sh.length)pool(sh,0.3);if(!deep.length)continue;pool(deep,0.82,1);
+    ctx.strokeStyle='rgba(170,220,255,0.35)';ctx.lineWidth=1.2;for(const i of deep){const cx=(i%MW+0.5)*T,cy=(((i/MW)|0)+0.5)*T;if(!vis(cx,cy,T))continue;const o=((t*9+i*5)%T)-T/2;ctx.beginPath();for(let k=0;k<=6;k++){const xx=cx-T*0.35+k*T*0.12,yy=cy+o*0.5+Math.sin(t*4+k*1.2+i)*2;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)}ctx.stroke()}}
+  ctx.restore()}
 // called at the end of startLevel: sleeping nests + pacing
 function epStart(){if(!ep)return;const c=ep.c;spawnT=EP_PEACE?epGap(c)*0.6*(epQuiet1()?1.6:PIT_FLOW_V2&&ep.kind==='heavy'?0.4:1):spawnT;
   if(tunPath||!EP_PEACE||(PIT_FLOW_V2&&ep.kind==='maze'))return;const cap=epCapNow(),N=epQuiet1()?Math.max(2,Math.round(cap*4/3)):PIT_FLOW_V2&&ep.kind==='heavy'?Math.min(16,Math.round(cap*2)):Math.min(10,Math.round(cap*7/3)),fl=epFloorList(10).sort(()=>Math.random()-0.5),nests=[];let made=0;
@@ -630,15 +691,17 @@ function epCrystal(it){const n=it.rich&&PIT_FLOW_V2?EP_RICH:it.unst?2:1;if(it.ri
 // sleeping mobs: wake on sight at short range, on damage, or when a nest-mate wakes
 function epSleep(m,d){if(!m.asleep)return false;if(m.hp<m.max||(d<T*5&&los(m.x,m.y,ship.x,ship.y))){m.asleep=0;m.cd=Math.max(m.cd,0.8);toast('!',m.x,m.y-16,'#ff8a5a');for(const o of mobs)if(o.asleep&&dist(o.x,o.y,m.x,m.y)<T*4){o.asleep=0;o.cd=Math.max(o.cd,1.2)}return false}
   m.vx=m.vy=0;if(Math.random()<0.006)parts.push({x:m.x+6,y:m.y-10,vx:rnd(4,10),vy:-18,life:1.4,max:1.4,c:'rgba(200,220,255,0.6)',s:2.2,drag:0.3});return true}
-function epInFlood(x,y){if(!ep)return false;for(const f of ep.flood)if(dist(x,y,f.x,f.y)<f.r)return true;return false}
+function epInFlood(x,y){if(!ep)return false;if(WATER_REWORK&&ep.wet){const tx=Math.floor(x/T),ty=Math.floor(y/T);if(tx<0||ty<0||tx>=MW||ty>=MH)return false;const i=ty*MW+tx;return ep.wet.has(i)||!!(ep.wnear&&ep.wnear[i])}for(const f of ep.flood)if(dist(x,y,f.x,f.y)<f.r)return true;return false}
 function epGasBoom(g){if(g.dead)return;g.dead=true;boom(g.x,g.y,2.2,'#bf6');shake=Math.max(shake,16);for(let k=0;k<26;k++){const a=Math.random()*6.283,s=rnd(40,200);parts.push({x:g.x,y:g.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0.7,max:0.7,c:k%2?'#cf6':'#fd6',s:3,drag:2,g:1})}
   const R2=g.r*1.7;for(const m of mobs)if(!m.dead&&dist(m.x,m.y,g.x,g.y)<R2){m.hp-=m.type==='boss'?8:6;m.hf=0.1;m.asleep=0;if(m.hp<=0)kill(m)}
   if(dist(ship.x,ship.y,g.x,g.y)<g.r*1.4)hurtShip(15);if(RIVAL_DAMAGE&&rival&&dist(rival.x,rival.y,g.x,g.y)<g.r*1.4)rivalHit(1.3);for(const o of ep.gas)if(!o.dead&&o.fuse<0&&dist(o.x,o.y,g.x,g.y)<g.r*2.6)o.fuse=0.3}
 function epTick(dt){if(!ep)return;const c=ep.c;
   for(const g of ep.gas){if(g.dead)continue;g.ph+=dt;if(g.fuse>=0){g.fuse-=dt;if(g.fuse<=0)epGasBoom(g);continue}for(const b of bolts)if(!b.dead&&dist(b.x,b.y,g.x,g.y)<g.r){b.dead=true;epGasBoom(g);break}}
   ep.gas=ep.gas.filter(g=>!g.dead);
-  if(ep.flood.length&&epInFlood(ship.x,ship.y)){const k=Math.exp(-2.4*dt);ship.vx*=k;ship.vy*=k;if(Math.random()<dt*8)parts.push({x:ship.x+rnd(-14,14),y:ship.y+rnd(-14,14),vx:rnd(-20,20),vy:rnd(-20,20),life:0.5,max:0.5,c:'rgba(120,190,255,0.6)',s:2,drag:2})}
-  if(ep.flood.length)for(const m of mobs)if(m.type!=='boss'&&epInFlood(m.x,m.y)){m.vx*=Math.exp(-2*dt);m.vy*=Math.exp(-2*dt)}
+  if(WATER_REWORK&&ep.weeps)waterTick(dt);
+  const wetLv=ep.flood.length||WATER_REWORK&&ep.wet&&ep.wet.size;
+  if(wetLv&&epInFlood(ship.x,ship.y)){const k=Math.exp(-2.4*dt);ship.vx*=k;ship.vy*=k;if(Math.random()<dt*8)parts.push({x:ship.x+rnd(-14,14),y:ship.y+rnd(-14,14),vx:rnd(-20,20),vy:rnd(-20,20),life:0.5,max:0.5,c:'rgba(120,190,255,0.6)',s:2,drag:2})}
+  if(wetLv)for(const m of mobs)if(m.type!=='boss'&&epInFlood(m.x,m.y)){m.vx*=Math.exp(-2*dt);m.vy*=Math.exp(-2*dt)}
   for(const it of items){if(!it.unst||it.dead)continue;if(it.fuse==null){if(dist(it.x,it.y,ship.x,ship.y)<T*3&&passable(tileAt(Math.floor(it.x/T),Math.floor(it.y/T)))){it.fuse=3;SFX.crack()}}
     else{it.fuse-=dt;if(it.fuse<=0){it.dead=true;boom(it.x,it.y,1,'#f64');if(dist(it.x,it.y,ship.x,ship.y)<52)hurtShip(10);const i=ep.floors[(Math.random()*ep.floors.length)|0];if(i!=null)items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'crystal',ph:0})}}}
   if(cfg.pit.mods.includes('collapse')&&!ep.collapse&&padIsActive()&&!bossLevel){ep.collapse=true;const dd=bfs(Math.floor(padX/T),Math.floor(padY/T),9999),si=Math.floor(ship.y/T)*MW+Math.floor(ship.x/T),pd=dd[si]>0?dd[si]:dist(ship.x,ship.y,padX,padY)/T*1.5;
@@ -675,7 +738,7 @@ function epHud(L,t){if(!ep||!EP_HUD)return;const sm=L.sm,x=12;let y=L.top+(sm?40
     ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.font=`bold ${sm?8:9}px ${FW}`;y+=sm?11:13;const kn=`${st}/5 \u00b7 `+(epQuiet1()?EP_KNAME.quiet:EP_KNAME[ep.kind]||'');ctx.strokeText(kn,x,y);ctx.fillStyle=ep.kind==='heavy'?'rgba(225,160,255,0.95)':'rgba(255,220,160,0.9)';ctx.fillText(kn,x,y)}ctx.font=`${sm?8:9}px ${FW}`;
   for(const n of cfg.pit.names.slice(0,3)){y+=sm?11:13;ctx.strokeText(n,x,y);ctx.fillStyle='rgba(255,150,110,0.85)';ctx.fillText(n,x,y)}ctx.restore()}
 // world layer (under mobs): flood water, gas clouds, unstable crystal warnings
-function epDrawWorld(t,vis){if(!ep)return;
+function epDrawWorld(t,vis){if(!ep)return;if(WATER_REWORK&&ep.seeps)waterDraw(t,vis);
   for(const f of ep.flood){if(!vis(f.x,f.y,f.r))continue;const g=ctx.createRadialGradient(f.x,f.y,f.r*0.2,f.x,f.y,f.r);g.addColorStop(0,'rgba(40,110,190,0.42)');g.addColorStop(0.8,'rgba(40,110,190,0.3)');g.addColorStop(1,'rgba(40,110,190,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,6.283);ctx.fill();
     ctx.strokeStyle='rgba(150,210,255,0.22)';ctx.lineWidth=1;for(let k=0;k<3;k++){const rr=((t*14+k*f.r/3+f.ph*10)%f.r);ctx.beginPath();ctx.arc(f.x,f.y,rr,0,6.283);ctx.stroke()}}
   for(const g of ep.gas){if(!vis(g.x,g.y,g.r))continue;for(let k=0;k<4;k++){const ox=Math.cos(g.ph*0.7+k*1.7)*g.r*0.3,oy=Math.sin(g.ph*0.5+k*2.1)*g.r*0.3,gr=ctx.createRadialGradient(g.x+ox,g.y+oy,0,g.x+ox,g.y+oy,g.r);
@@ -718,7 +781,7 @@ function arenaDraw(t,vis){if(!bArena)return;const x=(bArena.tx+0.5)*T,y=(bArena.
   if(!bossWoke){ctx.globalAlpha=0.25+0.15*Math.sin(t*2.2);ctx.fillStyle='#c4f';ctx.beginPath();ctx.arc(x,y,T*0.35,0,6.283);ctx.fill()}ctx.restore()}
 function genLevel(lv){
   const R=mulberry((Date.now()^Math.imul(lv,7919))>>>0);
-  ep=null;cfg=levelCfg(lv);const cells=cfg.cells||Math.min(24,7+lv*2);MW=MH=cells*4+3;
+  ep=null;wDeep=null;cfg=levelCfg(lv);const cells=cfg.cells||Math.min(24,7+lv*2);MW=MH=cells*4+3;
   map=new Uint8Array(MW*MH).fill(ROCK);thp=new Float32Array(MW*MH);explored=new Uint8Array(MW*MH);
   const set=(x,y,v)=>{if(x>=2&&y>=2&&x<MW-2&&y<MH-2)map[y*MW+x]=v};
   for(let y=0;y<MH;y++)for(let x=0;x<MW;x++)if(x<2||y<2||x>=MW-2||y>=MH-2)map[y*MW+x]=BED;
@@ -924,7 +987,7 @@ function drawTile(x,y){if(x<0||y<0||x>=MW||y>=MH)return;const c=mctx,px=x*T,py=y
   if(t===ROCK&&MAZE_LEVELS&&mazeCrack&&mazeCrack.has(y*MW+x))crackMark(c,px,py,x,y)}
 function weakMark(c,px,py,x,y){const h=hash(x*13+5,y*7+1),h2=hash(y*3+2,x*11+9),mx=px+T*(0.3+h2*0.4),my=py+T*(0.35+h*0.3);c.save();c.lineCap='round';c.lineJoin='round';
   for(const[col,lw,bl]of[['rgba(255,150,40,0.5)',3.2,8],['rgba(255,205,120,0.95)',1.3,3]]){c.shadowColor='#ff9a30';c.shadowBlur=bl;c.strokeStyle=col;c.lineWidth=lw;c.beginPath();c.moveTo(px+T*h,py);c.lineTo(mx,my);c.lineTo(px+T*(1-h*0.7),py+T);c.moveTo(mx,my);c.lineTo(h2>0.5?px+T:px,py+T*(0.25+h*0.5));c.stroke()}c.restore()}
-function breakTile(tx,ty,quiet){const i=ty*MW+tx;if(map[i]!==ROCK)return;map[i]=FLOOR;
+function breakTile(tx,ty,quiet){const i=ty*MW+tx;if(map[i]!==ROCK)return;map[i]=FLOOR;if(WATER_REWORK&&ep&&ep.wmap&&ep.wmap.has(i))waterRelease(ep.wmap.get(i));
   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)drawTile(tx+a,ty+b);
   const cx=(tx+0.5)*T,cy=(ty+0.5)*T;
   for(let k=0;k<(quiet?5:10);k++)parts.push({x:cx+rnd(-10,10),y:cy+rnd(-10,10),vx:rnd(-90,90),vy:rnd(-90,90),life:rnd(0.4,0.9),max:0.9,c:`hsl(${20+Math.random()*20},40%,${30+Math.random()*20}%)`,s:rnd(2,4.5),drag:3});

@@ -310,6 +310,9 @@ function midCalm(){return EASE_MID&&level>=4&&level<=7}
 // like M6) must be burrowed through, 8 enemy blocker groups sit in the tunnel, 5 rockfall zones drop boulders (warning shadow, then 10 dmg), crystals line the walls
 // and each one adds RACE_CRY s. Timer = tunnel length at 105px/s + burrow + fight allowance, x RACE_SLACK (0.88: tight; old race was 150s); 10 blocker groups incl. a relay guard. Revert: RACE_TUNNEL=false (old open-maze race)
 const RACE_TUNNEL=true,RACE_CRY=1,RACE_SLACK=0.88,RACE_RF_DMG=10,RACE_SPAWN=1.6,RACE_CAP=4; // ambient spawns in the tunnel: interval x1.8, max 4 live within 14 tiles (blockers are placed on top)
+// TWO_MOONS (Justin): all 8 campaign missions take place on Ohma-D'un (Rori stays as the Pit's second moon and in lore). The Pit alternates moons
+// by shift, predetermined: shift 1 Ohma-D'un, 2 Rori, 3 Ohma-D'un... Each moon keeps its own depth, deepest, last completed, time and credits earned (PROG.mo). Revert: TWO_MOONS=false
+const TWO_MOONS=true,TM_NAME={o:'OHMA-D\u2019UN',r:'RORI'};
 const CAMPAIGN={
 1:{moon:'OHMA-D\u2019UN',name:'Routine Shift',crystals:12,spawnMul:0.6,music:'explore',
   brief:[['F','Morning, kid. First shift on Ohma-D\u2019un. Theed runs on plasma, and the Guild runs on crystals. Try not to crash my drill.'],
@@ -321,12 +324,12 @@ const CAMPAIGN={
     ['F','Moons rumble. Always have. ...Though I never felt one hit on the hour, every hour.'],
     ['F','Somebody\u2019s been leaving datapads in the old tunnels. Bring back anything that isn\u2019t rock.']],
   intel:[['datapad','I','Blasting log: six charges set in the east galleries. No Guild permit number.'],['transmission','V','\u201cKeep the drill crews out of the east galleries.\u201d \u2014 signed only \u201cV.\u201d']]},
-3:{moon:'RORI',name:'Things in the Walls',crystals:20,spawnMul:1.6,music:'explore',
-  brief:[['F','We lost two drills on Rori last night. Something came out of the walls. A LOT of somethings.'],
+3:{moon:TWO_MOONS?'OHMA-D\u2019UN':'RORI',name:'Things in the Walls',crystals:20,spawnMul:1.6,music:'explore',
+  brief:[['F',TWO_MOONS?'We lost two drills in the east galleries last night. Something came out of the walls. A LOT of somethings.':'We lost two drills on Rori last night. Something came out of the walls. A LOT of somethings.'],
     ['D','Bioscans show the burrowers nesting deeper than ever recorded. And they are agitated. Very agitated.'],
     ['F','Shoot anything with more legs than me. Crystals, then the lift.']],
   intel:[['datapad','I','Xenobiology note: \u201cBurrowers react violently to percussive blasts. If the blasting continues, they will swarm.\u201d'],['transmission','V','\u201cThe miners are getting curious. Good. Let the bugs keep them busy.\u201d']]},
-4:{moon:'RORI',name:'Lost Crew',crystals:9,spawnMul:1.2,rescue:3,music:'explore',
+4:{moon:TWO_MOONS?'OHMA-D\u2019UN':'RORI',name:'Lost Crew',crystals:9,spawnMul:1.2,rescue:3,music:'explore',
   brief:[['F','Drill Crew Seven went dark in the lower galleries. Three miners, one wrecked hauler. You\u2019re closest.'],
     ['D','I read three distress beacons. They are on your minimap. Fly close to each one and I will lock the tow beam.'],
     ['F','Bring \u2019em home, kid. Crystals are secondary.']],
@@ -351,7 +354,7 @@ const CAMPAIGN={
   intel:[['datapad','I','Survey office requisition: forty \u201cseismic charges\u201d signed out for Ohma-D\u2019un. Authorised by the Guild survey division \u2014 operations never saw the order.'],
     ['transmission','V','Intercept, relay origin RORI: \u201cThe miners keep digging near our caches. Move the schedule up. The cruiser will not wait for us.\u201d'],
     ['datapad','I','Freight tag: \u201cHANDLE AS ROYAL DIPLOMATIC CARGO \u2014 DO NOT SCAN.\u201d Destination: Theed landing platform, cruiser berth.']]},
-6:{moon:'RORI',name:'The Agitator Cell',crystals:M6_POCKETS?10:12,spawnMul:1.3,intelNeed:4,music:'tension',crates:M6_POCKETS?2:0,pockets:M6_POCKETS,caveIn:M6_CAVEIN,
+6:{moon:TWO_MOONS?'OHMA-D\u2019UN':'RORI',name:'The Agitator Cell',crystals:M6_POCKETS?10:12,spawnMul:1.3,intelNeed:4,music:'tension',crates:M6_POCKETS?2:0,pockets:M6_POCKETS,caveIn:M6_CAVEIN,
   crateLines:[['R','Baradium again. Fresh crates, same forged seals. The cell has been busy.'],['D','Second crate secured, sir. Same royal transponder codes as the Ohma-D\u2019un shipment.']],
   brief:[['R','We intercepted chatter from an agitator cell. They want to overthrow the government, and they\u2019re using your mine as cover.'],
     ['F','Agitators. In MY mine. Find out who, kid.'],
@@ -378,7 +381,7 @@ const CAMPAIGN={
     ['F','The hive queen. An old miners\u2019 legend. Looks like she\u2019s real, and she\u2019s furious.'],
     ['R','Vosh\u2019s cell has sealed the lower lift. Kill that thing, or you\u2019re trapped down there with it.']],
   intel:[['datapad','V','Vosh\u2019s personal log: \u201cIf the queen wakes, the mine buries the evidence for us.\u201d'],['datapad','V','Vosh\u2019s itinerary: Senator Amidala\u2019s cruiser departs Theed at dawn.']]},
-8:{moon:'RORI',name:'Race to the Relay',crystals:0,spawnMul:1.4,timed:150,cells:15,music:'tension',pad:'COMM RELAY',tunnel:RACE_TUNNEL,
+8:{moon:TWO_MOONS?'OHMA-D\u2019UN':'RORI',name:'Race to the Relay',crystals:0,spawnMul:1.4,timed:150,cells:15,music:'tension',pad:'COMM RELAY',tunnel:RACE_TUNNEL,
   brief:[['R','The Senator\u2019s departure was moved up. If that evidence isn\u2019t transmitted in the next few minutes, it won\u2019t matter.'],
     ['F','Vosh blew the support pillars. The whole mine is coming down. Forget the crystals, kid. Just GO.'],
     ['D',RACE_TUNNEL?'The comm relay is at the far end of the old haul tunnel, and the tunnel has caved in along the way. Burrow through the amber rubble, keep moving under falling rock, and grab crystals: each one buys us time. Go, go, GO!':'The comm relay is at the far end of this sector. Burrowing is the shortest path. Go, go, GO!']],
@@ -668,7 +671,7 @@ function bossShape(c,hue){const R=mulberry((Math.imul(c,40503)+7717)>>>0),pk=a=>
   const desc=k==='worm'||k==='serpent'?seg+'-segmented':k==='jelly'?limb+'-tentacled':(limb*2)+'-legged';
   return{plan:k,seg,limb,head:pk(P.heads),pat:pk(BOSS_PATS),hue,sat:35+((R()*30)|0),lit:30+((R()*14)|0),ph:R()*6.28,noun:desc+' '+P.noun}}
 function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),has=k=>mods.some(m=>m[0]===k);
-  const cfg={moon:c%2?'OHMA-D\u2019UN':'RORI',name:'',spawnMul:1,music:'explore',intel:[],pit:{c,kind,Q,mods:mods.map(m=>m[0]),names:mods.map(m=>m[2])},cells:Math.min(20,10+Math.floor(c/2)),maxMobs:epCap(c)};
+  const cfg={moon:TWO_MOONS?TM_NAME[tmCur()]:c%2?'OHMA-D\u2019UN':'RORI',name:'',spawnMul:1,music:'explore',intel:[],pit:{c,kind,Q,mods:mods.map(m=>m[0]),names:mods.map(m=>m[2])},cells:Math.min(20,10+Math.floor(c/2)),maxMobs:epCap(c)};
   if(kind==='mine'){cfg.crystals=Q;cfg.name=SECTORS[(c-1)%SECTORS.length]}
   else if(kind==='rescue'){cfg.crystals=Math.round(Q*0.5);cfg.rescue=Math.min(5,3+Math.floor(c/10));cfg.name='Lost Crew \u00b7 '+SECTORS[(c+3)%SECTORS.length];
     cfg.rescueLines=['Pilot! Thought we\u2019d die down here.','Another one! Tell the Guild we\u2019re still breathing.','Get me out of this hole, I\u2019m done with mining.','Watch the nests on the way back, they\u2019re everywhere.','That\u2019s all of us. Go, go!']}
@@ -862,7 +865,7 @@ function epWeak(m){const q=m.a+Math.PI;return{x:m.x+Math.cos(q)*m.r*0.62,y:m.y+M
 function epHit(m,b){if(!m.ep)return 1;const w=epWeak(m);if(dist(b.x,b.y,w.x,w.y)<16){toast('WEAK SPOT',w.x,w.y-10,'#ffb347');return 3}return 1}
 // run end: bonus credits + autosave (PROG.cr, PROG.pitAt = depth to resume)
 function epRunEnd(ok){if(!ep)return;let b=0;if(ok&&EP_CREDITS){b=EP_BONUS[ep.kind]||0;if(ep.kind==='race'&&(RIVAL_RACE&&rivalOn()&&rival?rival.res==='win':timeMax&&timeLeft>=timeMax*0.25))b=60;PROG.cr=(PROG.cr||0)+b}if(EP_SAVE)PROG.pitAt=ok?level+1:level;
-  ep.bonus=b;if(ok&&ep.kind==='boss')PROG.pitBoss=1;if(EP_CREDITS&&typeof lvStats==='object'&&lvStats){lvStats.cr=ep.cr+b;lvStats.crB=b}if(level>PROG.deep)PROG.deep=level;if(EP_SAVE)saveProg()}
+  ep.bonus=b;if(ok&&ep.kind==='boss')PROG.pitBoss=1;if(EP_CREDITS&&typeof lvStats==='object'&&lvStats){lvStats.cr=ep.cr+b;lvStats.crB=b}if(level>PROG.deep)PROG.deep=level;if(TWO_MOONS){const z=tmP()[tmCur()];if(EP_SAVE)z.at=PROG.pitAt;z.deep=Math.max(z.deep,ep.c);if(ok)z.last=ep.c;z.t+=typeof lvStats==='object'&&lvStats&&lvStats.t0!=null?Math.max(0,gameT-lvStats.t0):0;z.cr+=EP_CREDITS?(ep.cr||0)+b:0}if(EP_SAVE)saveProg()}
 function epHud(L,t){if(!ep||!EP_HUD)return;const sm=L.sm,x=12;let y=L.top+(sm?40:52)+(touchMode?16:30);ctx.save();ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FB}`;ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';
   const s='DEPTH '+ep.c;ctx.strokeText(s,x,y);ctx.fillStyle='rgba(255,196,110,0.95)';ctx.fillText(s,x,y);
   if(PIT_FLOW_V2&&EP_CYCLE){const st=epStep(ep.c),px=x+ctx.measureText(s).width+8,L10=EP_LOOP>5,pr=L10?(sm?2.4:3):sm?3:3.5;for(let k=1;k<=EP_LOOP;k++){ctx.beginPath();ctx.arc(px+(k-1)*pr*(L10?2.7:3)+(L10&&k>5?pr*1.6:0),y-(sm?3.5:4),k===st?pr+0.8:pr,0,6.283);ctx.fillStyle=k<st?'rgba(255,196,110,0.75)':k===st?'#fff2c8':'rgba(0,0,0,0.45)';ctx.fill();ctx.lineWidth=1;ctx.strokeStyle=L10&&k===EP_LOOP?'rgba(255,90,70,0.95)':'rgba(255,196,110,0.8)';ctx.stroke()}
@@ -2400,6 +2403,13 @@ let qt=null,qtLast=null;
 function qtNeed(){return QUARTERS_TOUR&&BASECAMP_V1&&PROG.qtour===0&&!gameBeaten}
 // PIT_FLOW_V2 save migration: old 4-step saves keep their depth number (difficulty, quota and hazards are by depth); the step is re-derived from it. Bad values reset to depth 1.
 (function(){if(!PIT_FLOW_V2||PROG.pitV===2)return;if(PROG.pitAt!=null){const a=+PROG.pitAt;PROG.pitAt=a>=0&&a<100000?Math.floor(a):0}PROG.pitV=2})(); // written with the next save
+// TWO_MOONS per-moon Pit state: at = depth level to resume, deep = deepest depth reached, last = last depth completed, t = seconds spent, cr = credits earned
+function tmP(){const m=PROG.mo&&typeof PROG.mo==='object'?PROG.mo:(PROG.mo={});for(const k of['o','r']){const z=m[k]&&typeof m[k]==='object'?m[k]:(m[k]={});z.at=+z.at>=9&&+z.at<100000?Math.floor(+z.at):9;z.deep=Math.max(0,Math.floor(+z.deep||0));z.last=Math.max(0,Math.floor(+z.last||0));z.t=Math.max(0,+z.t||0);z.cr=Math.max(0,Math.round(+z.cr||0))}PROG.shiftN=Math.max(0,Math.floor(+PROG.shiftN||0));return m}
+function tmNext(){return (PROG.shiftN||0)%2?'r':'o'}
+function tmCur(){return PROG.tmCur==='r'?'r':'o'}
+// migration: the old Pit alternated moons every depth, so both moons resume at the old depth with the old deepest/last; time and credits start at 0 (never tracked); shift 1 = Ohma-D'un
+(function(){if(!TWO_MOONS||PROG.mo)return;const at=PROG.pitAt>9?Math.floor(PROG.pitAt):9,dp=Math.max(0,(PROG.deep||0)-8);if(at>=13&&!PROG.pitBoss)PROG.pitBoss=1;
+  PROG.mo={o:{at,deep:dp,last:at-9,t:0,cr:0},r:{at,deep:dp,last:at-9,t:0,cr:0}};PROG.shiftN=0;PROG.tmCur='o';tmP()})();
 function recordBest(){if(level<=8)PROG.next=Math.max(PROG.next||1,level+1);const ms=Math.max(0,score-(lvStats.s0||0));lvStats.ms=ms;lvStats.nb=false;if(level<=8){if(ms>(PROG.best[level]||0)){PROG.best[level]=ms;lvStats.nb=true}}else if(level>PROG.deep)PROG.deep=level;saveProg()}
 function dossierEntries(){return DOSSIERS.map((d,i)=>{const k=DOS_KEY[i];if(k==='you')return d;if(k==='V'){if(PROG.d.V)return Object.assign({},d,{tone:'red'});if(PROG.d.Vm)return VOSH_MASKED}
   return PROG.d[k]?d:{p:d.p,locked:true,name:'CLASSIFIED',role:'Not yet in contact',col:'#9a8a66',bio:'This dossier unlocks the first time this character makes contact over the comm. Keep flying.'}})}
@@ -2512,10 +2522,10 @@ const TINT={};function tinted(n,mode){const key=n+':'+mode;if(TINT[key])return T
   else{try{const d=g.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){const l=a[i]*0.3+a[i+1]*0.59+a[i+2]*0.11;
       if(mode==='mask'){a[i]=l*0.62;a[i+1]=l*0.7;a[i+2]=l*0.8}else{a[i]=Math.min(255,a[i]*0.45+l*0.85+18);a[i+1]=a[i+1]*0.3+l*0.18;a[i+2]=a[i+2]*0.3+l*0.16}}g.putImageData(d,0,0)}catch(e){}}
   TINT[key]=c;return c}
-function stageInfo(lv){if(lv>8&&ENDLESS_PIT)return{num:'\u221e',name:'THE ENDLESS PIT',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END \u00b7 CREDITS',best:PROG.pitAt>9?'RESUME DEPTH '+(PROG.pitAt-8)+(PIT_FLOW_V2&&EP_CYCLE?' \u00b7 '+epStep(PROG.pitAt-8)+'/'+EP_LOOP:''):'FROM DEPTH 1'};if(lv>8)return{num:'\u221e',name:'ENDLESS SECTORS',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END',best:PROG.deep?'DEEPEST SECTOR '+PROG.deep:'FROM SECTOR 9'};const c=CAMPAIGN[lv],tg=[];if(c.rescue)tg.push('RESCUE');if(c.crates)tg.push('CRATES');if(c.intelNeed)tg.push('INTEL');if(c.boss)tg.push('BOSS');if(c.timed)tg.push('TIMED');if(c.quakes)tg.push('QUAKES');
+function stageInfo(lv){if(lv>8&&ENDLESS_PIT&&TWO_MOONS){const m=tmNext(),a=tmP()[m].at;return{num:'\u221e',name:'THE ENDLESS PIT',moon:'NEXT SHIFT \u00b7 '+TM_NAME[m],tags:'NO END \u00b7 CREDITS',best:a>9?'RESUME DEPTH '+(a-8)+(PIT_FLOW_V2&&EP_CYCLE?' \u00b7 '+epStep(a-8)+'/'+EP_LOOP:''):'FROM DEPTH 1'}}if(lv>8&&ENDLESS_PIT)return{num:'\u221e',name:'THE ENDLESS PIT',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END \u00b7 CREDITS',best:PROG.pitAt>9?'RESUME DEPTH '+(PROG.pitAt-8)+(PIT_FLOW_V2&&EP_CYCLE?' \u00b7 '+epStep(PROG.pitAt-8)+'/'+EP_LOOP:''):'FROM DEPTH 1'};if(lv>8)return{num:'\u221e',name:'ENDLESS SECTORS',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END',best:PROG.deep?'DEEPEST SECTOR '+PROG.deep:'FROM SECTOR 9'};const c=CAMPAIGN[lv],tg=[];if(c.rescue)tg.push('RESCUE');if(c.crates)tg.push('CRATES');if(c.intelNeed)tg.push('INTEL');if(c.boss)tg.push('BOSS');if(c.timed)tg.push('TIMED');if(c.quakes)tg.push('QUAKES');
   return{num:String(lv).padStart(2,'0'),name:c.name.toUpperCase(),moon:c.moon,tags:tg.join(' \u00b7 '),best:PROG.best[lv]?'BEST '+PROG.best[lv].toLocaleString('en-US'):'NO SCORE YET'}}
 let stageSel=0,pausePage='main',pauseHits=[],pausePick=0,lockFlash=-9;
-function launchStage(n){campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;if(ENDLESS_PIT&&n===9&&PROG.pitAt>9)n=PROG.pitAt;level=n;startLevel()}
+function launchStage(n){campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;if(TWO_MOONS&&ENDLESS_PIT&&n===9){const m=tmNext();PROG.tmCur=m;PROG.shiftN++;PROG.pitAt=tmP()[m].at;saveProg()}if(ENDLESS_PIT&&n===9&&PROG.pitAt>9)n=PROG.pitAt;level=n;startLevel()}
 function lockIcon(x,y,s,col){ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=Math.max(1.5,s*0.16);ctx.beginPath();ctx.arc(x+s/2,y+s*0.42,s*0.27,Math.PI,0);ctx.stroke();rrect(x+s*0.12,y+s*0.42,s*0.76,s*0.58,s*0.1);ctx.fill();ctx.restore()}
 function aboutTabs(cx,y,cw,t,TL,LB){const th=Math.max(clamp(cw/18,24,34),touchMode&&cw<560?44:0);let fs=clamp(cw/18,24,34)*0.5;const tabs=(TL||ABOUT_TABS).map(id=>[id,LB&&LB[id]||{story:'STORY',chars:TL?'PROFILES':'CHARACTERS',creatures:cw>640?'CREATUREPEDIA':'CREATURES',art:'ARTWORK',msgs:campDesk?(cw>560?'MISSION LOGS':'LOGS'):'MESSAGES',scans:cw>560?'FOUND SCANS':'SCANS'}[id]]);let x=cx;
   ctx.font=boxFont(fs);{const tot=()=>tabs.reduce((a,[,lb])=>a+ctx.measureText(lb).width+fs*2.2+10,-10);while(tot()>cw&&fs>8){fs-=0.5;ctx.font=boxFont(fs)}}const gapX=fs*1.1;for(const[id,lb]of tabs){const lk=false,w=ctx.measureText(lb).width+gapX*2+(lk?fs*1.4:0),on=aboutTab===id;rrect(x,y,w,th,5);ctx.fillStyle=on?'#ffd21f':'rgba(40,22,12,0.85)';ctx.fill();ctx.strokeStyle=on?'#3a0a04':'rgba(255,210,31,0.6)';ctx.lineWidth=1.5;ctx.stroke();
@@ -2855,7 +2865,7 @@ function menuButton(x,y,w,h,label,sel,t,primary){ctx.save();const glow=sel?0.6+0
 const DATAPAD_SELECT=true,PAUSE_RESUME=true,DP_NODES=[[.16,.12],[.5,.18],[.84,.28],[.62,.44],[.3,.5],[.06,.7],[.48,.8],[.86,.9]],DP_BLURB=['',
   'First shift on Ohma-D\u2019un. Learn the drill, haul crystals back to the pad, and try not to crash the Guild\u2019s hauler.',
   'Seismic readings are up 300 percent, and the tremors have a rhythm. Quakes reshape the tunnels mid-shift.',
-  'Two drills lost on Rori last night. Something is coming out of the walls \u2014 a lot of somethings.',
+  TWO_MOONS?'Two drills lost in the east galleries last night. Something is coming out of the walls \u2014 a lot of somethings.':'Two drills lost on Rori last night. Something is coming out of the walls \u2014 a lot of somethings.',
   'Drill Crew Seven went dark in the lower galleries. Find the survivors before their air runs out.',
   'Someone is blasting seams without Guild permits. Royal Security wants the evidence crates recovered.',
   'Forged seals, sealed crates and a missing seam crew. An agitator cell is using your mine as cover.',
@@ -2900,7 +2910,7 @@ function drawMineDP(t,go,back){pauseHits=[];const L=padLayout();ctx.fillStyle='r
   if(lk)padBtn(ix+dx,ly,iw,lh,LA,{lock:true,sub:lv>8?'beat the campaign':'complete mission '+(lv-1)},()=>dpLaunch(lv,go));else dpPrime(ix,ly,iw,lh,LA,t,()=>dpLaunch(lv,go),false);
   const pl=!gameBeaten,pon=sel===8;rrect(ix,pty,iw,pch,6);ctx.fillStyle=pon?'rgba(255,190,85,0.14)':'rgba(10,26,20,0.9)';ctx.fill();if(pl)ctx.setLineDash([4,3]);ctx.strokeStyle=pon?PAD_AMB:pl?'rgba(255,190,85,0.45)':'rgba(159,245,207,0.6)';ctx.lineWidth=pon?2.5:1.3;ctx.stroke();ctx.setLineDash([]);
   {const hx=ix+pch*0.55,hy=pty+pch/2,hr=pch*0.34;for(let k=0;k<4;k++){ctx.beginPath();ctx.ellipse(hx,hy,hr*(1-k*0.22),hr*(0.55-k*0.12),0,0,6.283);ctx.fillStyle=`rgba(${pl?'60,60,55':'255,140,60'},${0.18+k*0.2})`;ctx.fill()}ctx.beginPath();ctx.ellipse(hx,hy,hr*0.3,hr*0.14,0,0,6.283);ctx.fillStyle='#000';ctx.fill();if(pl)lockIcon(hx-hr*0.3,hy-hr*0.45,hr*0.6,'rgba(255,190,85,0.8)')}
-  const pf=clamp(pch*0.3,11,17);padChrome('THE PIT',ix+pch*1.1,pty+pch*0.46,pf,'left');ctx.font=`${Math.max(9,pf*0.62)}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=pl?'rgba(255,190,85,0.7)':PAD_MINT;ctx.fillText(pl?'LOCKED \u00b7 beat the campaign':deep?'BEST DEPTH '+deep+(PROG.pitAt>9?' \u00b7 resume depth '+(PROG.pitAt-8):''):'endless \u00b7 no depth yet',ix+pch*1.1,pty+pch*0.46+pf*0.95,iw-pch*1.2);
+  const pf=clamp(pch*0.3,11,17);padChrome('THE PIT',ix+pch*1.1,pty+pch*0.46,pf,'left');ctx.font=`${Math.max(9,pf*0.62)}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=pl?'rgba(255,190,85,0.7)':PAD_MINT;ctx.fillText(pl?'LOCKED \u00b7 beat the campaign':TWO_MOONS?'NEXT SHIFT \u00b7 '+TM_NAME[tmNext()]+' \u00b7 depth '+(tmP()[tmNext()].at-8):deep?'BEST DEPTH '+deep+(PROG.pitAt>9?' \u00b7 resume depth '+(PROG.pitAt-8):''):'endless \u00b7 no depth yet',ix+pch*1.1,pty+pch*0.46+pf*0.95,iw-pch*1.2);
   pauseHits.push({x:ix,y:pty,w:iw,h:pch,st:8,act:()=>{if(stageSel!==8)SFX.click();stageSel=8}});
   ctx.restore();pauseHits.push({x:L.px,y:L.py,w:L.pw,h:L.ph,act:()=>{}});
   dpLast={nodes,r,land,lv,lk,blurb,launch:{x:ix,y:ly,w:iw,h:lh,label:LA},pit:{x:ix,y:pty,w:iw,h:pch,lock:pl,deep},map:{x:mx,y:my,w:mw,h:mh},back:{x:cx+cw-bbw,y:sy+ip,w:bbw,h:tb}}}

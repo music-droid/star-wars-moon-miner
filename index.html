@@ -413,6 +413,11 @@ const M8_VOSH_RACE=true,VOSH_RED='#ff4a3a',VOSH_R={
     ['V','Every crate, every jammed beacon, every name on that list. I built this cell, miner. I led it. And I would have handed it to you.'],
     ['V','You could have been a real liberator, the one the people followed out of the dark. Instead you\u2019re a courier for bureaucrats. What a waste. Remember that I asked.']],
   arrest:'Dellan Vosh is in custody. My team pulled him out of that red skiff at the relay, still talking. Turns out he didn\u2019t just speak for the cell. He led it.'};
+// M8_PRERACE_TALK (Justin): every Mission 8 line happens BEFORE the race in one tap-through comm (music silent): Vosh's congratulations, his offer (choices greyed),
+// the Sykes and Pik cut-ins, then his taunts and 'Very well' as parting shots. Dialogue ends -> race starts at once with the mission music; no comms, captions or
+// pop-up dialogue during the race (only his 'relay is mine' line if he wins = loss handling, unchanged). Post-win mourning unchanged. Revert: M8_PRERACE_TALK=false
+const M8_PRERACE_TALK=true,VOSH_TALK=[['V',VOSH_R.brief,'solo'],['V',VOSH_R.ask,'ask'],[...VOSH_R.cut[0],'cut'],[...VOSH_R.cut[1],'cut'],
+  ['V',VOSH_R.taunt[2]+' '+VOSH_R.taunt[3],'solo'],['V',VOSH_R.taunt[0]+' '+VOSH_R.taunt[1],'solo'],['V',VOSH_R.taunt[5]+' '+VOSH_R.taunt[6],'solo'],['V',VOSH_R.taunt[4]+' '+VOSH_R.go,'solo']];
 const EPILOGUE=[...(M8_VOSH_RACE?VOSH_R.mourn.slice(1):[]),['R','Your evidence came through. Honestly? Command thinks a miner\u2019s story about bugs and baradium sounds far-fetched.'],
   ['R',M8_VOSH_RACE?VOSH_R.arrest:'But it\u2019s credible enough. Survey Chief Dellan Vosh was arrested at the Theed hangar an hour ago.'],
   ['R','And the Senator won\u2019t ride the royal cruiser. A handmaiden will travel aboard it as a decoy, while the Senator flies escort in a starfighter.'],
@@ -1185,7 +1190,7 @@ function setMode(m){if(ship.mode===m)return;if(m==='burrow'&&ship.en<4){toast('N
 
 // one message channel: comms queue, never stack; a waiting message shortens the current one once it has been read
 let commQ=[];
-function sayComm(who,text,dur){const c={who,text,t:0,max:dur||Math.max(5,text.length*0.06)};if(!comm){comm=c;return}
+function sayComm(who,text,dur){if(M8_PRERACE_TALK&&M8_VOSH_RACE&&level===8&&rival&&rivalOn()&&!rival.fin&&(state==='play'||state==='briefing'))return;const c={who,text,t:0,max:dur||Math.max(5,text.length*0.06)};if(!comm){comm=c;return}
   if(comm.text===text||commQ.some(q=>q.text===text))return;commQ.push(c);if(commQ.length>4)commQ.shift()}
 // UNLOCKS_V1: unlock notices share the single screen-message lane; one at a time, after the level banner, never blocking
 let laneQ=[];
@@ -3426,13 +3431,13 @@ function rivalOn(){return RIVAL_RACE&&!!tunPath&&!!cfg&&!!cfg.tunnel}
 const VR=()=>M8_VOSH_RACE&&level===8&&rivalOn(),rivL=()=>VR()?VOSH_R:RIVAL_LINES,rivNm=()=>VR()?'VOSH':'VARRO',rivC=()=>VR()?VOSH_RED:RIVAL_YEL;
 function rivalInit(){rival=null;rivBet=null;if(!rivalOn())return;
   rival={i:1.5,pi:0,x:0,y:0,a:0,lane:1,dig:false,dt:0,cd:0,tt:9,cap:null,used:[],lead:0,ovT:-99,fin:0,settled:false,res:null,delta:0,bumped:0,pt:0};rivalPlace();
-  rivBet={open:false,done:false,bet:0,sel:0,t0:0,hits:[],vosh:VR()?1:0,ph:0,pt:0};if(rivBet.vosh&&cfg.brief){cfg.brief=[['V',VOSH_R.brief]];return}
+  rivBet={open:false,done:false,bet:0,sel:0,t0:0,hits:[],vosh:VR()?1:0,ph:0,pt:0};if(rivBet.vosh&&cfg.brief){cfg.brief=M8_PRERACE_TALK?[]:[['V',VOSH_R.brief]];return}
   if(cfg.brief)cfg.brief=cfg.brief.map(([w,s])=>[w,s.replace('grab crystals: each one buys us time','grab crystals on the way: a cell runner in a grey hauler is racing us there').replace('Burrow through it before the timer runs out.','Burrow through it. And there\u2019s a grey hauler in the tunnel, sir. He has been calling for you.')])}
 function rivalPlace(){const P=tunPath,N=P.length,i=clamp(rival.i,0,N-1),j=Math.min(N-2,Math.floor(i)),f=i-j,a=P[j],b=P[j+1],dx=b[0]-a[0],dy=b[1]-a[1],dl=Math.hypot(dx,dy)||1;
   const off=RIVAL_LANE*T*Math.cos(i*0.13)*rival.lane*-1;rival.x=(a[0]+dx*f+0.5)*T-dy/dl*off;rival.y=(a[1]+dy*f+0.5)*T+dx/dl*off;
   const c=P[Math.min(N-1,j+3)],ta=Math.atan2(c[1]-a[1],c[0]-a[0]);let da=ta-rival.a;while(da>Math.PI)da-=6.283;while(da<-Math.PI)da+=6.283;rival.a+=da*0.12}
-function rivalSay(s){rival.cap={text:s,t:4}}
-function rivalHold(){if(!rivalOn()||!rival||!rivBet)return false;if(!rivBet.done&&!rivBet.open&&!arr){rivBet.open=true;rivBet.t0=performance.now()/1000;SFX.blip('vosh')}return rivBet.open}
+function rivalSay(s){if(M8_PRERACE_TALK&&VR()&&s!==VOSH_R.win)return;rival.cap={text:s,t:4}}
+function rivalHold(){if(!rivalOn()||!rival||!rivBet)return false;if(!rivBet.done&&!rivBet.open&&!arr){rivBet.open=true;rivBet.t0=performance.now()/1000;SFX.blip('vosh');if(M8_PRERACE_TALK&&rivBet.vosh){Music.play(null);comm=null;commQ=[]}}return rivBet.open}
 function rivChoose(k){if(!rivBet||!rivBet.open)return;const b=RIVAL_BETS[clamp(k,0,2)];rivBet.bet=b[0];rivBet.sel=k;rivBet.open=false;rivBet.done=true;SFX.click();
   toast(`BET ${b[0]} CR \u00b7 BEAT VARRO TO THE RELAY`,null,null,RIVAL_YEL);rivalSay(k===2?'Two hundred. I like you already. Go.':k===1?'A hundred it is. Try to keep up.':'Fifty. Cheap, but it spends. Go.')}
 function rivShown(){return Math.floor((performance.now()/1000-rivBet.t0)*60)}
@@ -3501,17 +3506,20 @@ function rivBetDraw(t){if(!rivBet||!rivBet.open)return;if(rivBet.vosh){voshDraw(
     rivBet.hits.push({x:bx,y:by,w:bw,h:bh,k,pad:lb})});
   ctx.textAlign='center';ctx.font=`${sm?11:12}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.75)';ctx.fillText(`BALANCE ${PROG.cr||0} CR  \u00b7  WIN +BET  \u00b7  LOSE \u2212BET`+(touchMode?'':'  \u00b7  1 / 2 / 3'),x+w/2,by+bh+24);ctx.restore()}
 // M8_VOSH_RACE pre-race comm: Vosh's offer (ph0, choices greyed, unselectable), Sykes cut-in (ph1), Pik cut-in (ph2), then the race. Tap = finish typing / next.
-function voshLine(){return rivBet.ph?VOSH_R.cut[rivBet.ph-1]:['V',VOSH_R.ask]}
-function voshAdv(){const L=voshLine()[1];if(rivBet.pt<L.length/55){rivBet.pt=L.length/55;return}rivBet.pt=0;SFX.click();if(++rivBet.ph<=VOSH_R.cut.length)return;
-  rivBet.open=false;rivBet.done=true;rivBet.bet=0;toast('BEAT VOSH TO THE RELAY',null,null,VOSH_RED);rivalSay(VOSH_R.go)}
+function voshLine(){return M8_PRERACE_TALK?VOSH_TALK[Math.min(rivBet.ph,VOSH_TALK.length-1)]:rivBet.ph?VOSH_R.cut[rivBet.ph-1]:['V',VOSH_R.ask]}
+function voshCut(){return M8_PRERACE_TALK?voshLine()[2]==='cut':!!rivBet.ph}
+function voshAdv(){const L=voshLine()[1];if(rivBet.pt<L.length/55){rivBet.pt=L.length/55;return}rivBet.pt=0;SFX.click();if(M8_PRERACE_TALK?++rivBet.ph<VOSH_TALK.length:++rivBet.ph<=VOSH_R.cut.length)return;
+  rivBet.open=false;rivBet.done=true;rivBet.bet=0;toast('BEAT VOSH TO THE RELAY',null,null,VOSH_RED);if(M8_PRERACE_TALK){Music.play(cfg.music);Music.battle(0);rivBet.go=gameT}else rivalSay(VOSH_R.go)}
 function voshDraw(t){const now=performance.now()/1000;rivBet.pt+=Math.min(0.1,now-(rivBet.lt||now));rivBet.lt=now;const[who,txt]=voshLine();if(rivBet.pt>txt.length/55+(rivBet.ph?2.6:3.2))voshAdv();
   const port=H>W,w=Math.min(640,W-16),x=(W-w)/2,cp=!port&&H<500?1:0,sm=w<500;ctx.save();ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
-  let y=port?Math.max(touchMode?60:20,H*0.1):8;const vh=dlgH(VOSH_R.ask,w,cp);ctx.globalAlpha=rivBet.ph?0.55:1;dialogBox('V',VOSH_R.ask,x,y,w,rivBet.ph?999:Math.floor(rivBet.pt*55),t,cp);ctx.globalAlpha=1;y+=vh+(cp?6:10);
-  const sh=rivBet.ph||rivBet.pt>VOSH_R.ask.length/55*0.6,bh=cp?30:40,gw=10,bw=(w-gw)/2;rivBet.hits=[];
-  if(sh)VOSH_R.ch.forEach((lb,k)=>{const bx=x+k*(bw+gw);ctx.globalAlpha=rivBet.ph?0.35:0.6+0.15*Math.sin(t*6+k);rrect(bx,y,bw,bh,6);ctx.fillStyle='rgba(60,60,64,0.75)';ctx.fill();ctx.strokeStyle='rgba(200,200,205,0.5)';ctx.lineWidth=1;ctx.stroke();
-    ctx.textAlign='center';ctx.fillStyle='#9a9aa2';ctx.font=`bold ${sm?11:14}px ${FW}`;ctx.fillText(lb,bx+bw/2,y+bh*0.64,bw-8);if(rivBet.ph){ctx.strokeStyle='rgba(255,90,70,0.8)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(bx+8,y+bh/2);ctx.lineTo(bx+bw-8,y+bh/2);ctx.stroke()}});
+  if(M8_PRERACE_TALK&&voshLine()[2]==='solo'){const yy=port?Math.max(touchMode?60:20,H*0.1):8;rivBet.hits=[];ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FW}`;ctx.fillStyle='#ff6a50';ctx.fillText('\u25cf RED SKIFF \u00b7 OPEN CHANNEL',x+4,yy+(cp?8:10));
+    dialogBox(who,txt,x,yy+(cp?11:16),w,Math.floor(rivBet.pt*55),t,cp);ctx.textAlign='center';ctx.font=`${sm?11:12}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.7)';ctx.fillText((touchMode?'Tap to continue':'ENTER / click to continue')+`  \u00b7  ${rivBet.ph+1}/${VOSH_TALK.length}`,W/2,H-(port?24:8));ctx.restore();return}
+  let y=port?Math.max(touchMode?60:20,H*0.1):8;const vh=dlgH(VOSH_R.ask,w,cp);ctx.globalAlpha=voshCut()?0.55:1;dialogBox('V',VOSH_R.ask,x,y,w,voshCut()?999:Math.floor(rivBet.pt*55),t,cp);ctx.globalAlpha=1;y+=vh+(cp?6:10);
+  const sh=voshCut()||rivBet.pt>VOSH_R.ask.length/55*0.6,bh=cp?30:40,gw=10,bw=(w-gw)/2;rivBet.hits=[];
+  if(sh)VOSH_R.ch.forEach((lb,k)=>{const bx=x+k*(bw+gw);ctx.globalAlpha=voshCut()?0.35:0.6+0.15*Math.sin(t*6+k);rrect(bx,y,bw,bh,6);ctx.fillStyle='rgba(60,60,64,0.75)';ctx.fill();ctx.strokeStyle='rgba(200,200,205,0.5)';ctx.lineWidth=1;ctx.stroke();
+    ctx.textAlign='center';ctx.fillStyle='#9a9aa2';ctx.font=`bold ${sm?11:14}px ${FW}`;ctx.fillText(lb,bx+bw/2,y+bh*0.64,bw-8);if(voshCut()){ctx.strokeStyle='rgba(255,90,70,0.8)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(bx+8,y+bh/2);ctx.lineTo(bx+bw-8,y+bh/2);ctx.stroke()}});
   ctx.globalAlpha=1;y+=bh+(cp?6:12);
-  if(rivBet.ph){ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FW}`;ctx.fillStyle='#ff6a50';ctx.fillText('\u25b6 CUT-IN',x+4,y+(cp?8:10));y+=cp?11:16;dialogBox(who,txt,x,y,w,Math.floor(rivBet.pt*55),t,cp)}
+  if(voshCut()){ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FW}`;ctx.fillStyle='#ff6a50';ctx.fillText('\u25b6 CUT-IN',x+4,y+(cp?8:10));y+=cp?11:16;dialogBox(who,txt,x,y,w,Math.floor(rivBet.pt*55),t,cp)}
   ctx.textAlign='center';ctx.font=`${sm?11:12}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.7)';ctx.fillText(touchMode?'Tap to continue':'ENTER / click to continue',W/2,H-(port?24:8));ctx.restore()}
 // NEW tag (after Pik's credits comm) on the hatch, until the Quartermaster is opened once
 function gearNewTag(){return QM_STORE&&gameBeaten&&typeof PIK_CREDITS_COMM!=='undefined'&&PIK_CREDITS_COMM&&!!PROG.pikCr&&!PROG.qmSeen}

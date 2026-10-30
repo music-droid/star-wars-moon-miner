@@ -3058,11 +3058,14 @@ function doneScores(){const s0=(lvStats&&lvStats.s0)||0,ms=lvStats&&lvStats.ms!=
   const f=n=>n.toLocaleString('en-US');for(const[a,b]of parts)r.push({l:a,v:f(b)});r.push({rule:1});r.push({l:'MISSION TOTAL',v:f(ms),tot:1});
   if(level<=8)r.push({l:lvStats&&lvStats.nb?'\u2605 NEW MISSION BEST':'MISSION BEST',v:f(PROG.best[level]||ms),hot:lvStats&&lvStats.nb});if(s0>0)r.push({l:'RUN SCORE',v:f(score)});if(epOn()&&lvStats&&lvStats.cr!=null)r.push({l:`CREDITS +${f(lvStats.cr)}`,v:f(PROG.cr||0),hot:1});
   const nh=score>=hi&&score>0;r.push({l:nh?'\u2605 NEW HIGH SCORE':'HIGH SCORE',v:f(Math.max(hi,score)),hot:nh});return r}
+// NO_STAGESEL_END (Justin): Stage Select is only reached through the Quarters hatch datapad, so the end-of-mission pad drops its STAGE SELECT button (and the S key/hint);
+// NEXT MISSION goes full width on top with MAIN MENU + QUARTERS side by side below (landscape header row: NEXT double width). Revert: NO_STAGESEL_END=false
+const NO_STAGESEL_END=true;
 function doneCanStages(){return gameBeaten||level===8}
 function doneNext(){if(stateT<0.8)return;SFX.click();advance()}
 function doneStages(){if(!doneCanStages()){lockFlash=performance.now()/1000;SFX.click();return}SFX.click();if(level===8&&!gameBeaten)markBeaten();const ns=clamp(level<=8?level%9:8,0,8);setState('menu');menuPage='stages';stageSel=ns;menuHits=[];if(H<520&&W>H)ap.style.display='none'}
 function doneMenu(){if(level===8&&!gameBeaten)markBeaten();padGoMenu()}
-function doneBtns(){return[[level===8?'CONTINUE':level===1&&qtNeed()?'TO QUARTERS':level<8?'NEXT MISSION':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],[campOn()?'QUARTERS':'ARCHIVE',{hot:level===1&&campOn()},()=>{SFX.click();padOpenArchive()}]]}
+function doneBtns(){return[[level===8?'CONTINUE':level===1&&qtNeed()?'TO QUARTERS':level<8?'NEXT MISSION':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],[campOn()?'QUARTERS':'ARCHIVE',{hot:level===1&&campOn()},()=>{SFX.click();padOpenArchive()}]].filter(b=>!(NO_STAGESEL_END&&b[2]===doneStages))}
 function drawComplete(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.8)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L;const ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2;ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();
   if(pausePage==='archive'){drawPadArchive(L,cx,cw,ip,t);ctx.restore();if(artView>=0)drawArtView(t);return}
   const land=sw>=560,short=land&&sh<380,title=level===8?'EVIDENCE TRANSMITTED':level>8?(ENDLESS_PIT?'DEPTH CLEARED':'SECTOR CLEARED'):'MISSION COMPLETE',tf=clamp(Math.min(sw/(land?18:12.5),sh/(short?12:10)),18,44),bh=Math.max(touchMode?44:34,Math.min(46,sh*0.085));let y=sy+ip;
@@ -3070,10 +3073,11 @@ function drawComplete(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,
   ctx.fillText((level<=8?`MISSION ${level}`:epShort(level))+`  \u00b7  ${(cfg&&cfg.name||'').toUpperCase()}`,cx,y+tf*0.85+sf*1.7,land?Math.max(tw,cw*0.4):cw);
   const hdr=tf*0.85+sf*1.7+6,bs=doneBtns();let pos=[];
   if(land&&cw-Math.max(tw,cw*0.36)-24>=4*100+24){const bw=Math.min(150,(cw-Math.max(tw,cw*0.36)-24-24)/4),bx0=cx+cw-(bw*4+24),by=y+Math.max(0,(hdr-bh)/2);pos=bs.map((_,i)=>[bx0+i*(bw+8),by,bw]);y+=Math.max(hdr,bh)+ip*0.6}
+  if(NO_STAGESEL_END){if(pos.length){const u=pos[0][2];pos=[[pos[0][0],pos[0][1],u*2+8],[pos[0][0]+u*2+16,pos[0][1],u],[pos[0][0]+u*3+24,pos[0][1],u]]}else if(cw>=4*104+24){const u=(cw-24)/4,by=y+hdr+6;pos=[[cx,by,u*2+8],[cx+u*2+16,by,u],[cx+u*3+24,by,u]];y=by+bh+ip*0.6}else{const bw=(cw-8)/2,by=y+hdr+6;pos=[[cx,by,cw],[cx,by+bh+8,bw],[cx+bw+8,by+bh+8,bw]];y=by+bh*2+8+ip*0.6}}
   else if(cw>=4*104+24){const bw=(cw-24)/4,by=y+hdr+6;pos=bs.map((_,i)=>[cx+i*(bw+8),by,bw]);y=by+bh+ip*0.6}
   else{const bw=(cw-8)/2,by=y+hdr+6;pos=bs.map((_,i)=>[cx+(i%2)*(bw+8),by+((i/2)|0)*(bh+8),bw]);y=by+bh*2+8+ip*0.6}
   bs.forEach(([lb,o,act],i)=>padBtn(pos[i][0],pos[i][1],pos[i][2],bh,lb,{...o,sel:padSel===i},act));
-  if(performance.now()/1000-lockFlash<1.6&&!doneCanStages()){ctx.font=`bold 12px ${FB}`;ctx.textAlign='center';ctx.fillStyle=PAD_AMB;ctx.fillText('Beat the campaign to unlock Stage Select',pos[1][0]+pos[1][2]/2,pos[1][1]+bh+14)}
+  if(!NO_STAGESEL_END&&performance.now()/1000-lockFlash<1.6&&!doneCanStages()){ctx.font=`bold 12px ${FB}`;ctx.textAlign='center';ctx.fillStyle=PAD_AMB;ctx.fillText('Beat the campaign to unlock Stage Select',pos[1][0]+pos[1][2]/2,pos[1][1]+bh+14)}
   ctx.fillStyle='rgba(159,245,207,0.25)';ctx.fillRect(cx,y,cw,1);y+=ip*0.8;
   const commH=clamp(sh*(land?0.2:0.19),62,116),commY=sy+sh-ip-commH-(!touchMode&&sh>360?8:0);padComm(cx,commY,short?cw*0.51:cw,commH,t,doneComm(),false);
   const bodyB=commY-ip*0.8,avail=bodyB-y,ravail=short?sy+sh-ip-y:avail,ms=doneMetrics(),sc=doneScores(),nr=sc.length;
@@ -3083,15 +3087,15 @@ function drawComplete(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,
   else{const pf=clamp(Math.min(cw/26,avail*0.56/(nr*1.75+2.4)),9,13.5),scoresH=(nr*1.75+2.4)*pf,mcols=ms.length>4?3:2,rows=Math.ceil(ms.length/mcols),cellH=clamp((avail-scoresH-6)/rows,30,80),vf=clamp(cellH*0.48,12,30),lf=clamp(cellH*0.2,8,12);
     ms.forEach(([lb,v],i)=>{const c2=i%mcols,r=(i/mcols)|0,mx=cx+c2*(cw/mcols),my=y+r*cellH;ctx.font=`${lf}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_DIM;ctx.fillText(lb,mx,my+lf);padChrome(v,mx,my+lf+vf*0.98+2,vf,'left')});
     doneLay={sb:doneScoreList(sc,cx,y+rows*cellH+4,cw,pf),lim:bodyB+2,mb:y+rows*cellH,mlim:bodyB+2,cy:commY}}
-  if(!touchMode&&sh>360){ctx.font=`11px ${FB}`;ctx.textAlign='right';ctx.fillStyle='rgba(159,245,207,0.4)';ctx.fillText('ENTER '+(level===8?'continue':'next mission')+'  \u00b7  S stage select  \u00b7  Q main menu  \u00b7  A archive',cx+cw,sy+sh-5)}
+  if(!touchMode&&sh>360){ctx.font=`11px ${FB}`;ctx.textAlign='right';ctx.fillStyle='rgba(159,245,207,0.4)';ctx.fillText('ENTER '+(level===8?'continue':'next mission')+(NO_STAGESEL_END?'':'  \u00b7  S stage select')+'  \u00b7  Q main menu  \u00b7  A archive',cx+cw,sy+sh-5)}
   ctx.restore()}
 function doneScoreList(sc,x,y,w,pf){ctx.font=`bold ${pf}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_AMB;ctx.fillText('SCORE',x,y+pf);let yy=y+pf*2.4;
   for(const r of sc){if(r.rule){ctx.fillStyle='rgba(159,245,207,0.35)';ctx.fillRect(x,yy-pf*0.6,w,1);yy+=pf*0.5;continue}padLeader(r.l,r.v,x,yy+pf*0.4,w,r.tot?pf*1.08:pf,r.hot||r.tot?PAD_AMB:null);yy+=pf*1.75}return yy-pf*1.75+pf*0.6}
 function doneTap(x,y){if(stateT<0.4)return;if(pausePage==='archive'){padTap(x,y);return}for(const h of pauseHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return}}
 function doneKey(k){if(pausePage==='archive'){padKey(k);return}
   if(k==='enter'||k===' '){if(padSel>=0){const h=pauseHits.filter(h=>h.pad)[padSel];if(h)h.act()}else doneNext();return}
-  if(k==='n'){doneNext();return}if(k==='s'){doneStages();return}if(k==='q'){doneMenu();return}if(k==='a'){SFX.click();padOpenArchive();return}
-  if(k==='tab'||k==='arrowright'||k==='arrowleft'){SFX.click();padSel=k==='arrowleft'?(padSel+3)%4:(padSel+1)%4}}
+  if(k==='n'){doneNext();return}if(k==='s'&&!NO_STAGESEL_END){doneStages();return}if(k==='q'){doneMenu();return}if(k==='a'){SFX.click();padOpenArchive();return}
+  if(k==='tab'||k==='arrowright'||k==='arrowleft'){SFX.click();{const nb=NO_STAGESEL_END?3:4;padSel=k==='arrowleft'?(padSel+nb-1+(padSel<0?1:0))%nb:(padSel+1)%nb}}}
 
 // BASECAMP_V1 (Justin): the pause / mission-complete ARCHIVE becomes BASE CAMP after Mission 1 (Vosh suggests it on the M1 debrief).
 // A painted crew room with a viewport onto a distant Naboo, and tappable stations: COT (rest -> next mission / back to the mission),

@@ -2686,9 +2686,9 @@ function menuAct(i){unlockAudio();menuSel=i;const it=MENU_ITEMS[i];if(it==='STAR
 function menuBack(){if(campStageRet&&menuPage==='stages'){SFX.click();campStageRet=false;artView=-1;stageCap=9;campOpen(QUARTERS_HATCH?campStageFrom:'menu');return}SFX.click();artView=-1;if(menuPage==='settings'){aboutTab='story';rsStep=0}menuPage='main';menuHits=[];if(state==='menu')ap.style.display='flex'}
 function menuMove(d){menuSel=menuSel===3?(d<0?1:1):(menuSel+d+3)%3;SFX.click()}
 function menuVert(d){if(qMenu()){if(menuSel===3)menuSel=1;return}menuSel=d>0?3:(menuSel===3?1:menuSel);SFX.click()}
-function menuKey(k){if(menuPage==='main'&&posterOn()){pmKeyNav(k);return}if(menuPage==='main'){if(k==='arrowleft'||k==='a')menuMove(-1);else if(k==='arrowright'||k==='d')menuMove(1);else if(k==='arrowup'||k==='w')menuVert(-1);else if(k==='arrowdown'||k==='s')menuVert(1);else if(k==='tab'){menuSel=(menuSel+1)%(qMenu()?3:4);SFX.click()}else if(k==='enter'||k===' ')menuAct(menuSel)}
+function menuKey(k){if(menuPage==='elev'){if(elevPop){if(k==='escape'||k==='backspace'||k==='enter'||k===' '){SFX.click();elevPop=null}return}if(k==='escape'||k==='backspace')elevBack();else if(k==='enter'||k===' ')elevGo();return}if(menuPage==='main'&&posterOn()){pmKeyNav(k);return}if(menuPage==='main'){if(k==='arrowleft'||k==='a')menuMove(-1);else if(k==='arrowright'||k==='d')menuMove(1);else if(k==='arrowup'||k==='w')menuVert(-1);else if(k==='arrowdown'||k==='s')menuVert(1);else if(k==='tab'){menuSel=(menuSel+1)%(qMenu()?3:4);SFX.click()}else if(k==='enter'||k===' ')menuAct(menuSel)}
   else if(menuPage==='stages'&&(k==='arrowup'||k==='w'||k==='arrowdown'||k==='s')){SFX.click();stageSel=(stageSel+(k==='arrowup'||k==='w'?-1:1)+9)%9}
-  else if(menuPage==='stages'&&(k==='enter'||k===' ')){const lv=stageSel<8?stageSel+1:9;QUARTERS_HATCH?hatchPick(lv):launchStage(lv)}
+  else if(menuPage==='stages'&&(k==='enter'||k===' ')){const lv=stageSel<8?stageSel+1:9;if(lv===9&&elevOn()&&gameBeaten){elevOpen('stages');return}QUARTERS_HATCH?hatchPick(lv):launchStage(lv)}
   else if(menuPage==='settings'&&(k==='tab'||k==='c'||k==='arrowright'||k==='d'||k==='arrowleft'||k==='a'))setCycle(k==='arrowleft'||k==='a'?-1:1)
   else if(menuPage==='settings'&&aboutTab==='reset'&&rsStep&&(k==='escape'||k==='backspace')){SFX.click();rsStep=0}
   else if(menuPage==='settings'&&aboutTab==='reset'&&(k==='enter'||k===' '||k==='y')){if(!rsStep&&k!=='y'){SFX.click();rsStep=1}else if(rsStep&&k==='y')eraseAll()}
@@ -2822,7 +2822,7 @@ function pmItems(){const it=[{id:'story',lab:'STORY START'},{id:'shift',lab:'SHI
 // STORY START: Mission 1 again (saved progress, unlocks, credits and the Pit save are kept). SHIFT START: straight into the Endless Pit (resumes the Pit save), after the campaign is beaten
 function pmAct(id){unlockAudio();const k=pmItems().findIndex(o=>o.id===id);if(k>=0)pmSel=k;
   if(id==='story'){startGame();return}
-  if(id==='shift'){if(!gameBeaten){SFX.click();pmLockT=performance.now()/1000;return}launchStage(9);return}
+  if(id==='shift'){if(!gameBeaten){SFX.click();pmLockT=performance.now()/1000;return}if(elevOn()){elevOpen('main');return}launchStage(9);return}
   if(id==='quarters'){if(!qMenu())return;SFX.click();campOpen('menu');return}
   if(id==='settings'){setOpen('controls');return}
   if(id==='about'||id==='controls')menuAct(MENU_ITEMS.indexOf(id.toUpperCase()))}
@@ -2895,10 +2895,59 @@ const DATAPAD_SELECT=true,PAUSE_RESUME=true,DP_NODES=[[.16,.12],[.5,.18],[.84,.2
 let dpLast=null;
 function dpDone(lv){return gameBeaten||lv<campNext()||!!PROG.best[lv]}
 function dpLock(lv){return lv>stageCap||(lv>8&&!gameBeaten)}
-function dpLaunch(lv,go){if(dpLock(lv)){lockFlash=performance.now()/1000;SFX.click();return}go(lv)}
+function dpLaunch(lv,go){if(dpLock(lv)){lockFlash=performance.now()/1000;SFX.click();return}if(lv===9&&elevOn()&&state==='menu'){elevOpen('stages');return}go(lv)}
 function dpPrime(x,y,w,h,label,t,act,sel){ctx.save();const p=0.5+0.5*Math.sin(t*3.2);ctx.shadowColor='rgba(120,255,190,0.7)';ctx.shadowBlur=8+p*10;rrect(x,y,w,h,8);const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,'#c4ffe4');g.addColorStop(1,'#3fbf8a');ctx.fillStyle=g;ctx.fill();ctx.shadowBlur=0;
   ctx.lineWidth=sel?3:1.5;ctx.strokeStyle=sel?PAD_AMB:'#e6fff3';ctx.stroke();const fs=Math.min(h*0.42,w/(label.length*0.8+2.6),30);ctx.font=`bold ${fs}px ${FW}`;const lw=ctx.measureText(label).width,is=fs*0.95,lx=x+(w-is-fs*0.5-lw)/2,cy=y+h/2;
   ctx.fillStyle='#06140e';ctx.beginPath();ctx.moveTo(lx,cy-is/2);ctx.lineTo(lx+is*0.87,cy);ctx.lineTo(lx,cy+is/2);ctx.closePath();ctx.fill();ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(label,lx+is+fs*0.5,cy+1);ctx.restore();pauseHits.push({x,y,w,h,act,pad:label})}
+// PIT_ELEVATOR (Justin): tapping The Pit (datapad entrance, main-menu SHIFT START) opens an elevator screen in the Return of the Jedi turbolift style:
+// two thin columns of small rounded pill bars (datapad mint, amber marker, never red), OHMA-D'UN and RORI. Lit bars = depth reached on that moon;
+// under/beside each column its 4 stats (deepest, last completed, time, credits earned); tap a bar column for the moon's totals card, tap a line for that total.
+// One big START SHIFT at the bottom names the next (predetermined) moon and launches it. Needs TWO_MOONS. Revert: PIT_ELEVATOR=false
+const PIT_ELEVATOR=true,ELEV_N=20;
+let elevFrom='main',elevPop=null,elevLast=null;
+function elevOn(){return PIT_ELEVATOR&&TWO_MOONS&&ENDLESS_PIT}
+function elevOpen(from){SFX.click();elevFrom=from||'main';elevPop=null;menuPage='elev';menuHits=[];if(typeof ap!=='undefined')ap.style.display='flex'}
+function elevBack(){SFX.click();elevPop=null;if(elevFrom==='hub'&&typeof hubOpen==='function'){menuPage='main';hubOpen();return}menuPage=elevFrom==='stages'?'stages':'main';menuHits=[];if(menuPage==='main'&&state==='menu')ap.style.display='flex'}
+function elevGo(){if(!gameBeaten){lockFlash=performance.now()/1000;SFX.click();return}elevPop=null;const f=elevFrom;menuPage='main';if(f==='stages'&&QUARTERS_HATCH)hatchPick(9);else launchStage(9)}
+function elevTime(s){s=Math.floor(s||0);return s<60?s+'s':s<3600?Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s':Math.floor(s/3600)+'h '+String(Math.floor(s%3600/60)).padStart(2,'0')+'m'}
+function elevStats(m){const z=tmP()[m];return[['DEEPEST',z.deep?'DEPTH '+z.deep:'\u2014','deepest depth reached'],['LAST',z.last?'DEPTH '+z.last:'\u2014','last depth completed'],['TIME',elevTime(z.t),'time spent on '+TM_NAME[m]],['CREDITS',(z.cr||0).toLocaleString('en-US')+' cr','credits earned on '+TM_NAME[m]]]}
+function drawElev(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.82)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L,ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2,land=sw>sh*1.15,touch=touchMode,tb=touch?44:34;
+  ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();const tf=clamp(Math.min(sw/(land?22:12),sh/15),16,32),sf=clamp(tf*0.42,10,14),bbw=clamp(cw*0.22,96,140),mo=tmP(),nx=tmNext(),M=['o','r'];
+  padChrome('PIT ELEVATOR',cx,sy+ip+tf*0.85,tf,'left');ctx.font=`${sf}px ${FW}`;ctx.textAlign='left';const nz0=tmP()[tmNext()],nextTxt='NEXT: '+TM_NAME[tmNext()]+' \u00b7 '+(nz0.at>9?'RESUME DEPTH '+(nz0.at-8):'DEPTH 1')+' \u00b7 SHIFT '+((PROG.shiftN||0)+1);ctx.fillStyle=land?PAD_AMB:PAD_DIM;ctx.fillText(land?nextTxt:'THE ENDLESS PIT \u00b7 SHIFTS ALTERNATE MOONS',cx,sy+ip+tf*0.85+sf*1.5,cw-bbw-10);
+  padBtn(cx+cw-bbw,sy+ip,bbw,tb,'\u25c0 BACK',{},elevBack);
+  const top=sy+ip+Math.max(tf*0.85+sf*1.5+10,tb+10),bot=sy+sh-ip,gh=touch?56:48,gy=bot-gh,ny=gy-sf*0.9,midB=land?gy-10:ny-sf*1.4;
+  const maxD=Math.max(1,mo.o.deep,mo.r.deep,mo.o.at-8,mo.r.at-8),per=Math.max(1,Math.ceil(maxD/ELEV_N)),cols=[];let lhs=touch?44:Math.max(22,sf*2);
+  M.forEach((m,i)=>{const z=mo[m],hx=cx+i*cw/2,hw=cw/2,nf=clamp(hw/10,12,20),lab=TM_NAME[m],isN=m===nx;let y=top;
+    ctx.textAlign='center';ctx.font=`bold ${nf}px ${FW}`;ctx.fillStyle=isN?PAD_AMB:PAD_MINT;const lx=land?hx+hw*0.2:hx+hw/2;ctx.fillText(lab,lx,y+nf,hw-8);
+    ctx.font=`bold ${Math.max(8,sf*0.75)}px ${FW}`;ctx.fillStyle=isN?`rgba(255,190,85,${0.6+0.35*Math.sin(t*4)})`:'rgba(159,245,207,0.4)';ctx.fillText(isN?'\u25bc NEXT SHIFT':PROG.shiftN>0?'LAST SHIFT':'',lx,y+nf+sf*1.2,hw-8);y+=nf+sf*1.8;
+    if(land)lhs=clamp((midB-y)/2-2,30,64);const statH=land?0:4*lhs+4,barTop=y,barBot=midB-statH,cell=Math.max(4,Math.min(16,(barBot-barTop)/ELEV_N)),pH=clamp(cell*0.42,2.5,6),pW=clamp(hw*0.26,26,56),bx=lx-pW/2,lit=Math.ceil(z.deep/per),res=Math.ceil(Math.max(1,z.at-8)/per)-1;
+    ctx.fillStyle='rgba(4,18,12,0.85)';rrect(bx-8,barTop-6,pW+16,cell*ELEV_N+10,8);ctx.fill();ctx.strokeStyle=isN?'rgba(255,190,85,0.55)':'rgba(159,245,207,0.28)';ctx.lineWidth=isN?1.6:1;ctx.stroke();
+    for(let k=0;k<ELEV_N;k++){const yy=barTop+k*cell+(cell-pH)/2,on=k<lit,rs=k===res;rrect(bx,yy,pW,pH,pH/2);
+      if(on){ctx.fillStyle=rs?PAD_AMB:PAD_MINT;ctx.shadowColor=rs?'rgba(255,190,85,0.8)':'rgba(120,255,190,0.7)';ctx.shadowBlur=5;ctx.fill();ctx.shadowBlur=0}
+      else{ctx.fillStyle=rs?'rgba(255,190,85,0.55)':'rgba(95,168,138,0.16)';ctx.fill()}}
+    if(per>1){ctx.font=`${Math.max(8,sf*0.7)}px ${FW}`;ctx.fillStyle='rgba(159,245,207,0.45)';ctx.textAlign='center';ctx.fillText('1 BAR = '+per+' DEPTHS',lx,barTop+cell*ELEV_N+sf*0.9)}
+    const colR={x:bx-10,y:barTop-8,w:pW+20,h:cell*ELEV_N+14,m};
+    const st=elevStats(m),stx=land?hx+hw*0.36:hx+8,stw=land?hw*0.62:hw-16,sty=land?barTop+Math.max(0,(cell*ELEV_N-2*lhs)/2):barBot+6,lines=[],gc=land?2:1,cw2=stw/gc;
+    st.forEach(([k2,v],j)=>{const xx=stx+(j%gc)*cw2,yy=sty+Math.floor(j/gc)*lhs,ww=cw2-(gc>1?4:0);ctx.fillStyle='rgba(16,40,30,0.55)';rrect(xx,yy+2,ww,lhs-4,5);ctx.fill();ctx.strokeStyle='rgba(159,245,207,0.22)';ctx.lineWidth=1;ctx.stroke();
+      if(land){const f2=clamp(Math.min(lhs*0.24,ww/9),9,14);ctx.textAlign='center';ctx.font=`bold ${f2*0.8}px ${FW}`;ctx.fillStyle=PAD_DIM;ctx.fillText(k2,xx+ww/2,yy+lhs*0.42,ww-8);ctx.font=`bold ${f2}px ${FW}`;ctx.fillStyle=PAD_MINT;ctx.fillText(v,xx+ww/2,yy+lhs*0.42+f2*1.25,ww-8)}
+      else{const f2=clamp(Math.min(lhs*0.32,stw/17),9,13);ctx.font=`bold ${f2}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_DIM;ctx.fillText(k2,xx+8,yy+lhs/2+f2*0.36);ctx.textAlign='right';ctx.fillStyle=PAD_MINT;ctx.fillText(v,xx+ww-8,yy+lhs/2+f2*0.36,ww*0.48)}
+      lines.push({x:xx,y:yy,w:ww,h:lhs,j})});
+    cols.push({m,col:colR,lines,lit,res})});
+  // next moon + START SHIFT
+  if(!land){ctx.textAlign='center';ctx.font=`bold ${sf}px ${FW}`;ctx.fillStyle=PAD_AMB;ctx.fillText(nextTxt,cx+cw/2,ny,cw)}
+  if(gameBeaten)dpPrime(cx,gy,cw,gh,'START SHIFT \u00b7 '+TM_NAME[nx],t,elevGo,false);else padBtn(cx,gy,cw,gh,'START SHIFT',{lock:true,sub:'beat the campaign'},elevGo);
+  ctx.restore();
+  // pop-up totals
+  if(elevPop){const P=elevPop,pw=Math.min(cw*0.9,420),rows=P.line!=null?1:4,f3=clamp(pw/18,12,18),phh=f3*3.2+rows*f3*(P.line!=null?2.6:1.9)+f3*1.6,px=sx+(sw-pw)/2,py=sy+(sh-phh)/2;
+    ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,0,W,H);rrect(px,py,pw,phh,10);ctx.fillStyle='rgba(6,22,16,0.97)';ctx.fill();ctx.strokeStyle=PAD_MINT;ctx.lineWidth=2;ctx.stroke();
+    const st=elevStats(P.m);ctx.textAlign='center';ctx.font=`bold ${f3}px ${FW}`;ctx.fillStyle=P.m===nx?PAD_AMB:PAD_MINT;ctx.fillText(TM_NAME[P.m]+(P.line!=null?' \u00b7 '+st[P.line][2].replace(' on '+TM_NAME[P.m],'').toUpperCase():' \u00b7 PIT TOTALS'),px+pw/2,py+f3*1.7,pw-20);
+    if(P.line!=null){ctx.font=`bold ${f3*2.2}px ${FT}`;ctx.fillStyle='#e6fff3';ctx.fillText(st[P.line][1],px+pw/2,py+f3*4.6,pw-20)}
+    else st.forEach(([k2,v,d],j)=>{const yy=py+f3*3.4+j*f3*1.9;ctx.textAlign='left';ctx.font=`${f3}px ${FB}`;ctx.fillStyle='rgba(225,250,238,0.8)';ctx.fillText(d.charAt(0).toUpperCase()+d.slice(1).replace(' on '+TM_NAME[P.m],''),px+16,yy);ctx.textAlign='right';ctx.font=`bold ${f3}px ${FW}`;ctx.fillStyle=PAD_MINT;ctx.fillText(v,px+pw-16,yy)});
+    ctx.textAlign='center';ctx.font=`${Math.max(9,f3*0.7)}px ${FW}`;ctx.fillStyle='rgba(159,245,207,0.5)';ctx.fillText(touch?'TAP TO CLOSE':'CLICK / ESC TO CLOSE',px+pw/2,py+phh-f3*0.6);
+    pauseHits=[{x:0,y:0,w:W,h:H,act:()=>{SFX.click();elevPop=null},pad:'close'}]}
+  else{for(const c of cols){pauseHits.push({...c.col,act:()=>{SFX.click();elevPop={m:c.m}},pad:'bars '+c.m});for(const l of c.lines)pauseHits.push({x:l.x,y:l.y,w:l.w,h:l.h,act:()=>{SFX.click();elevPop={m:c.m,line:l.j}},pad:'line '+c.m+l.j})}
+    pauseHits.push({x:0,y:0,w:W,h:H,act:()=>{},pad:'bg'})}
+  elevLast={cols:cols.map(c=>({m:c.m,col:c.col,lines:c.lines,lit:c.lit,res:c.res})),go:{x:cx,y:gy,w:cw,h:gh},per,pop:elevPop}}
 function drawMineDP(t,go,back){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.82)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L,ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2,land=sw>sh*1.15,touch=touchMode,tb=touch?44:34;
   ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();const tf=clamp(Math.min(sw/(land?22:12),sh/15),16,32),sf=clamp(tf*0.42,10,14),bbw=clamp(cw*0.22,96,140);
   padChrome('MINE SURVEY',cx,sy+ip+tf*0.85,tf,'left');ctx.font=`${sf}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_DIM;ctx.fillText('OHMA-D\u2019UN \u00b7 HAUL TUNNEL 7 \u00b7 SELECT A MISSION',cx,sy+ip+tf*0.85+sf*1.5,cw-bbw-10);
@@ -2932,14 +2981,14 @@ function drawMineDP(t,go,back){pauseHits=[];const L=padLayout();ctx.fillStyle='r
   const pl=!gameBeaten,pon=sel===8;rrect(ix,pty,iw,pch,6);ctx.fillStyle=pon?'rgba(255,190,85,0.14)':'rgba(10,26,20,0.9)';ctx.fill();if(pl)ctx.setLineDash([4,3]);ctx.strokeStyle=pon?PAD_AMB:pl?'rgba(255,190,85,0.45)':'rgba(159,245,207,0.6)';ctx.lineWidth=pon?2.5:1.3;ctx.stroke();ctx.setLineDash([]);
   {const hx=ix+pch*0.55,hy=pty+pch/2,hr=pch*0.34;for(let k=0;k<4;k++){ctx.beginPath();ctx.ellipse(hx,hy,hr*(1-k*0.22),hr*(0.55-k*0.12),0,0,6.283);ctx.fillStyle=`rgba(${pl?'60,60,55':'255,140,60'},${0.18+k*0.2})`;ctx.fill()}ctx.beginPath();ctx.ellipse(hx,hy,hr*0.3,hr*0.14,0,0,6.283);ctx.fillStyle='#000';ctx.fill();if(pl)lockIcon(hx-hr*0.3,hy-hr*0.45,hr*0.6,'rgba(255,190,85,0.8)')}
   const pf=clamp(pch*0.3,11,17);padChrome('THE PIT',ix+pch*1.1,pty+pch*0.46,pf,'left');ctx.font=`${Math.max(9,pf*0.62)}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=pl?'rgba(255,190,85,0.7)':PAD_MINT;ctx.fillText(pl?'LOCKED \u00b7 beat the campaign':TWO_MOONS?'NEXT SHIFT \u00b7 '+TM_NAME[tmNext()]+' \u00b7 depth '+(tmP()[tmNext()].at-8):deep?'BEST DEPTH '+deep+(PROG.pitAt>9?' \u00b7 resume depth '+(PROG.pitAt-8):''):'endless \u00b7 no depth yet',ix+pch*1.1,pty+pch*0.46+pf*0.95,iw-pch*1.2);
-  pauseHits.push({x:ix,y:pty,w:iw,h:pch,st:8,act:()=>{if(stageSel!==8)SFX.click();stageSel=8}});
+  pauseHits.push({x:ix,y:pty,w:iw,h:pch,st:8,act:()=>{if(elevOn()&&state==='menu'&&!pl){stageSel=8;elevOpen('stages');return}if(stageSel!==8)SFX.click();stageSel=8}});
   ctx.restore();pauseHits.push({x:L.px,y:L.py,w:L.pw,h:L.ph,act:()=>{}});
   dpLast={nodes,r,land,lv,lk,blurb,launch:{x:ix,y:ly,w:iw,h:lh,label:LA},pit:{x:ix,y:pty,w:iw,h:pch,lock:pl,deep},map:{x:mx,y:my,w:mw,h:mh},back:{x:cx+cw-bbw,y:sy+ip,w:bbw,h:tb}}}
 function padResume(){SFX.click();setState('play')}
 function padResumeRow(cx,cw,y,hdrW,hdr,bh,t,bs,land){const rh=Math.max(touchMode?58:48,bh*1.35);
   if(land&&cw-hdrW>=340){const x0=cx+hdrW,aw=cw-hdrW,rw=aw*0.5,yy=y+Math.max(0,(hdr-rh)/2);dpPrime(x0,yy,rw,rh,'RESUME',t,padResume,padSel===0);const bw=(aw-rw-20)/2,by=yy+(rh-bh)/2;bs.forEach(([lb,o,act],i)=>padBtn(x0+rw+10+i*(bw+10),by,bw,bh,lb,{...o,sel:padSel===i+1},act));return y+Math.max(hdr,rh)}
   y+=hdr+4;dpPrime(cx,y,cw,rh,'RESUME',t,padResume,padSel===0);const bw=(cw-10)/2,by=y+rh+10;bs.forEach(([lb,o,act],i)=>padBtn(cx+i*(bw+10),by,bw,bh,lb,{...o,sel:padSel===i+1},act));return by+bh}
-function drawMenu(t){if(menuPage==='main'){drawMainMenu(t);return}if(DATAPAD_SELECT&&menuPage==='stages'){drawMineDP(t,lv=>QUARTERS_HATCH?hatchPick(lv):launchStage(lv),menuBack);menuHits=pauseHits;pauseHits=[];dpLast.ctx='menu';return}const L=boxLayout();menuHits=[];drawBoxShell(L,t);const{ix,iy,iw,ih,hh,sb,ay,ah,fy,fh}=L;
+function drawMenu(t){if(menuPage==='main'){drawMainMenu(t);return}if(menuPage==='elev'){if(elevOn()){drawElev(t);menuHits=pauseHits;pauseHits=[];return}menuPage='main';drawMainMenu(t);return}if(DATAPAD_SELECT&&menuPage==='stages'){drawMineDP(t,lv=>QUARTERS_HATCH?hatchPick(lv):launchStage(lv),menuBack);menuHits=pauseHits;pauseHits=[];dpLast.ctx='menu';return}const L=boxLayout();menuHits=[];drawBoxShell(L,t);const{ix,iy,iw,ih,hh,sb,ay,ah,fy,fh}=L;
   {// "back of the box" page
     drawArtScene(L,t);const top=iy+hh+sb+1;ctx.fillStyle='rgba(6,4,12,0.86)';ctx.fillRect(ix,top,iw,iy+ih-top);ctx.fillStyle='rgba(6,4,12,0.35)';ctx.fillRect(ix,top,iw,iy+ih-top);
     const pad=clamp(iw*0.05,14,40),avW=iw-pad*2,bottom=iy+ih-12;const SP=menuPage==='settings',pg=SP?{story:'about'}[aboutTab]||aboutTab:menuPage,title=SP?'SETTINGS':menuPage==='about'?'ABOUT THE GAME':menuPage==='stages'?'STAGE SELECT':'CONTROLS';

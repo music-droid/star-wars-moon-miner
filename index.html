@@ -3316,15 +3316,38 @@ function gearIcon(it,x,y,s,t){ctx.save();rrect(x,y,s,s,5);ctx.fillStyle='rgba(0,
   else{const im=gearImg(it.img);if(im){const k=Math.min(s/im.naturalWidth,s/im.naturalHeight)*1.15;ctx.drawImage(im,cx-im.naturalWidth*k/2,cy-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}}
   ctx.restore()}
 // ---------- hatch prompt ----------
-function hatchPrompt(){if(!gameBeaten){campHatch();return}SFX.click();campCap=null;campPage='hatch';hatchSel=0}// the store is sealed until the campaign is beaten, so before that the hatch goes straight to Stage Select as it always did
+// HANGAR_HUB (Justin): the Quarters hangar hatch is a 4-way hub - STORY (the datapad mine map / campaign), START SHIFT (the Pit elevator),
+// QUARTERMASTER (existing store) and MESS HALL (sealed, coming soon). Shown from the first visit; locked rows explain why. Revert: HANGAR_HUB=false.
+const HANGAR_HUB=true;let hubFrom='menu';
+function hubOpen(){campOpen(hubFrom||'menu');campPage='hatch';hatchSel=1}
+function hubItems(){const beat=gameBeaten,nx=typeof tmNext==='function'&&TWO_MOONS?TM_NAME[tmNext()]:'';return[
+  {id:'story',lb:'STORY',sub:beat?'mine map \u00b7 replay missions':'mine map \u00b7 Mission '+Math.min(8,campNext())},
+  {id:'shift',lb:'START SHIFT',lock:!beat,sub:beat?'pit elevator'+(nx?' \u00b7 next: '+nx:''):'beat the campaign'},
+  {id:'qm',lb:'QUARTERMASTER',lock:!beat,sub:beat?'spend Pit credits \u00b7 '+(PROG.cr||0)+' CR':'beat the campaign'},
+  {id:'mess',lb:'MESS HALL',lock:true,sub:'coming soon'}]}
+function hubGo(i){const id=(hubItems()[i]||{}).id;if(id==='story'){hatchGo(0);return}if(id==='qm'){hatchGo(1);return}
+  if(id==='mess'){SFX.click();lockFlash=performance.now()/1000;gearSay('The Mess Hall is coming soon. Galley droid\u2019s still on back-order.',1);return}
+  if(id==='shift'){if(!gameBeaten){SFX.click();lockFlash=performance.now()/1000;gearSay('The Pit opens once you finish the contract.',1);return}
+    if(campFrom==='pause'||!PIT_ELEVATOR){qmDirect=true;try{campHatch()}finally{qmDirect=false}stageSel=8;return}// mid-run Quarters: the pause datapad, Pit selected (old flow)
+    SFX.click();hubFrom=campFrom;campStageRet=false;campCap=null;campPage='room';setState('menu');elevOpen('hub')}}
+function hatchPrompt(){if(!gameBeaten&&!HANGAR_HUB){campHatch();return}SFX.click();campCap=null;campPage='hatch';hatchSel=0}// the store is sealed until the campaign is beaten, so before that the hatch goes straight to Stage Select as it always did
 function hatchGo(i){if(i===0){qmDirect=true;try{campHatch()}finally{qmDirect=false}return}if(!gameBeaten){SFX.click();lockFlash=performance.now()/1000;gearSay('The Quartermaster only serves miners who finished the contract.',1);return}
   SFX.click();campPage='qm';gearTab=0;gearMsg=null;if(!PROG.qmSeen){PROG.qmSeen=1;saveProg()}}
-function drawHatchPick(t){pauseHits=[];ctx.fillStyle='rgba(2,3,4,0.66)';ctx.fillRect(0,0,W,H);const touch=touchMode,land=W>H,bw=land?Math.min(300,(W-60)/2):Math.min(W-40,340),bh=touch?84:72,fs=clamp(Math.min(W,H)/26,13,20);
+function drawHatchPick(t){if(HANGAR_HUB){drawHub(t);return}pauseHits=[];ctx.fillStyle='rgba(2,3,4,0.66)';ctx.fillRect(0,0,W,H);const touch=touchMode,land=W>H,bw=land?Math.min(300,(W-60)/2):Math.min(W-40,340),bh=touch?84:72,fs=clamp(Math.min(W,H)/26,13,20);
   ctx.textAlign='center';ctx.font=`bold ${fs*1.2}px ${FW}`;ctx.fillStyle=PAD_AMB;const ty=land?H*0.3:H*0.28;ctx.fillText('HANGAR HATCH',W/2,ty);ctx.font=`${fs*0.75}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.85)';ctx.fillText('Where to, miner?',W/2,ty+fs*1.2);
   const B=[['HANGAR',{hot:hatchSel===0,sel:hatchSel===0,sub:'stage select'}],['QUARTERMASTER',{hot:hatchSel===1&&gameBeaten,sel:hatchSel===1,lock:!gameBeaten,sub:gameBeaten?'spend Pit credits \u00b7 '+(PROG.cr||0)+' CR':'beat the campaign'}]];
   B.forEach(([lb,o],i)=>{const x=land?W/2-bw-10+i*(bw+20):(W-bw)/2,y=land?ty+fs*2.2:ty+fs*2.4+i*(bh+16);padBtn(x,y,bw,bh,lb,o,()=>{hatchSel=i;hatchGo(i)});if(i===1&&gearNewTag())gearNewPill(x+bw-22,y+4,t)});
   const cb=touch?44:34;padBtn((W-130)/2,H-cb-(touch?24:16),130,cb,'\u25c0 BACK',{},()=>{SFX.click();campPage='room'});
   if(gearMsg){const a=clamp(4-(performance.now()/1000-gearMsg.t),0,1);ctx.globalAlpha=a;ctx.font=`${fs*0.7}px ${FB}`;ctx.fillStyle='#ff8a6a';ctx.textAlign='center';ctx.fillText(gearMsg.text,W/2,H-cb-(touch?40:30),W-20);ctx.globalAlpha=1}}
+function drawHub(t){pauseHits=[];ctx.fillStyle='rgba(2,3,4,0.84)';ctx.fillRect(0,0,W,H);const touch=touchMode,land=W>H,fs=clamp(Math.min(W,H)/26,13,20),cb=touch?44:34;let cby=H-cb-(touch?24:16);
+  const ty=land?Math.max(40,H*0.17):Math.max(60,H*0.16),top=ty+fs*1.9,avail=cby-10-top,its=hubItems(),rows=land?2:4,bw=land?Math.min(320,(W-60)/2):Math.min(W-40,340),bh=Math.min(touch?84:72,(avail-12*(rows-1))/rows);
+  ctx.textAlign='center';ctx.font=`bold ${fs*1.2}px ${FW}`;ctx.fillStyle=PAD_AMB;ctx.fillText('HANGAR HATCH',W/2,ty);ctx.font=`${fs*0.75}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.85)';ctx.fillText('Where to, miner?',W/2,ty+fs*1.2);
+  hubLast={btn:[]};its.forEach((it,i)=>{const x=land?W/2-bw-10+(i%2)*(bw+20):(W-bw)/2,y=top+(land?Math.floor(i/2):i)*(bh+12);
+    padBtn(x,y,bw,bh,it.lb,{hot:hatchSel===i&&!it.lock,sel:hatchSel===i,lock:!!it.lock,sub:it.sub},()=>{hatchSel=i;hubGo(i)});hubLast.btn.push({id:it.id,x,y,w:bw,h:bh});
+    if(it.id==='qm'&&gameBeaten&&gearNewTag())gearNewPill(x+bw-22,y+4,t)});
+  cby=Math.min(cby,top+rows*(bh+12)+16);padBtn((W-130)/2,cby,130,cb,'\u25c0 BACK',{},()=>{SFX.click();campPage='room'});hubLast.back={x:(W-130)/2,y:cby,w:130,h:cb};
+  if(gearMsg){const a=clamp(4-(performance.now()/1000-gearMsg.t),0,1);ctx.globalAlpha=a;ctx.font=`${fs*0.7}px ${FB}`;ctx.fillStyle='#ff8a6a';ctx.textAlign='center';ctx.fillText(gearMsg.text,W/2,cby-(touch?14:12),W-20);ctx.globalAlpha=1}}
+let hubLast=null;
 // ---------- Quartermaster store ----------
 function drawQM(t){pauseHits=[];const L=gearLayout(),A=L.A;ctx.fillStyle='#050403';ctx.fillRect(0,0,W,H);const im=gearImg('qm');
   if(im){const s=Math.max(A.h/576,A.w/1024*0.8),ox=A.x+A.w/2-400*s,oy=A.y+A.h/2-300*s;ctx.drawImage(im,ox,oy,1024*s,576*s);glowAt(ctx,ox+407*s,oy+178*s,26*s,'255,190,90',0.25+0.15*Math.sin(t*3))}
@@ -3354,7 +3377,7 @@ function drawWardrobe(t){pauseHits=[];const L=gearLayout(),A=L.A,F=lkFit(L),g=ge
   [['MALE','m'],['FEMALE','f']].forEach(([lb,s],i)=>padBtn(tx-tw-3+i*(tw+6),ty,tw,tb,lb,{hot:g.sex===s,sel:g.sex===s},()=>gearSex(s)));
   gearPanel('lk',L,t)}
 function gearPage(id,t){if(COMM_STATION&&id==='comm'){commDraw(t);return true}if(WORKBENCH_PAINT&&id==='bench'){drawBench(t);return true}if(QM_STORE&&id==='hatch'){drawHatchPick(t);return true}if(QM_STORE&&id==='qm'){drawQM(t);return true}if(id==='closet'&&gearMine()){drawWardrobe(t);return true}return false}
-function gearKey(k){const pg=campPage;if(COMM_STATION&&pg==='comm')return commKey(k);if(benchKey(k))return true;if(pg==='hatch'&&QM_STORE){if(k==='arrowleft'||k==='arrowup'||k==='a'||k==='w'||k==='arrowright'||k==='arrowdown'||k==='d'||k==='s'||k==='tab'){SFX.click();hatchSel=1-hatchSel;return true}if(k==='enter'||k===' '){hatchGo(hatchSel);return true}return false}
+function gearKey(k){const pg=campPage;if(COMM_STATION&&pg==='comm')return commKey(k);if(benchKey(k))return true;if(pg==='hatch'&&QM_STORE&&HANGAR_HUB){const nb=k==='arrowleft'||k==='arrowup'||k==='a'||k==='w'?-1:k==='arrowright'||k==='arrowdown'||k==='d'||k==='s'||k==='tab'?1:0;if(nb){SFX.click();hatchSel=(hatchSel+nb+4)%4;return true}if(k==='enter'||k===' '){hubGo(hatchSel);return true}return false}if(pg==='hatch'&&QM_STORE){if(k==='arrowleft'||k==='arrowup'||k==='a'||k==='w'||k==='arrowright'||k==='arrowdown'||k==='d'||k==='s'||k==='tab'){SFX.click();hatchSel=1-hatchSel;return true}if(k==='enter'||k===' '){hatchGo(hatchSel);return true}return false}
   if(!(pg==='qm'&&QM_STORE||pg==='closet'&&gearMine()))return false;const mode=pg==='qm'?'qm':'lk',items=gearItems(mode),S=gearSel[mode];
   if(k==='arrowup'||k==='w'||k==='arrowdown'||k==='s'||k==='tab'){SFX.click();gearTab=(gearTab+(k==='arrowup'||k==='w'?gearTabs(mode).length-1:1))%gearTabs(mode).length;gearMsg=null;return true}
   if(k==='arrowleft'||k==='a'||k==='arrowright'||k==='d'){const d=k==='arrowleft'||k==='a'?-1:1;let i=items.findIndex(o=>o.id===S[gearTab]);for(let n=0;n<items.length;n++){i=(i+d+items.length)%items.length;if(mode==='qm'||gearP().own[items[i].id])break}SFX.click();S[gearTab]=items[i].id;gearMsg=null;return true}
@@ -3778,7 +3801,7 @@ function campStationsH(beat){const nx=campNext(),hs=beat?'stage select':nx>8?'en
   {id:'cot',lb:'COT',sub:BUNK_REST?'lie down a while':'rest a while',hot:!BUNK_REST,act:BUNK_REST?bunkStart:campRest},
   {id:'desk',lb:'DESK',sub:'datapad archive',hot:true,act:()=>{SFX.click();campPage='desk';campDesk=true;pausePage='archive';if(!CAMP_TABS.includes(aboutTab))aboutTab='msgs';msgScroll=0;artPage=0;menuHits=[]}},
   {id:'closet',lb:'LOCKER',sub:beat?(LOCKER_SHOP?'wardrobe':'gear coming soon'):'beat the campaign',lock:!beat,act:()=>{SFX.click();campPage='closet'}},
-  {id:'hangar',lb:'HANGAR HATCH',sub:QM_STORE&&beat?'hangar \u00b7 quartermaster':hs,hot:true,act:QM_STORE?hatchPrompt:campHatch}].concat(CAMP_ART&&campArtOn()?[{id:'bench',lb:'WORKBENCH',sub:WORKBENCH_PAINT?'paint your hauler':'ship paint coming soon',act:()=>{SFX.click();campPage='bench'}},{id:'board',lb:'MISSION BOARD',sub:hs,act:campHatch}]:[])}
+  {id:'hangar',lb:'HANGAR HATCH',sub:HANGAR_HUB?(beat?'story \u00b7 shift \u00b7 quartermaster':'story \u00b7 '+hs):QM_STORE&&beat?'hangar \u00b7 quartermaster':hs,hot:true,act:QM_STORE?hatchPrompt:campHatch}].concat(CAMP_ART&&campArtOn()?[{id:'bench',lb:'WORKBENCH',sub:WORKBENCH_PAINT?'paint your hauler':'ship paint coming soon',act:()=>{SFX.click();campPage='bench'}},{id:'board',lb:'MISSION BOARD',sub:hs,act:campHatch}]:[])}
 function campRest(){if(campFade>=0)return;SFX.click();campFade=0}
 function campRestDone(){campFade=-1;campDesk=false;campPage='room';if(QUARTERS_HATCH)return;if(campFrom==='menu'){launchStage(campNext())}else if(campFrom==='pause'){campMusicOut('play');setState('play')}else{campMusicOut('done');setState('levelDone');stateT=1;advance()}}
 function campLayout(){const land=W>=H*1.05,top=Math.max(8,Math.min(W,H)*0.02);let vp,st;

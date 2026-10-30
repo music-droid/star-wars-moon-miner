@@ -860,6 +860,10 @@ function huntTick(dt){if(ep.hk>=ep.hq)return;ep.nestT-=dt;if(ep.nestT>0||gameT<e
 const CRASH_SURVIVAL=true;
 const CRASH={tMin:30,tMax:150,pow:1.5,mps:25,hull:100,lanes:5,yaw:40,rof:0.18,r0:0.6,rD:0.02,ramp:45,vMax:1.8,keep:0.5};
 const CRASH_T={crawler:{hp:1,dmg:10,v:0.22,sz:0.8,at:0,nm:'charger'},scorpion:{hp:3,dmg:12,v:0.14,sz:1.15,at:20,nm:'scorpion'},spitter:{hp:2,dmg:8,v:0.13,sz:0.85,at:40,nm:'mite'},worm:{hp:4,dmg:15,v:0.105,sz:1.1,at:60,nm:'worm'}};
+// CRASH_AIMFIX (Justin: couldn't reach creatures on the far left): every lane + debris-peek spot spawns inside the turret's reach (|th| <= yaw - margin);
+// peeks only from wreck edges inside that arc, any creature outside it eases back in, and the auto-aim cone is at least the margin wide (so the slider ends hit edge creatures). Revert: CRASH_AIMFIX=false
+var CRASH_AIMFIX=true;
+const CRASH_AIM={m:4};function crashReach(){return CRASH.yaw-CRASH_AIM.m}
 const CRASH_FX={slow:4.6,white:1.6,comm:[2.1,3.9],fadeIn:[3.2,4.6],lane:16,maxMobs:36,maxFlame:72,maxSmoke:50,peek:0.35,wrk:2.4};
 let crs=null,gpLX=0,crashLP=null;
 function crashOn(){return CRASH_SURVIVAL&&epOn()&&!!ep}
@@ -945,9 +949,11 @@ function crashFrameCv(){if(crs.frame)return crs.frame;const D=Math.min(2,DPR||1)
 function crashSlider(){const land=W>H,w=Math.min(W*0.82,560),h=touchMode?34:26,y=H-h-(land?8:14);return{x:W/2-w/2,y,w,h}}
 function crashSetYaw(px){const s=crashSlider();crs.yaw=clamp(((px-s.x)/s.w*2-1)*CRASH.yaw,-CRASH.yaw,CRASH.yaw)}
 // ---- update
+function crashPeekHW(w){return Math.atan((w.sz*CRASH_FX.wrk*crashS(w.z)*0.5)/crs.geo.f)*180/Math.PI}
+function crashPeekSides(w){const A=crashReach(),hw=crashPeekHW(w);return[-1,1].filter(sd=>Math.abs(w.th+sd*hw*0.95)<=A)}
 function crashSpawn(){const t=crs.ft,R=Math.random,ty=Object.keys(CRASH_T).filter(k=>t>=CRASH_T[k].at),k=ty[(R()*ty.length)|0],P=CRASH_T[k];
-  const peek=crs.wreck.filter(w=>w.z>0.24&&w.z<0.9&&Math.abs(w.th)<CRASH.yaw+30);let m;
-  if(peek.length&&R()<CRASH_FX.peek){const w=peek[(R()*peek.length)|0],hw=Math.atan((w.sz*CRASH_FX.wrk*crashS(w.z)*0.5)/crs.geo.f)*180/Math.PI,side=R()<0.5?-1:1;m={type:k,th:w.th+side*hw*0.95,th0:w.th+side*hw*0.35,z:w.z+0.025,peek:0.9,pk:0.9,w}}
+  const peek=crs.wreck.filter(w=>w.z>0.24&&w.z<0.9&&Math.abs(w.th)<CRASH.yaw+30&&(!CRASH_AIMFIX||crashPeekSides(w).length));let m;
+  if(peek.length&&R()<CRASH_FX.peek){const w=peek[(R()*peek.length)|0],hw=Math.atan((w.sz*CRASH_FX.wrk*crashS(w.z)*0.5)/crs.geo.f)*180/Math.PI,side=CRASH_AIMFIX?(S=>S[(R()*S.length)|0])(crashPeekSides(w)):R()<0.5?-1:1;m={type:k,th:w.th+side*hw*0.95,th0:w.th+side*hw*0.35,z:w.z+0.025,peek:0.9,pk:0.9,w}}
   else{const l=(R()*CRASH.lanes)|0;m={type:k,th:(l-(CRASH.lanes-1)/2)*CRASH_FX.lane+(R()-0.5)*4,z:1,peek:0}}
   m.hp=P.hp+Math.floor(crs.depth/20);m.ph=R()*6;m.hf=0;m.spit=-1;crs.mobs.push(m)}
 function crashHit(m,dmg){m.hp-=dmg;m.hf=0.1;if(m.hp>0)return;m.dead=1;crs.kills++;const x=crashX(m.th),y=crashY(m.z),s=crashS(m.z);for(let k=0;k<10;k++)crs.sp.push({x,y:y-s*0.2,vx:rnd(-1,1)*s*1.5,vy:rnd(-1.4,0.2)*s*1.5,l:0.45,c:m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':'#f84'});SFX.boom(0.6)}
@@ -969,6 +975,7 @@ function crashUpdate(dt){const g=crashGeo();crs.ct+=dt;
   if(live){const sp=Math.min(CRASH.vMax,1+crs.ft/90);
     for(const m of crs.mobs){if(m.dead)continue;const P=CRASH_T[m.type];m.ph+=dt*(6+P.v*30);m.hf=Math.max(0,m.hf-dt);
       if(crs.ph==='rescue'){m.z+=dt*0.35;if(m.z>1.1)m.dead=1;continue}
+      if(CRASH_AIMFIX){const A=crashReach();if(Math.abs(m.th)>A)m.th=Math.sign(m.th)*Math.max(A,Math.abs(m.th)-30*dt)}
       if(m.peek>0){m.peek-=dt;continue}
       if(m.spit>=0){m.spit+=dt;if(m.spit>=0.55&&!m.spat){m.spat=1;crs.globs=crs.globs||[];crs.globs.push({th:m.th,z:m.z,t:0})}if(m.spit>1.1){m.dead=1;m.burrow=1}continue}
       const burst=m.pk&&m.peek>-0.6?1.35:1;if(m.pk)m.peek-=dt;m.z-=P.v*sp*burst*dt;
@@ -982,7 +989,7 @@ function crashUpdate(dt){const g=crashGeo();crs.ct+=dt;
   if(crs.ph!=='slow'&&crs.ph!=='pad'){for(const f of crs.fires){if(crs.fl.length<CRASH_FX.maxFlame&&Math.random()<dt*10)crs.fl.push({th:f.th+(Math.random()-0.5)*3,z:f.z,y:0,vy:rnd(0.5,1.1),l:rnd(0.5,0.9),m:0.9,s:rnd(0.6,1.1)})}
     for(const w of crs.wreck)if(w.smoke&&crs.sm.length<CRASH_FX.maxSmoke&&Math.random()<dt*3)crs.sm.push({th:w.th+(Math.random()-0.5)*w.sz*6,z:w.z,y:0.3,vy:rnd(0.25,0.45),dx:rnd(-0.1,0.1),l:2.6,m:2.6})}
   for(const p of crs.fl){p.l-=dt;p.y+=p.vy*dt}crs.fl=crs.fl.filter(p=>p.l>0);for(const p of crs.sm){p.l-=dt;p.y+=p.vy*dt;p.th+=p.dx*dt*10}crs.sm=crs.sm.filter(p=>p.l>0)}
-function crashTarget(){let best=null;for(const m of crs.mobs){if(m.dead||m.z<-0.05)continue;if(m.peek>0&&m.peek>m.pk*0.55)continue;const x=crashX(m.th),r=crashS(m.z)*CRASH_T[m.type].sz*0.5;if(x<-r||x>W+r)continue;if(Math.abs(x-W/2)<r&&(!best||m.z<best.z))best=m}return best}
+function crashTarget(){let best=null;for(const m of crs.mobs){if(m.dead||m.z<-0.05)continue;if(m.peek>0&&m.peek>m.pk*0.55)continue;const x=crashX(m.th),r=crashS(m.z)*CRASH_T[m.type].sz*0.5;if(x<-r||x>W+r)continue;if(Math.abs(x-W/2)<(CRASH_AIMFIX?Math.max(r,crs.geo.f*CRASH_AIM.m*Math.PI/180):r)&&(!best||m.z<best.z))best=m}return best}
 function crashShoot(){const m=crashTarget(),g=crs.geo,gx=W/2-crs.yaw/CRASH.yaw*W*0.08,s=crashSlider(),gy=s.y-Math.min(W,H)*0.2;crs.recoil=1;SFX.laser();
   if(m){const s2=crashS(m.z)*CRASH_T[m.type].sz;crs.bolts.push({x0:gx,y0:gy,x1:crashX(m.th),y1:crashY(m.z)-s2*0.25,l:0.07});crashHit(m,1)}else crs.bolts.push({x0:gx,y0:gy,x1:W/2,y1:g.hz+(g.yB-g.hz)*0.12,l:0.06})}
 // ---- draw

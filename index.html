@@ -276,11 +276,16 @@ const M6_POCKETS=true,M6_CAVEIN=true;
 // crates buried in the solid rock blocks nearest the centre of the mine (never next to open floor: you have to burrow in), and the crystal quota cut to 4.
 // Revert: M6_TUNE=false (2 miners, 2 crates in pockets 2+4, 10 crystals)
 const M6_TUNE=true;
+// M6_TUNE2 (Justin, after playtesting M6_TUNE): each of the 4 sealed holds now holds a trapped miner + a recording + a baradium crate (no separate
+// baradium blocks); the 4 crystals stay out in the chamber; the mid-mission three-comm sequence (now on the first hold) is spaced out. Revert: M6_TUNE2=false
+const M6_TUNE2=true;
 const M6_REDO=true,M6_MID=[['F','Kid, those walls didn\u2019t fall on their own. Somebody buried my crews and cut their comms. Find out who\u2019s behind this. I want a NAME.'],
   ['D','I almost have enough data to trace where these messages originate, sir. The jammer is chatty, which is rude of it. Keep searching the mine.'],
   ['R','This is it, miner. The agitator cell isn\u2019t on Naboo. It\u2019s HERE, on this moon, right under our feet.']];
-let m6Mid=0;
-function m6MidTick(){if(m6Mid===0&&rescued>=1&&intelGot>=1&&cratesGot>=1)m6Mid=1;if(m6Mid!==1||commQ.length)return;m6Mid=2;
+let m6Mid=0,m6MidK=0,m6MidAt=0;
+function m6MidTick(){if(m6Mid===0&&rescued>=1&&intelGot>=1&&cratesGot>=1){m6Mid=1;m6MidK=0;m6MidAt=gameT+2}
+  if(M6_TUNE2&&m6Mid===1){if(comm||commQ.length){m6MidAt=Math.max(m6MidAt,gameT+1.6);return}if(gameT<m6MidAt)return;const[who,text]=M6_MID[m6MidK++];comm={who,text,t:0,max:Math.max(6,text.length*0.075),hold:1};m6MidAt=gameT+1.6;if(m6MidK>=M6_MID.length)m6Mid=2;return}
+  if(m6Mid!==1||commQ.length)return;m6Mid=2;
   for(const[who,text]of M6_MID){const c={who,text,t:0,max:Math.max(5,text.length*0.062),hold:1};if(!comm)comm=c;else commQ.push(c)}}
 // M7_V2 (Justin): Mission 7 starts in the service tunnel from the M6 cave-in: a long arched, lamp-lit hallway that opens into a new maze.
 // One short briefing line, the rest arrives as in-mission comms. Few crystals, scorpions only, scattered optional intel, more static and tremors.
@@ -357,7 +362,7 @@ const CAMPAIGN={
   rescueLines:['A stranger in a Guild jacket offered our crew credits to rig the lift relays. We said no. Next shift, the wall came down on us.','Forty years I\u2019ve dug this moon. Someone jammed our beacon and sealed us in for refusing them. They wanted us quiet, pilot.',
     ...(M6_TUNE?['Somebody in the Guild office signed the work order that sent us down here. Same shift, our beacon died. Ask who signed it, pilot.','I heard them through the rock. A polite voice, never shouted. Kept saying the miners would thank him one day.']:[])],
   ...(M6_TUNE?{m6tune:1,crystals:4,rescue:4,crates:4,crateLines:[['R','Baradium again. Fresh crates, same forged seals. The cell has been busy.'],['D','Second crate secured, sir. Same royal transponder codes as the Ohma-D\u2019un shipment.'],
-    ['F','Third one, buried in solid rock right under my haul route. That\u2019s enough boom to drop a lift shaft, kid. Keep digging.'],['D','Fourth crate secured, sir. That accounts for every forged seal on the manifest.']]}:{}),
+    M6_TUNE2?['F','Third one, sealed in with my crew. They buried the evidence right next to the witnesses, kid. Keep digging.']:['F','Third one, buried in solid rock right under my haul route. That\u2019s enough boom to drop a lift shaft, kid. Keep digging.'],['D','Fourth crate secured, sir. That accounts for every forged seal on the manifest.']]}:{}),
   brief:[['R','Before you go down, miner. My team heard rumblings of an agitator cell while we were working Naboo. Every lead ran back to this moon. That\u2019s why I followed your trail.'],
     ['R','I need someone who knows these tunnels. If you\u2019d help me find the conspirators, I could\u2014'],
     ['D','Apologies for interrupting the Captain\u2019s recruitment speech, sir. Miners are trapped all over the mine, and their comms aren\u2019t failing. They\u2019re being jammed. Intentionally.'],
@@ -987,7 +992,9 @@ function genLevel(lv){
   let pk=0;for(const[kind]of cfg.intel){const pp=pockets[pk++];const i=pp?(pp.y+1)*MW+pp.x+1:kind==='crate'?(pick(deep)??pick(rocks)):pick(floors);if(i!=null)items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'intel',kind,ph:Math.random()*6})}
   intelTotal=items.filter(i=>i.type==='intel').length;intelNeed=Math.min(intelNeed,intelTotal);
   // M4M5_V1 baradium crates: sealed inside solid rock, spread apart, dug out in burrow mode
-  cratesGot=0;cratesTotal=0;cratesNeed=0;if(cfg.crates&&cfg.m6tune){const dd=bfsDrill(4,4),pk=new Set(),cand=[],cs=[];for(const p of pockets)for(let y=p.y-2;y<=p.y+3;y++)for(let x=p.x-2;x<=p.x+3;x++)pk.add(y*MW+x);
+  cratesGot=0;cratesTotal=0;cratesNeed=0;if(cfg.crates&&cfg.m6tune&&M6_TUNE2&&pockets.length>=4){const pc=pockets.slice(0,4);for(const p of pc)items.push({x:(p.x+1.5)*T,y:(p.y+0.5)*T,type:'baradium',ph:Math.random()*6,rot:R()*0.6-0.3});
+    cratesTotal=pc.length;cratesNeed=Math.min(cfg.crates,cratesTotal);const g=pockets[1];if(g)pocketGuard={x:(g.x+1+g.dx*4)*T,y:(g.y+1+g.dy*4)*T}}
+  else if(cfg.crates&&cfg.m6tune){const dd=bfsDrill(4,4),pk=new Set(),cand=[],cs=[];for(const p of pockets)for(let y=p.y-2;y<=p.y+3;y++)for(let x=p.x-2;x<=p.x+3;x++)pk.add(y*MW+x);
     for(let y=3;y<MH-3;y++)for(let x=3;x<MW-3;x++){const i=y*MW+x;if(map[i]!==ROCK||dd[i]<0||pk.has(i)||weakSet&&weakSet.has(i)||dist(x,y,ptx,pty)<5||dist(x,y,4,4)<9||[i-1,i+1,i-MW,i+MW].some(n=>map[n]===FLOOR||map[n]===PAD))continue;cand.push([i,dist(x,y,MW/2,MH/2)+R()*4])}
     cand.sort((a,b)=>a[1]-b[1]);for(const sp of[MW*0.18,MW*0.1,4])for(const[i]of cand){if(cs.length>=cfg.crates)break;const x=i%MW,y=(i/MW)|0;if(!cs.includes(i)&&cs.every(c=>dist(c%MW,(c/MW)|0,x,y)>=sp))cs.push(i)}
     for(const i of cs){for(const a of[rocks,deep]){const k=a.indexOf(i);if(k>=0)a.splice(k,1)}items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'baradium',ph:Math.random()*6,rot:R()*0.6-0.3})}
@@ -1000,7 +1007,7 @@ function genLevel(lv){
     for(const i of cs){map[i]=ROCK;for(const arr of[rocks,deep]){const a=arr.indexOf(i);if(a>=0)arr.splice(a,1)}items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'baradium',ph:Math.random()*6,rot:R()*0.6-0.3})}
     cratesTotal=cs.length;cratesNeed=Math.min(cfg.crateNeed||cfg.crates,cratesTotal)}
   // MECH_V1 crystals: ~1.3x the quota spawned, ~65% buried in drillable rock next to the tunnels (never bedrock, always reachable by drilling)
-  {const dd=bfsDrill(4,4),ok=i=>dd[i]>=0&&map[i]===ROCK&&dist(i%MW,(i/MW)|0,4,4)>5&&dist(i%MW,(i/MW)|0,ptx,pty)>3;
+  {const dd=bfsDrill(4,4),pz=new Set();if(M6_TUNE2&&cfg.m6tune)for(const p of pockets)for(let y=p.y-2;y<=p.y+3;y++)for(let x=p.x-2;x<=p.x+3;x++)pz.add(y*MW+x);const ok=i=>dd[i]>=0&&map[i]===ROCK&&!pz.has(i)&&dist(i%MW,(i/MW)|0,4,4)>5&&dist(i%MW,(i/MW)|0,ptx,pty)>3;
    const rk=rocks.filter(ok),dp=deep.filter(ok);const pickR=()=>pick(rk)??pick(dp);
    const tot=need?Math.ceil(need*1.3):0,nb=need?Math.round(tot*0.65):5+lv;crystalPlan={tot,buried:0,open:0,need};
    for(let k=0;k<nb;k++){const i=pickR();if(i!=null){add(i,'crystal');crystalPlan.buried++}}

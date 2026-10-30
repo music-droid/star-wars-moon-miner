@@ -507,7 +507,13 @@ const EP_BONUS={mine:20,rescue:40,race:40,boss:75,maze:40,heavy:40};
 const PIT_FLOW_V2=true;
 const EP_STEP3_W={rescue:1,maze:1,race:1},EP_STEP3_INTRO=['rescue','race','maze'],EP_STEP4_HEAVY=0.5,EP_RICH=5; // step-3 pick weights (equal), chance step 4 is the heavy rich vein, credits per rich crystal
 const EP_KNAME={mine:'MINING',quiet:'QUIET SEAM',rescue:'RESCUE',maze:'MAZE',race:'RIVAL RACE',heavy:'RICH VEIN',boss:'BOSS'};
-function epStep(c){return((c-1)%5)+1}
+// PIT_LOOP_10 (Justin): a boss every 10th Pit level. Steps 1-4 as before (quiet, mining, rescue/maze/race pick, rich vein/rescue pick), 5 = an ordinary
+// mining level, 6-9 repeat 1-4, 10 = boss. epSub maps a 10-step to its old 5-step role. Revert: PIT_LOOP_10=false (5-step loop)
+// HEAVY_SOFTER (Justin): rich-vein levels ~30% calmer: monster cap x0.7 (never below mining cap+1), spawn gap 0.45 -> 0.6 of normal, a third -> a quarter of
+// the nests start awake, 7-9 s (was 5-7) breather after a kill streak. Rich crystals and credits unchanged. Revert: HEAVY_SOFTER=false
+const PIT_LOOP_10=true,EP_LOOP=PIT_LOOP_10?10:5,HEAVY_SOFTER=true;
+function epStep(c){return((c-1)%EP_LOOP)+1}
+function epSub(c){const s=epStep(c);return !PIT_LOOP_10?s:s===10?5:s===5?2:s>5?s-5:s}
 // MAZE_LEVELS (Justin): Pit step-3 maze: monster-free, no timer, no hazards. A perfect labyrinth of 2-thick bedrock (2-wide corridors), 4-6 crystals in far dead ends
 // (quota = count-1), exactly 2-4 burrowable shortcut walls drawn as cracked rock. Solvable without shortcuts (BFS-checked at generation). Revert: MAZE_LEVELS=false (step 3 = rescue/race)
 const MAZE_LEVELS=true;
@@ -541,22 +547,22 @@ function crackMark(c,px,py,x,y){const h=hash(x*7+3,y*13+5),h2=hash(y*5+1,x*3+7);
   c.fillStyle='rgba(0,0,0,0.35)';for(let k=0;k<4;k++)c.fillRect(px+hash(x+k*3,y)*T*0.9,py+hash(y+k*5,x)*T*0.9,2,2);c.restore()}
 function epPick3(c){const R=mulberry((Math.imul(c,40503)+7)>>>0);R();const w=Object.entries(EP_STEP3_W).filter(([k,v])=>v>0&&(k!=='maze'||(typeof MAZE_LEVELS!=='undefined'&&MAZE_LEVELS)));if(!w.length)return'rescue';const intro=EP_STEP3_INTRO.filter(k=>w.some(x=>x[0]===k)),j=(c-3)/5;if(j>=0&&j<intro.length&&j===Math.floor(j))return intro[j];let r=R()*w.reduce((a,b)=>a+b[1],0);for(const[k,v]of w)if((r-=v)<0)return k;return w[w.length-1][0]}
 function epPick4(c){const R=mulberry((Math.imul(c,69069)+3)>>>0);R();return R()<EP_STEP4_HEAVY?'heavy':'rescue'}
-function epQuiet1(){return PIT_FLOW_V2&&EP_CYCLE&&!!ep&&ep.kind==='mine'&&epStep(ep.c)===1}
-function epCapNow(){const c=ep.c,k=epCap(c);if(!PIT_FLOW_V2)return k;if(ep.kind==='heavy')return Math.min(8,k+3);if(ep.kind==='maze')return 0;return epQuiet1()?Math.max(1,k-1):k}
+function epQuiet1(){return PIT_FLOW_V2&&EP_CYCLE&&!!ep&&ep.kind==='mine'&&epSub(ep.c)===1}
+function epCapNow(){const c=ep.c,k=epCap(c);if(!PIT_FLOW_V2)return k;if(ep.kind==='heavy')return HEAVY_SOFTER?Math.max(k+1,Math.round(Math.min(8,k+3)*0.7)):Math.min(8,k+3);if(ep.kind==='maze')return 0;return epQuiet1()?Math.max(1,k-1):k}
 const EP_ATK=['ring','volley','brood','charge','spiral','rockrain','nova','strike'];
 const EP_BMOD=[['armored','ARMORED'],['swift','SWIFT'],['frenzied','FRENZIED'],['regen','REGENERATING'],['brooding','BROODING']];
 const EP_BN1=['Vor','Kreth','Ash','Sable','Grav','Moro','Xil','Thul','Nyx','Ombr','Skar','Vael'],EP_BN2=['ax','esh','ura','ith','okk','yne','amar','oth'],EP_BN3=['the Unburied','Mother of Shafts','the Deep Hunger','Who Waits Below','the Hollow Queen','of the Black Vein','the Seam-Eater','the Lightless'];
 let ep=null; // per-run state
 function epOn(){return ENDLESS_PIT&&level>8}
 function epQuota(c){if(!EP_QUOTA)return endlessQuota(c+8,false);return Math.min(60,Math.round(12+48*(1-Math.exp(-(c-1)/16))))}
-function epKind(c){if(!EP_CYCLE)return'mine';if(PIT_FLOW_V2){const s=epStep(c);return s<=2?'mine':s===3?epPick3(c):s===4?epPick4(c):'boss'}const p=(c-1)%4;return p<2?'mine':p===2?'rescue':(Math.floor((c-1)/4)%2===0?'boss':'race')}
+function epKind(c){if(!EP_CYCLE)return'mine';if(PIT_FLOW_V2){const s=epSub(c);return s<=2?'mine':s===3?epPick3(c):s===4?epPick4(c):'boss'}const p=(c-1)%4;return p<2?'mine':p===2?'rescue':(Math.floor((c-1)/4)%2===0?'boss':'race')}
 function epCap(c){return Math.min(5,2+Math.floor((c-1)/6))}
 function epGap(c){return Math.max(9,16-0.35*(c-1))}
 function epVet(c){return Math.min(0.25,0.25*(c-1)/19)}
 function epMul(c){if(!EP_PEACE)return 1;return Math.min(1.3,1+0.03*Math.floor(c/4))}
 function epMods(c,kind){if(c<2||!EP_HAZARDS||(kind==='maze'&&MAZE_LEVELS))return[];const R=mulberry((c*7919+101)>>>0);let pool=EP_HZ.filter(h=>h[1]<=c);
   if(kind==='race')pool=pool.filter(h=>['gas','quakes','dark','unstable','static'].includes(h[0]));if(kind==='boss')pool=pool.filter(h=>h[0]!=='collapse');
-  const n=c<6?1:c<16?2:3,out=[],intro=pool.find(h=>h[1]===c);if(intro)out.push(intro);if(kind==='boss'&&c===(PIT_FLOW_V2?5:4)&&!out.some(h=>h[0]==='quakes'))out.push(EP_HZ[2]);
+  const n=c<6?1:c<16?2:3,out=[],intro=pool.find(h=>h[1]===c);if(intro)out.push(intro);if(kind==='boss'&&c===(PIT_FLOW_V2?EP_LOOP:4)&&!out.some(h=>h[0]==='quakes'))out.push(EP_HZ[2]);
   const rest=pool.filter(h=>!out.includes(h));while(out.length<n&&rest.length)out.push(rest.splice((R()*rest.length)|0,1)[0]);return out.slice(0,3)}
 function epBossGen(c){const R=mulberry((c*2654435761+17)>>>0),pk=a=>a[(R()*a.length)|0];const atk=EP_ATK.slice();const A=[];while(A.length<3)A.push(atk.splice((R()*atk.length)|0,1)[0]);
   const bm=EP_BMOD.slice(),M=[];const nm=c>=12?2:1;while(M.length<nm)M.push(bm.splice((R()*bm.length)|0,1)[0]);
@@ -590,7 +596,7 @@ function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),
   if(has('pockets')&&kind!=='race'&&kind!=='heavy'){cfg.pockets=true;cfg.epPockets=Math.min(5,2+Math.floor(c/6))}
   if(has('quakes'))cfg.quakes=true;if(has('static'))cfg.static=true;
   const hz=cfg.pit.names.length?' Hazards: '+cfg.pit.names.join(', ').toLowerCase()+'.':'';
-  const what=kind==='maze'?`No bugs on the scope, sir. Only an old bedrock labyrinth, and ${cfg.mazeN} crystals tucked away in its dead ends. Bring up ${cfg.mazeNeed}. Bedrock won\u2019t drill, but a few walls are cracked through. Burrow those if you find them.`:kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epStep(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
+  const what=kind==='maze'?`No bugs on the scope, sir. Only an old bedrock labyrinth, and ${cfg.mazeN} crystals tucked away in its dead ends. Bring up ${cfg.mazeNeed}. Bedrock won\u2019t drill, but a few walls are cracked through. Burrow those if you find them.`:kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epSub(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
   cfg.brief=[['D',`The Pit, depth ${c}. ${what}${hz}`]];
   if(c===1)cfg.brief.unshift(['F','The campaign\u2019s over, kid, but the Guild still pays. Every crystal you bring up is a credit in your account, and they\u2019re yours to keep even if you crash. Most of the bugs down here are asleep. Let \u2019em lie.']);
   if(c===1&&PIT_FLOW_V2&&EP_CYCLE)cfg.brief.push(['D','Shifts run in fives. Two seams, a wildcard, a rich vein or a rescue, then whatever is nesting at the bottom. Then you do it again, deeper.']);
@@ -717,12 +723,12 @@ function epStart(){if(!ep)return;const c=ep.c;spawnT=EP_PEACE?epGap(c)*0.6*(epQu
   for(const i of fl){if(made>=N)break;const x=i%MW,y=(i/MW)|0;if(!nests.every(n=>dist(n[0],n[1],x,y)>7))continue;nests.push([x,y]);
     const r0=Math.random(),t=r0<0.4?'crawler':r0<0.7?'spitter':'scorpion',k=t==='crawler'?Math.min(3,N-made):1;
     for(let j=0;j<k;j++){const m=spawnMob(t,(x+0.5)*T+rnd(-8,8),(y+0.5)*T+rnd(-8,8));m.asleep=1;made++}}
-  if(PIT_FLOW_V2&&ep.kind==='heavy'){ep.heavy=1;mobs.filter(m=>m.asleep&&m.type!=='boss').forEach((m,i)=>{if(i%3===0)m.asleep=0})}}
+  if(PIT_FLOW_V2&&ep.kind==='heavy'){ep.heavy=1;mobs.filter(m=>m.asleep&&m.type!=='boss').forEach((m,i)=>{if(i%(HEAVY_SOFTER?4:3)===0)m.asleep=0})}}
 function epAwake(){return mobs.filter(m=>!m.asleep&&m.type!=='boss').length}
 function epCanSpawn(){if(!EP_PEACE)return mobs.length<(cfg.maxMobs||8);return gameT>=ep.quiet&&epAwake()+cracks.length<epCapNow()}
-function epSpawnGap(){if(!EP_PEACE)return Math.max(1.6,4.5-ep.c*0.08);return epGap(ep.c)*rnd(0.85,1.15)*(epQuiet1()?1.5:PIT_FLOW_V2&&ep.kind==='heavy'?0.45:1)}
+function epSpawnGap(){if(!EP_PEACE)return Math.max(1.6,4.5-ep.c*0.08);return epGap(ep.c)*rnd(0.85,1.15)*(epQuiet1()?1.5:PIT_FLOW_V2&&ep.kind==='heavy'?(HEAVY_SOFTER?0.6:0.45):1)}
 function epOnMob(m){if(m.type==='boss'||!EP_PEACE)return;m.hp=m.max=MOB[m.type].hp+Math.floor(ep.c/8);if(Math.random()<epVet(ep.c)){m.vet=1;m.hp=m.max=Math.ceil(m.max*1.7)}}
-function epQuietNow(){if(!EP_PEACE)return;ep.quiet=Math.max(ep.quiet,gameT+(PIT_FLOW_V2&&ep.kind==='heavy'?rnd(5,7):rnd(15,20)));spawnT=Math.max(spawnT,ep.quiet-gameT)}
+function epQuietNow(){if(!EP_PEACE)return;ep.quiet=Math.max(ep.quiet,gameT+(PIT_FLOW_V2&&ep.kind==='heavy'?(HEAVY_SOFTER?rnd(7,9):rnd(5,7)):rnd(15,20)));spawnT=Math.max(spawnT,ep.quiet-gameT)}
 function epOnKill(m){if(m.type==='boss'){const bn=m.ep?m.ep.name:'';toast(bn+' SLAIN!',null,null,'#f8f');return}if(m.vet){score+=MOB[m.type].pts;toast('VETERAN',m.x,m.y-12,'#ffd27a')}
   ep.kt=ep.kt.filter(t=>gameT-t<3);ep.kt.push(gameT);if(ep.kt.length>=2){ep.kt=[];epQuietNow()}}
 function epOnHurt(){epQuietNow()}
@@ -773,8 +779,8 @@ function epRunEnd(ok){if(!ep)return;let b=0;if(ok&&EP_CREDITS){b=EP_BONUS[ep.kin
   ep.bonus=b;if(ok&&ep.kind==='boss')PROG.pitBoss=1;if(EP_CREDITS&&typeof lvStats==='object'&&lvStats){lvStats.cr=ep.cr+b;lvStats.crB=b}if(level>PROG.deep)PROG.deep=level;if(EP_SAVE)saveProg()}
 function epHud(L,t){if(!ep||!EP_HUD)return;const sm=L.sm,x=12;let y=L.top+(sm?40:52)+(touchMode?16:30);ctx.save();ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FB}`;ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';
   const s='DEPTH '+ep.c;ctx.strokeText(s,x,y);ctx.fillStyle='rgba(255,196,110,0.95)';ctx.fillText(s,x,y);
-  if(PIT_FLOW_V2&&EP_CYCLE){const st=epStep(ep.c),px=x+ctx.measureText(s).width+8,pr=sm?3:3.5;for(let k=1;k<=5;k++){ctx.beginPath();ctx.arc(px+(k-1)*pr*3,y-(sm?3.5:4),k===st?pr+0.8:pr,0,6.283);ctx.fillStyle=k<st?'rgba(255,196,110,0.75)':k===st?'#fff2c8':'rgba(0,0,0,0.45)';ctx.fill();ctx.lineWidth=1;ctx.strokeStyle='rgba(255,196,110,0.8)';ctx.stroke()}
-    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.font=`bold ${sm?8:9}px ${FW}`;y+=sm?11:13;const kn=`${st}/5 \u00b7 `+(epQuiet1()?EP_KNAME.quiet:EP_KNAME[ep.kind]||'');ctx.strokeText(kn,x,y);ctx.fillStyle=ep.kind==='heavy'?'rgba(225,160,255,0.95)':'rgba(255,220,160,0.9)';ctx.fillText(kn,x,y)}ctx.font=`${sm?8:9}px ${FW}`;
+  if(PIT_FLOW_V2&&EP_CYCLE){const st=epStep(ep.c),px=x+ctx.measureText(s).width+8,L10=EP_LOOP>5,pr=L10?(sm?2.4:3):sm?3:3.5;for(let k=1;k<=EP_LOOP;k++){ctx.beginPath();ctx.arc(px+(k-1)*pr*(L10?2.7:3)+(L10&&k>5?pr*1.6:0),y-(sm?3.5:4),k===st?pr+0.8:pr,0,6.283);ctx.fillStyle=k<st?'rgba(255,196,110,0.75)':k===st?'#fff2c8':'rgba(0,0,0,0.45)';ctx.fill();ctx.lineWidth=1;ctx.strokeStyle=L10&&k===EP_LOOP?'rgba(255,90,70,0.95)':'rgba(255,196,110,0.8)';ctx.stroke()}
+    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.font=`bold ${sm?8:9}px ${FW}`;y+=sm?11:13;const kn=`${st}/${EP_LOOP} \u00b7 `+(epQuiet1()?EP_KNAME.quiet:EP_KNAME[ep.kind]||'');ctx.strokeText(kn,x,y);ctx.fillStyle=ep.kind==='heavy'?'rgba(225,160,255,0.95)':'rgba(255,220,160,0.9)';ctx.fillText(kn,x,y)}ctx.font=`${sm?8:9}px ${FW}`;
   for(const n of cfg.pit.names.slice(0,3)){y+=sm?11:13;ctx.strokeText(n,x,y);ctx.fillStyle='rgba(255,150,110,0.85)';ctx.fillText(n,x,y)}ctx.restore()}
 // world layer (under mobs): flood water, gas clouds, unstable crystal warnings
 function epDrawWorld(t,vis){if(!ep)return;if(WATER_BLOCKS)wbDraw(t,vis);if(WATER_REWORK&&ep.seeps)waterDraw(t,vis);
@@ -2330,7 +2336,7 @@ const TINT={};function tinted(n,mode){const key=n+':'+mode;if(TINT[key])return T
   else{try{const d=g.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){const l=a[i]*0.3+a[i+1]*0.59+a[i+2]*0.11;
       if(mode==='mask'){a[i]=l*0.62;a[i+1]=l*0.7;a[i+2]=l*0.8}else{a[i]=Math.min(255,a[i]*0.45+l*0.85+18);a[i+1]=a[i+1]*0.3+l*0.18;a[i+2]=a[i+2]*0.3+l*0.16}}g.putImageData(d,0,0)}catch(e){}}
   TINT[key]=c;return c}
-function stageInfo(lv){if(lv>8&&ENDLESS_PIT)return{num:'\u221e',name:'THE ENDLESS PIT',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END \u00b7 CREDITS',best:PROG.pitAt>9?'RESUME DEPTH '+(PROG.pitAt-8)+(PIT_FLOW_V2&&EP_CYCLE?' \u00b7 '+epStep(PROG.pitAt-8)+'/5':''):'FROM DEPTH 1'};if(lv>8)return{num:'\u221e',name:'ENDLESS SECTORS',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END',best:PROG.deep?'DEEPEST SECTOR '+PROG.deep:'FROM SECTOR 9'};const c=CAMPAIGN[lv],tg=[];if(c.rescue)tg.push('RESCUE');if(c.crates)tg.push('CRATES');if(c.intelNeed)tg.push('INTEL');if(c.boss)tg.push('BOSS');if(c.timed)tg.push('TIMED');if(c.quakes)tg.push('QUAKES');
+function stageInfo(lv){if(lv>8&&ENDLESS_PIT)return{num:'\u221e',name:'THE ENDLESS PIT',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END \u00b7 CREDITS',best:PROG.pitAt>9?'RESUME DEPTH '+(PROG.pitAt-8)+(PIT_FLOW_V2&&EP_CYCLE?' \u00b7 '+epStep(PROG.pitAt-8)+'/'+EP_LOOP:''):'FROM DEPTH 1'};if(lv>8)return{num:'\u221e',name:'ENDLESS SECTORS',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END',best:PROG.deep?'DEEPEST SECTOR '+PROG.deep:'FROM SECTOR 9'};const c=CAMPAIGN[lv],tg=[];if(c.rescue)tg.push('RESCUE');if(c.crates)tg.push('CRATES');if(c.intelNeed)tg.push('INTEL');if(c.boss)tg.push('BOSS');if(c.timed)tg.push('TIMED');if(c.quakes)tg.push('QUAKES');
   return{num:String(lv).padStart(2,'0'),name:c.name.toUpperCase(),moon:c.moon,tags:tg.join(' \u00b7 '),best:PROG.best[lv]?'BEST '+PROG.best[lv].toLocaleString('en-US'):'NO SCORE YET'}}
 let stageSel=0,pausePage='main',pauseHits=[],pausePick=0,lockFlash=-9;
 function launchStage(n){campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;if(ENDLESS_PIT&&n===9&&PROG.pitAt>9)n=PROG.pitAt;level=n;startLevel()}

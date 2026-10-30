@@ -1330,7 +1330,7 @@ function setState(s){const prev=state;state=s;stateT=0;if(s==='epilogue')markBea
   if(s==='debrief'){debIdx=0;debT=0}
   applyVolumes()}
 function startGame(){evidence=[];level=START_LV;score=0;kills=0;startLevel()}
-function startLevel(){padLast=null;genLevel(level);ship=newShip();mobs=[];bolts=[];globs=[];parts=[];cracks=[];toasts=[];flow=null;flowT=0;spawnT=6;lastTile=-1;quakeT=0;
+function startLevel(){if(qtNeed()&&level>=2&&level<=8){level=1;campOpen('menu');return}padLast=null;genLevel(level);ship=newShip();mobs=[];bolts=[];globs=[];parts=[];cracks=[];toasts=[];flow=null;flowT=0;spawnT=6;lastTile=-1;quakeT=0;
   cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(4,4,8);explored[Math.floor(padY/T)*MW+Math.floor(padX/T)]=1;updateMinimap();
   comm=null;commQ=[];intelLog=[];leaderRevealed=level>6&&level<=8;
   if(RIVAL_RACE)rivalInit();briefIdx=0;briefT=0;setState('briefing');Music.play(cfg.music);Music.battle(0);
@@ -1342,7 +1342,7 @@ function debNext(){if(state!=='debrief')return;SFX.click();const L=cfg.debrief;i
 function endDebrief(){if(state!=='debrief')return;level++;startLevel()}
 function endBriefing(cine){if(COCKPIT_CINE&&cine&&state==='briefing'){pitBegin();return}if(arr)arrEnd();banner=4;setState('play');lvStats={t0:gameT,kills0:kills,s0:lvStats.s0!=null?lvStats.s0:score}}
 function advance(){if(state==='over'){setState('menu');return}
-  if(state==='levelDone'){if(level===8){markBeaten();setState('epilogue');return}if(level<=8&&cfg.debrief&&cfg.debrief.length){setState('debrief');return}level++;startLevel();return}
+  if(state==='levelDone'){if(level===1&&qtNeed()){campOpen('done');return}if(level===8){markBeaten();setState('epilogue');return}if(level<=8&&cfg.debrief&&cfg.debrief.length){setState('debrief');return}level++;startLevel();return}
   if(state==='debrief'){debNext();return}
   if(state==='epilogue'){if(epiIdx<EPILOGUE.length-1){epiIdx++;epiT=0;SFX.click();return}level++;startLevel()}}
 function completeLevel(cine){if(BASECAMP_V1&&level===1)campUnlock();if(RIVAL_RACE&&rivalOn()&&rival)rivalSettle(!rival.fin);const RV=RIVAL_RACE&&rivalOn()&&rival;const bonus=Math.round(ship.sh*5+ship.en*2+(timed&&!RV?timeLeft*15:0)+(RV&&rival.res==='win'?1500:0)+level*250);score+=bonus;
@@ -2370,6 +2370,12 @@ function unlockAllProg(p){for(const k of ['F','D','R','Vm','V'])p.d[k]=1;for(con
 const PROG=(()=>{let p=null;try{p=JSON.parse(localStorage.getItem('nm_prog')||'null')}catch(e){}if(!p||typeof p!=='object')p={};p.d=p.d||{};p.c=p.c||{};p.best=p.best||{};p.deep=p.deep||0;
   if(gameBeaten)unlockAllProg(p);/* migration: players who already beat the campaign get everything */return p})();
 function saveProg(){try{localStorage.setItem('nm_prog',JSON.stringify(PROG))}catch(e){}}
+// QUARTERS_TOUR (Justin): after Mission 1, Survey Chief Vosh (still masked) walks the new miner through Quarters in tap-to-advance comm boxes that
+// spotlight the hatch, locker, workbench, cot and comm station (Quartermaster only once it's unlocked). No skip; Mission 2 is gated until the
+// tour is done (every launch path funnels through startLevel), once per save; saves from before the tour count as done. Revert: QUARTERS_TOUR=false
+const QUARTERS_TOUR=true;if(QUARTERS_TOUR&&PROG.qtour==null&&(PROG.camp||PROG.best[1]||gameBeaten))PROG.qtour=1;
+let qt=null,qtLast=null;
+function qtNeed(){return QUARTERS_TOUR&&BASECAMP_V1&&PROG.qtour===0&&!gameBeaten}
 // PIT_FLOW_V2 save migration: old 4-step saves keep their depth number (difficulty, quota and hazards are by depth); the step is re-derived from it. Bad values reset to depth 1.
 (function(){if(!PIT_FLOW_V2||PROG.pitV===2)return;if(PROG.pitAt!=null){const a=+PROG.pitAt;PROG.pitAt=a>=0&&a<100000?Math.floor(a):0}PROG.pitV=2})(); // written with the next save
 function recordBest(){if(level<=8)PROG.next=Math.max(PROG.next||1,level+1);const ms=Math.max(0,score-(lvStats.s0||0));lvStats.ms=ms;lvStats.nb=false;if(level<=8){if(ms>(PROG.best[level]||0)){PROG.best[level]=ms;lvStats.nb=true}}else if(level>PROG.deep)PROG.deep=level;saveProg()}
@@ -3034,7 +3040,7 @@ function doneCanStages(){return gameBeaten||level===8}
 function doneNext(){if(stateT<0.8)return;SFX.click();advance()}
 function doneStages(){if(!doneCanStages()){lockFlash=performance.now()/1000;SFX.click();return}SFX.click();if(level===8&&!gameBeaten)markBeaten();const ns=clamp(level<=8?level%9:8,0,8);setState('menu');menuPage='stages';stageSel=ns;menuHits=[];if(H<520&&W>H)ap.style.display='none'}
 function doneMenu(){if(level===8&&!gameBeaten)markBeaten();padGoMenu()}
-function doneBtns(){return[[level===8?'CONTINUE':level<8?'NEXT MISSION':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],[campOn()?'QUARTERS':'ARCHIVE',{hot:level===1&&campOn()},()=>{SFX.click();padOpenArchive()}]]}
+function doneBtns(){return[[level===8?'CONTINUE':level===1&&qtNeed()?'TO QUARTERS':level<8?'NEXT MISSION':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],[campOn()?'QUARTERS':'ARCHIVE',{hot:level===1&&campOn()},()=>{SFX.click();padOpenArchive()}]]}
 function drawComplete(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.8)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L;const ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2;ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();
   if(pausePage==='archive'){drawPadArchive(L,cx,cw,ip,t);ctx.restore();if(artView>=0)drawArtView(t);return}
   const land=sw>=560,short=land&&sh<380,title=level===8?'EVIDENCE TRANSMITTED':level>8?(ENDLESS_PIT?'DEPTH CLEARED':'SECTOR CLEARED'):'MISSION COMPLETE',tf=clamp(Math.min(sw/(land?18:12.5),sh/(short?12:10)),18,44),bh=Math.max(touchMode?44:34,Math.min(46,sh*0.085));let y=sy+ip;
@@ -3073,8 +3079,31 @@ const BASECAMP_V1=true;
 const CAMP_TABS=['chars','creatures','msgs','scans','art'];
 let campStageRet=false,campFrom='done',campPage='room',campSel=1,campHits=[],campFade=-1,campDesk=false,campStars=null,campT0=0;
 function campOn(){return BASECAMP_V1&&!!(PROG.camp||gameBeaten||PROG.best[1])}
-function campUnlock(){if(!BASECAMP_V1||PROG.camp)return;PROG.camp=1;saveProg();toast('QUARTERS UNLOCKED',null,null,'#ffbe55')}
-function campOpen(from){campFrom=from;campPage='room';campDesk=false;campFade=-1;campHits=[];campT0=performance.now()/1000;artView=-1;if(CAMP_ART){campArtT0=0;campCap=null;campArtSel=touchMode?-1:CAMP_SPOTS.findIndex(s=>s.id===(QUARTERS_HATCH?'hangar':'cot'));campDrag=null;campPan=campPanT=0.4;campArtOn()}campBunk=null;setState('camp');ap.style.display='none';campMusicIn()}
+function campUnlock(){if(!BASECAMP_V1||PROG.camp)return;PROG.camp=1;if(QUARTERS_TOUR&&!gameBeaten)PROG.qtour=0;saveProg();toast('QUARTERS UNLOCKED',null,null,'#ffbe55')}
+function campOpen(from){campFrom=from;campPage='room';campDesk=false;campFade=-1;campHits=[];campT0=performance.now()/1000;artView=-1;if(CAMP_ART){campArtT0=0;campCap=null;campArtSel=touchMode?-1:CAMP_SPOTS.findIndex(s=>s.id===(QUARTERS_HATCH?'hangar':'cot'));campDrag=null;campPan=campPanT=0.4;campArtOn()}campBunk=null;setState('camp');ap.style.display='none';campMusicIn();if(qtNeed())qtBegin()}
+// QT_STEPS: [spotlight spot id, label, Vosh's line]; 7 boxes, ends on the hatch pointing to Mission 2 (no Quartermaster / Pit talk)
+const QT_STEPS=[[null,'',"Come in, come in. Survey Chief Vosh, Guild Survey Office. Every miner who survives a first shift earns quarters, and I like to show the new ones around myself. Indulge me."],
+  ['hangar','HANGAR HATCH',"The hangar hatch. Your hauler waits on the other side, and the datapad by the door maps every shift you\u2019ve earned. Routes planned by men like me, for miners like you."],
+  ['closet','LOCKER',"Your locker and wardrobe. There\u2019s a mirror inside the door. Look into it now and then, miner, and ask yourself whose work that face is doing."],
+  ['bench','WORKBENCH',"The workbench, under the window. Paint your hauler however you like. The Guild owns the hull, but the colours can still be yours. Small freedoms matter to people who have so few."],
+  ['cot','COT',"Your cot. Rest here between shifts. Tired miners talk, you\u2019ll find. About the pay, about the Crown\u2019s tariffs, about who gets rich off the seams. If you hear any of it\u2026 I\u2019d like to hear it too."],
+  ['comm','COMM STATION',"The comm station. Brakka, Pik, whoever will listen. Call them, learn them. Find out which of them you can trust. I take a great interest in loyalty."],
+  ['hangar','HANGAR HATCH',"That\u2019s the tour. Mission 2 is through the hatch: open the datapad and launch whenever you\u2019re ready. And miner\u2026 remember who showed you around."]];
+function qtSteps(){return QT_STEPS.map(([id,nm,text])=>({id,nm,text}))}
+function qtPan(){const st=qtSteps()[qt.i];if(st.id&&campArtOn()){const i=CAMP_SPOTS.findIndex(o=>o.id===st.id);if(i>=0)campPanTo(i)}}
+function qtBegin(){qt={i:0,t0:performance.now()/1000+0.5};campCap=null;campPage='room';qtPan()}
+function qtTap(){const S=qtSteps(),st=S[qt.i];if((performance.now()/1000-qt.t0)*55<st.text.length){qt.t0=-1e9;return}SFX.click();qt.i++;
+  if(qt.i>=S.length){qt=null;PROG.qtour=1;saveProg();toast('QUARTERS: YOURS',null,null,'#ffbe55');return}qt.t0=performance.now()/1000;qtPan()}
+function qtRect(id){if(!id)return null;if(campArtOn()){const sp=CAMP_SPOTS.find(o=>o.id===id);return sp?campSpotScr(sp,campArtFit()):null}const L=campLayout();return L.st&&L.st[id]||null}
+function qtDraw(t){const S=qtSteps(),st=S[qt.i],b=qtRect(st.id),n=Math.max(0,Math.floor((performance.now()/1000-qt.t0)*55)),done=n>=st.text.length,pd=8,land=W>H;ctx.save();
+  ctx.beginPath();ctx.rect(0,0,W,H);if(b)rrect(b.x-pd,b.y-pd,b.w+pd*2,b.h+pd*2,10);ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fill('evenodd');
+  if(b){const pu=0.5+0.5*Math.sin(t*4);ctx.shadowColor='rgba(255,190,85,0.9)';ctx.shadowBlur=16;ctx.strokeStyle=`rgba(255,190,85,${0.6+0.35*pu})`;ctx.lineWidth=2.5;ctx.setLineDash([8,5]);ctx.lineDashOffset=-t*20;rrect(b.x-pd,b.y-pd,b.w+pd*2,b.h+pd*2,10);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;
+    const fs=clamp(Math.min(W,H)/26,12,18);ctx.font=`bold ${fs}px ${FW}`;ctx.textAlign='center';const tw=ctx.measureText(st.nm).width,lx=clamp(b.x+b.w/2,tw/2+10,W-tw/2-10),ly=clamp(b.y-pd-10,fs+6,H-10);ctx.fillStyle='rgba(6,8,10,0.88)';rrect(lx-tw/2-8,ly-fs-4,tw+16,fs+12,5);ctx.fill();ctx.fillStyle=PAD_AMB;ctx.fillText(st.nm,lx,ly)}
+  const cw=land?Math.min(W*0.5,560):Math.min(W-20,520),ch=clamp(H*(land?0.34:0.2),100,160),bc=b?b.x+b.w/2:W/2,CA=[[12,H-ch-12],[W-cw-12,H-ch-12],[(W-cw)/2,H-ch-12],[12,12],[W-cw-12,12],[(W-cw)/2,12]],ovl=([x,y])=>b?Math.max(0,Math.min(x+cw,b.x+b.w+pd)-Math.max(x,b.x-pd))*Math.max(0,Math.min(y+ch,b.y+b.h+pd)-Math.max(y,b.y-pd)):Math.abs(x-(W-cw)/2)+(y<H/2?1:0),
+    [cx,cy]=CA.reduce((m,c)=>ovl(c)<ovl(m)-1?c:m,CA[land?2:2]);
+  padComm(cx,cy,cw,ch,t,{who:'S',text:st.text.slice(0,n)||'\u2026',tag:'QUARTERS'},false);
+  ctx.font=`bold ${clamp(ch*0.09,10,12)}px ${FW}`;ctx.textAlign='right';ctx.fillStyle=done?`rgba(159,245,207,${0.6+0.35*Math.sin(t*5)})`:'rgba(159,245,207,0.35)';ctx.fillText(`${qt.i+1}/${S.length}  \u00b7  ${touchMode?'TAP':'TAP / ENTER'} \u25b6`,cx+cw-12,cy+ch-9);
+  ctx.restore();qtLast={i:qt.i,n:S.length,id:st.id,rect:b,box:{x:cx,y:cy,w:cw,h:ch},text:st.text}}
 function campLeave(){SFX.click();campDesk=false;campPage='room';campBunk=null;campMusicOut(campFrom==='pause'?'pause':campFrom==='menu'?'menu':'done');if(campFrom==='pause')setState('pause');else if(campFrom==='menu')setState('menu');else{setState('levelDone')}}
 function campNext(){if(gameBeaten&&(PROG.next||1)>8)return 9;let n=PROG.next||1;for(let l=1;l<=8;l++)if(PROG.best[l])n=Math.max(n,l+1);return gameBeaten&&n>8?9:Math.min(n,gameBeaten?9:8)}
 function campNextName(){const n=campNext();return n>8?'endless sectors':'mission '+n}
@@ -3480,7 +3509,7 @@ const PIK_CREDITS_COMM=true;
 const PIK_CR_LINES=['Shift logged. The Federation has graciously allowed you to keep a fraction of what you dug up. Credits are in your account.',
   'The Captain says your locker is unsealed. Jumpsuits, helmets, trophies. Spend it before he invents a fee for it.'];
 let pikCom=null;
-function pikCheck(){if(!PIK_CREDITS_COMM||pikCom||PROG.pikCr||!((PROG.cr||0)>0))return;
+function pikCheck(){if(qt||!PIK_CREDITS_COMM||pikCom||PROG.pikCr||!((PROG.cr||0)>0))return;
   const shiftEnd=(state==='levelDone'||state==='over')&&level>8&&stateT>0.8,quarters=state==='camp'&&campPage==='room'&&!campBunk&&campFade<0;
   if(shiftEnd||quarters){pikCom={i:0,t0:performance.now()/1000};PROG.pikCr=1;saveProg()}}
 function pikShown(){return Math.floor((performance.now()/1000-pikCom.t0)*70)}
@@ -3733,7 +3762,7 @@ cv.addEventListener('touchmove',e=>{if(state!=='camp'||!campDrag||campPage!=='ro
 cv.addEventListener('touchend',e=>{if(state!=='camp'||!campDrag)return;const D=campDrag;campDrag=null;if(D.moved||campPage!=='room')return;
   if(D.x0<28||D.x0>W-28){const i0=campArtAt(D.x0,D.y0);if(i0<0){campPanT=clamp(campPan+(D.x0<28?-0.34:0.34),0,1);return}}const i=campArtAt(D.x0,D.y0);if(i>=0)campArtUse(i)},{passive:true});
 function campTagText(sp){const S=campStations(),s=sp.st&&S.find(o=>o.id===sp.st);return s?[sp.nm,s.lock?'SEALED':s.sub.toUpperCase()]:[sp.nm,sp.sub?sp.sub.toUpperCase():'']}
-function campArtRoom(t){let F=campArtFit();campHits=[];if(campPage==='room')pauseHits=[];if(F.pan&&!touchMode&&campPage==='room'&&!campCap&&mouse.x>0)campPanT=clamp((mouse.x/W-0.5)*1.25+0.5,0,1);if(campArtT0===0||state!=='camp')campArtT0=t;if(Math.abs(campPanT-campPan)>0.0005)campPan+=(campPanT-campPan)*0.18;
+function campArtRoom(t){let F=campArtFit();campHits=[];if(campPage==='room')pauseHits=[];if(F.pan&&!touchMode&&campPage==='room'&&!campCap&&!qt&&mouse.x>0)campPanT=clamp((mouse.x/W-0.5)*1.25+0.5,0,1);if(campArtT0===0||state!=='camp')campArtT0=t;if(Math.abs(campPanT-campPan)>0.0005)campPan+=(campPanT-campPan)*0.18;
   ctx.save();ctx.fillStyle='#050403';ctx.fillRect(0,0,W,H);ctx.drawImage(campImg,F.ox,F.oy,F.dw,F.dh);
   // subtle living light: glow panels breathe, screens shimmer
   ctx.globalCompositeOperation='lighter';const fl=0.06+0.03*Math.sin(t*2.1)+(Math.random()<0.01?0.05:0);
@@ -3830,7 +3859,7 @@ function bunkNaboo(x,y,r,el){if(BUNK_NABOO_REAL&&bunkNabooOK()){bunkNabooReal(x,
   const rot=el*0.004;for(const b of bunkLand){const u=((b.u+rot*(b.cl?1.25:1))%2+2)%2-1;if(Math.abs(u)>1.15)continue;const sx=x+Math.sin(u*1.5707)*r,sy=y+b.v*r*0.9,sq=Math.cos(u*1.5707);ctx.fillStyle=b.c;ctx.beginPath();ctx.ellipse(sx,sy,Math.max(0.3,b.s*r*sq*(b.cl?1.8:1)),b.s*r*(b.cl?0.45:0.8),0,0,7);ctx.fill()}
   const sh=ctx.createLinearGradient(x-r,y-r*0.4,x+r,y+r*0.4);sh.addColorStop(0,'rgba(0,0,10,0)');sh.addColorStop(0.55,'rgba(0,0,10,0.15)');sh.addColorStop(1,'rgba(0,0,10,0.78)');ctx.fillStyle=sh;ctx.fillRect(x-r,y-r,r*2,r*2);ctx.restore()}
 
-function drawCamp(t){bunkStep(t);if(BUNK_REST&&bunkShows())drawBunk(t);else drawCamp0(t);const ba=BUNK_REST?bunkBlack():0;if(ba>0){ctx.fillStyle=`rgba(0,0,0,${ba})`;ctx.fillRect(0,0,W,H)}}
+function drawCamp(t){bunkStep(t);if(BUNK_REST&&bunkShows())drawBunk(t);else drawCamp0(t);if(qt)qtDraw(t);const ba=BUNK_REST?bunkBlack():0;if(ba>0){ctx.fillStyle=`rgba(0,0,0,${ba})`;ctx.fillRect(0,0,W,H)}}
 function drawCamp0(t){const L=campLayout();campHits=[];if(campPage!=='desk')menuHits=[];if(campArtOn()){campArtRoom(t);gearRoomExtras(t)}else{campRoom(L,t);const S=campStations();
   S.forEach((s,i)=>{const b=L.st[s.id];const sel=campSel===i,hp=(campPage==='room')&&sel;campFurniture(s.id,b,t,s.lock);
     const fs=clamp(Math.min(b.w/7.5,H/40),10,15),lh=fs*2.9,lw=Math.max(b.w*0.96,Math.min(fs*8,b.w*1.15)),lx=b.x+b.w/2-lw/2,ly=Math.min(H-lh-6,b.y+b.h+4);
@@ -3867,10 +3896,10 @@ function drawScans(cx,y,cw,avail,t){const sm=cw<520,fs=sm?12.5:14.5,hf=sm?10:12,
       ctx.textAlign='left';ctx.font=`${hf*0.9}px ${FW}`;ctx.fillStyle=r.found?col[0]:PAD_DIM;ctx.fillText(r.found?r.nm:'ENCRYPTED',tx,yy+hf*1.1,tw-60);ctx.font=`${fs}px ${FB}`;ctx.fillStyle=r.found?col[2]:'rgba(159,245,207,0.35)';row.ls.forEach((l,i)=>ctx.fillText(l,tx,yy+hf*1.6+fs*1.05+i*fs*1.3))}}yy+=row.h}ctx.restore();
   if(msgMax>0){const bx=cx+cw-sbw,bh=Math.max(44,sbw);for(const[by,d,lb,on]of[[y,-1,'\u25b2',msgScroll>0],[y+avail-bh,1,'\u25bc',msgScroll<msgMax]]){rrect(bx,by,sbw,bh,5);ctx.fillStyle=on?'rgba(16,40,30,0.92)':'rgba(16,40,30,0.4)';ctx.fill();ctx.strokeStyle=on?PAD_MINT:'rgba(159,245,207,0.25)';ctx.lineWidth=1.2;ctx.stroke();ctx.font=`bold 14px ${FW}`;ctx.textAlign='center';ctx.fillStyle=on?PAD_MINT:'rgba(159,245,207,0.3)';ctx.fillText(lb,bx+sbw/2,by+bh/2+5);
     menuHits.push({x:bx,y:by,w:sbw,h:bh,act:()=>{SFX.click();msgScroll=clamp(msgScroll+d*avail*0.8,0,msgMax)}})}}}
-function campTap(x,y){if(BUNK_REST&&campBunk){bunkRise();return}if(campFade>=0)return;if(campPage==='desk'){padTap(x,y);if(pausePage!=='archive'){campPage='room';campDesk=false}return}
+function campTap(x,y){if(qt){qtTap();return}if(BUNK_REST&&campBunk){bunkRise();return}if(campFade>=0)return;if(campPage==='desk'){padTap(x,y);if(pausePage!=='archive'){campPage='room';campDesk=false}return}
   if(campPage!=='room'){for(const h of pauseHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return}return}
   if(campArtOn()){campArtTap(x,y);return}for(const h of campHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){if(h.i!=null)campSel=h.i;h.act();return}}
-function campKey(k){if(BUNK_REST&&campBunk){bunkRise();return}if(campFade>=0)return;if(campPage==='desk'){padKey(k);if(pausePage!=='archive'){campPage='room';campDesk=false}return}
+function campKey(k){if(qt){if(k==='enter'||k===' '||k==='arrowright')qtTap();return}if(BUNK_REST&&campBunk){bunkRise();return}if(campFade>=0)return;if(campPage==='desk'){padKey(k);if(pausePage!=='archive'){campPage='room';campDesk=false}return}
   if(gearKey(k))return;
   if(campPage!=='room'){if(k==='escape'||k==='backspace'||k==='enter'||k===' '){SFX.click();campPage='room'}return}
   if(campArtOn()&&campArtKey(k))return;const n=campStations().length;if(k==='arrowleft'||k==='a'||k==='arrowup'||k==='w'){SFX.click();campSel=(campSel+n-1)%n}else if(k==='arrowright'||k==='d'||k==='arrowdown'||k==='s'||k==='tab'){SFX.click();campSel=(campSel+1)%n}

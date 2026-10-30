@@ -3264,7 +3264,7 @@ function gearBuy(it){const g=gearP();if(!it||g.own[it.id]){SFX.click();gearSay('
   const cr=PROG.cr||0;if(cr<it.cr){SFX.click();gearSay(`NOT ENOUGH CREDITS: ${it.cr} CR needed, you have ${cr}.`,1);return false}
   PROG.cr=cr-it.cr;g.own[it.id]=1;saveProg();if(SFX.ok)SFX.ok();else SFX.click();gearSay(`${it.nm} bought for ${it.cr} CR. ${it.paint?'The tin is on your workbench.':"It's waiting in your locker."}`);return true}
 function gearEquip(it){const g=gearP();if(!it||!g.own[it.id]){SFX.click();gearSay('Available at the Quartermaster.',1);return false}SFX.click();
-  if(it.cat===0)g.lamp=it.id;else if(it.cat===1)g.suit=it.id;else{if(g.show[it.id])delete g.show[it.id];else g.show[it.id]=1}saveProg();return true}
+  if(it.cat===0)g.lamp=it.id;else if(it.cat===1)g.suit=it.id;else{if(g.show[it.id])delete g.show[it.id];else{for(const k in g.show)if(gearTbase(k)===(it.base||it.id))delete g.show[k];g.show[it.id]=1}}saveProg();return true}
 function gearLampRGB(i){if(!LOCKER_SHOP)return GEAR[0].rgb[i];const it=gearIt(gearP().lamp)||GEAR[0];return it.rgb[i]}
 function gearSex(s){const g=gearP();if(g.sex===s)return;SFX.click();g.sex=s;saveProg()}
 // suit tint: multiply the painted bust by the suit colour through its suit mask; cached per gender+suit
@@ -3272,7 +3272,7 @@ function gearBust(sex,suit){const key=sex+suit;if(gearBusts[key])return gearBust
   const c=document.createElement('canvas');c.width=b.naturalWidth;c.height=b.naturalHeight;const g=c.getContext('2d');g.drawImage(b,0,0);const it=gearIt(suit);
   if(it&&it.mul){const o=document.createElement('canvas');o.width=c.width;o.height=c.height;const q=o.getContext('2d');q.drawImage(b,0,0);q.globalCompositeOperation='multiply';q.fillStyle=it.mul;q.fillRect(0,0,o.width,o.height);
     q.globalCompositeOperation='destination-in';q.drawImage(m,0,0,o.width,o.height);g.drawImage(o,0,0)}return gearBusts[key]=c}
-function gearLayout(){const land=W/H>=1.25;const A=land?{x:0,y:0,w:Math.round(W*0.42),h:H}:{x:0,y:0,w:W,h:Math.round(H*0.5)};
+function gearLayout(qm){const land=W/H>=1.25;const A=land?{x:0,y:0,w:Math.round(W*0.42),h:H}:{x:0,y:0,w:W,h:Math.round(H*(qm&&QM_TRIPLE?0.42:0.5))};
   const P=land?{x:A.w,y:8,w:W-A.w-8,h:H-16}:{x:6,y:A.h,w:W-12,h:H-A.h-6};return{land,A,P}}
 function gearMine(){return LOCKER_SHOP&&gameBeaten}
 // ---------- shared panel: header, tabs, 2x2 / 1x4 cards, selected bar ----------
@@ -3283,10 +3283,11 @@ function gearPanel(mode,L,t){const P=L.P,g=gearP(),touch=touchMode,bh=touch?44:3
   ctx.font=`${clamp(fs*0.85,10,13)}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.8)';ctx.fillText(mode==='qm'?'Pit credits: '+(PROG.cr||0)+' CR':'Wear what you own. Mirror shows the fit.',P.x+pad+2,y+bh*0.5+fs*1.05,P.w-bw-pad*3);
   padBtn(P.x+P.w-bw-pad,y,bw,bh,'\u25c0 BACK',{},()=>{SFX.click();campPage='room';gearMsg=null});y+=bh+pad;
   if(gearTab>=gearTabs(mode).length)gearTab=0;const TB=gearTabs(mode),tw=(P.w-pad*2-(TB.length-1)*4)/TB.length;TB.forEach((nm,i)=>padBtn(P.x+pad+i*(tw+4),y,tw,bh,nm,{hot:i===gearTab,sel:i===gearTab},()=>{SFX.click();gearTab=i;gearMsg=null}));y+=bh+pad;y=gearPaintSub(mode,P,y,bh,pad);
-  const barH=touch?52:44,gy=y,gh=P.y+P.h-pad-barH-pad-gy-(gearMsg?fs*1.5:0);const items=gearItems(mode);const cols=P.w/Math.max(1,gh)>3.2?4:2,rows=Math.ceil(4/cols);
+  const items=gearItems(mode),pgN=QM_TRIPLE?Math.ceil(items.length/4):1,pgH=pgN>1?Math.round(bh*0.82)+6:0;const barH=touch?52:44,gy=y,gh=P.y+P.h-pad-barH-pad-gy-(gearMsg?fs*1.5:0)-pgH;const cols=P.w/Math.max(1,gh)>3.2?4:2,rows=Math.ceil(4/cols);
   const cw=(P.w-pad*2-(cols-1)*6)/cols,ch=Math.min(cols===4?gh:(gh-6)/rows,touch?140:150);const S=gearSel[mode];
   if(S[gearTab]==null||!items.find(o=>o.id===S[gearTab]))S[gearTab]=mode==='lk'?(gearTab===0?g.lamp:gearTab===1?g.suit:(items.find(o=>g.own[o.id])||items[0]).id):items[0].id;
-  items.forEach((it,i)=>{const cx=P.x+pad+(i%cols)*(cw+6),cy=gy+Math.floor(i/cols)*(ch+6);gearCard(mode,it,cx,cy,cw,ch,S[gearTab]===it.id,t);
+  const pgI=pgN>1?Math.floor(Math.max(0,items.findIndex(o=>o.id===S[gearTab]))/4):0;if(pgN>1)gearPager(mode,items,pgI,pgN,P.x+pad,gy+ch*rows+6*(rows-1)+6,P.w-pad*2,pgH-6);
+  items.slice(pgI*4,pgI*4+4).forEach((it,i)=>{const cx=P.x+pad+(i%cols)*(cw+6),cy=gy+Math.floor(i/cols)*(ch+6);gearCard(mode,it,cx,cy,cw,ch,S[gearTab]===it.id,t);
     pauseHits.push({x:cx,y:cy,w:cw,h:ch,gear:it.id,act:()=>{if(mode==='lk'&&!g.own[it.id]){SFX.click();gearSay('Available at the Quartermaster.',1);return}SFX.click();S[gearTab]=it.id;gearMsg=null}})});
   // selected bar
   const it=gearIt(S[gearTab]),by=P.y+P.h-pad-barH;if(gearMsg){const a=clamp(5-(performance.now()/1000-gearMsg.t),0,1);if(a<=0)gearMsg=null;else{ctx.globalAlpha=a;ctx.font=`${clamp(fs*0.9,10,13)}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=gearMsg.bad?'#ff8a6a':PAD_MINT;ctx.fillText(gearMsg.text,P.x+P.w/2,by-fs*0.5,P.w-pad*2);ctx.globalAlpha=1}}
@@ -3296,10 +3297,13 @@ function gearPanel(mode,L,t){const P=L.P,g=gearP(),touch=touchMode,bh=touch?44:3
   else{if(!g.own[it.id]){lb='NOT OWNED';o={lock:1};act=()=>gearEquip(it)}else if(it.cat<2){const on=(it.cat===0?g.lamp:g.suit)===it.id;lb=on?'EQUIPPED':'EQUIP';o=on?{}:{hot:1};act=()=>{if(!on)gearEquip(it)}}else{const on=!!g.show[it.id];lb=on?'TAKE DOWN':'EQUIP';o=on?{}:{hot:1};act=()=>gearEquip(it)}}
   padBtn(P.x+P.w-pad*2-abw,by+(barH-(touch?44:34))/2,abw,touch?44:34,lb,o,act);gearAct=act;return it}
 let gearAct=null;
+function gearPager(mode,items,pg,n,x,y,w,h){const bw=Math.min(w*0.3,130),S=gearSel[mode],go=d=>{const q=(pg+d+n)%n,on=items.slice(q*4,q*4+4),g=gearP();SFX.click();S[gearTab]=((mode==='lk'&&on.find(o=>g.own[o.id]))||on[0]).id;gearMsg=null};
+  padBtn(x,y,bw,h,'\u25c0 PREV',{},()=>go(-1));padBtn(x+w-bw,y,bw,h,'NEXT \u25b6',{},()=>go(1));const cx=x+w/2,fs=clamp(h*0.36,10,14);ctx.textAlign='center';ctx.font=`bold ${fs}px ${FW}`;ctx.fillStyle=PAD_AMB;ctx.fillText(`PAGE ${pg+1} / ${n}`,cx,y+h*0.45,w-bw*2-12);
+  for(let i=0;i<n;i++){ctx.fillStyle=i===pg?PAD_AMB:'rgba(255,190,110,0.3)';ctx.beginPath();ctx.arc(cx+(i-(n-1)/2)*fs*0.9,y+h*0.78,Math.max(2,fs*0.2),0,6.283);ctx.fill()}}
 function gearCard(mode,it,x,y,w,h,sel,t){const g=gearP(),own=!!g.own[it.id],dim=mode==='lk'&&!own,lock=mode==='qm'&&!own&&gearLocked(it);ctx.save();ctx.globalAlpha=dim?0.42:1;
   rrect(x,y,w,h,6);ctx.fillStyle=sel?'rgba(60,42,22,0.9)':'rgba(22,18,14,0.88)';ctx.fill();ctx.strokeStyle=sel?PAD_AMB:'rgba(255,200,140,0.25)';ctx.lineWidth=sel?2.2:1;ctx.stroke();
   const ic=Math.min(h-16,w*0.42),ix=x+8,iy=y+(h-ic)/2;gearIcon(it,ix,iy,ic,t);const tx=ix+ic+8,tw=x+w-tx-6,fs=clamp(Math.min(w/14,h/6.5),9.5,13.5);
-  ctx.textAlign='left';ctx.font=`bold ${fs}px ${FW}`;ctx.fillStyle='#f1e4c8';const ls=wrapLines(it.nm,tw).slice(0,3);ls.forEach((l,i)=>ctx.fillText(l,tx,y+fs*1.5+i*fs*1.2,tw));
+  ctx.textAlign='left';ctx.font=`bold ${fs}px ${FW}`;ctx.fillStyle='#f1e4c8';const ls=wrapLines(it.nm,tw).slice(0,QM_TRIPLE?Math.max(3,Math.floor((h-fs*3.8)/(fs*1.2))):3);ls.forEach((l,i)=>ctx.fillText(l,tx,y+fs*1.5+i*fs*1.2,tw));
   // paper price tag / status
   let tag,col='#2a1c10';if(mode==='qm')tag=own?'OWNED':lock?'BEAT A PIT BOSS':it.cr?it.cr+' CR':'FREE';else tag=!own?'AT THE QUARTERMASTER':(it.cat===0?g.lamp:it.cat===1?g.suit:'')===it.id||it.cat===2&&g.show[it.id]?(it.cat===2?'ON DISPLAY':'EQUIPPED'):'OWNED';
   ctx.font=`bold ${fs*0.86}px ${FB}`;const pw=Math.min(tw,ctx.measureText(tag).width+12),py=y+h-fs*1.9-4;ctx.save();ctx.translate(tx+pw/2,py+fs*0.8);ctx.rotate(-0.03);rrect(-pw/2,-fs*0.8,pw,fs*1.6,3);
@@ -3313,7 +3317,7 @@ function gearIcon(it,x,y,s,t){ctx.save();rrect(x,y,s,s,5);ctx.fillStyle='rgba(0,
     const sg=ctx.createLinearGradient(x,y,x+s,y+s);sg.addColorStop(0,it.sw);sg.addColorStop(1,'#000');ctx.globalAlpha=1;ctx.fillStyle=it.sw;rrect(x+s*0.16,y+s*0.14,s*0.68,s*0.76,4);ctx.fill();ctx.globalAlpha=0.55;ctx.fillStyle=sg;ctx.fill();ctx.globalAlpha=1;
     ctx.strokeStyle='rgba(0,0,0,0.5)';ctx.lineWidth=Math.max(1,s*0.025);ctx.beginPath();ctx.moveTo(cx,y+s*0.3);ctx.lineTo(cx,y+s*0.88);ctx.stroke();ctx.beginPath();ctx.moveTo(x+s*0.3,y+s*0.14);ctx.lineTo(cx,y+s*0.32);ctx.lineTo(x+s*0.7,y+s*0.14);ctx.stroke();
     ctx.fillStyle='rgba(255,255,255,0.07)';for(let i=0;i<6;i++)ctx.fillRect(x+s*0.16,y+s*(0.2+i*0.12),s*0.68,1)}
-  else{const im=gearImg(it.img);if(im){const k=Math.min(s/im.naturalWidth,s/im.naturalHeight)*1.15;ctx.drawImage(im,cx-im.naturalWidth*k/2,cy-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}}
+  else{const im=gearTimg(it);if(im){const k=Math.min(s/im.naturalWidth,s/im.naturalHeight)*1.15;ctx.drawImage(im,cx-im.naturalWidth*k/2,cy-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k)}}
   ctx.restore()}
 // ---------- hatch prompt ----------
 // HANGAR_HUB (Justin): the Quarters hangar hatch is a 4-way hub - STORY (the datapad mine map / campaign), START SHIFT (the Pit elevator),
@@ -3349,7 +3353,7 @@ function drawHub(t){pauseHits=[];ctx.fillStyle='rgba(2,3,4,0.84)';ctx.fillRect(0
   if(gearMsg){const a=clamp(4-(performance.now()/1000-gearMsg.t),0,1);ctx.globalAlpha=a;ctx.font=`${fs*0.7}px ${FB}`;ctx.fillStyle='#ff8a6a';ctx.textAlign='center';ctx.fillText(gearMsg.text,W/2,cby-(touch?14:12),W-20);ctx.globalAlpha=1}}
 let hubLast=null;
 // ---------- Quartermaster store ----------
-function drawQM(t){pauseHits=[];const L=gearLayout(),A=L.A;ctx.fillStyle='#050403';ctx.fillRect(0,0,W,H);const im=gearImg('qm');
+function drawQM(t){pauseHits=[];const L=gearLayout(1),A=L.A;ctx.fillStyle='#050403';ctx.fillRect(0,0,W,H);const im=gearImg('qm');
   if(im){const s=Math.max(A.h/576,A.w/1024*0.8),ox=A.x+A.w/2-400*s,oy=A.y+A.h/2-300*s;ctx.drawImage(im,ox,oy,1024*s,576*s);glowAt(ctx,ox+407*s,oy+178*s,26*s,'255,190,90',0.25+0.15*Math.sin(t*3))}
   const fs=clamp(Math.min(A.w,A.h)/22,11,15);ctx.save();ctx.font=`italic ${fs}px ${FB}`;ctx.textAlign='center';const ln='\u201cCredits up front. No refunds, no credit, no exceptions.\u201d';const ls=wrapLines(ln,A.w-24);const y0=A.y+A.h-ls.length*fs*1.3-12;
   const gr=ctx.createLinearGradient(0,y0-20,0,A.y+A.h);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(0,0,0,0.7)');ctx.fillStyle=gr;ctx.fillRect(A.x,y0-20,A.w,A.y+A.h-y0+20);ctx.fillStyle='rgba(255,215,160,0.85)';ls.forEach((l,i)=>ctx.fillText(l,A.x+A.w/2,y0+fs+i*fs*1.3));ctx.restore();
@@ -3358,13 +3362,13 @@ function drawQM(t){pauseHits=[];const L=gearLayout(),A=L.A;ctx.fillStyle='#05040
 function lkFit(L){const A=L.A,s=Math.min(A.h/300,A.w*0.86/186),mx=A.x+(A.w-186*s)/2,my=A.y+6;return{s,ox:mx-196*s,oy:my-32*s}}
 function drawWardrobe(t){pauseHits=[];const L=gearLayout(),A=L.A,F=lkFit(L),g=gearP();ctx.fillStyle='#040302';ctx.fillRect(0,0,W,H);const im=gearImg('lk');if(im)ctx.drawImage(im,F.ox,F.oy,1024*F.s,576*F.s);
   // preview = the selected owned item in the open tab, everything else as equipped
-  const S=gearSel.lk,sel=gearIt(S[gearTab]),pv=sel&&g.own[sel.id]?sel:null,lamp=pv&&pv.cat===0?pv:gearIt(g.lamp),suit=pv&&pv.cat===1?pv:gearIt(g.suit),show=Object.assign({},g.show);if(pv&&pv.cat===2)show[pv.id]=1;
+  const S=gearSel.lk,sel=gearIt(S[gearTab]),pv=sel&&g.own[sel.id]?sel:null,lamp=pv&&pv.cat===0?pv:gearIt(g.lamp),suit=pv&&pv.cat===1?pv:gearIt(g.suit),show=Object.assign({},g.show);if(pv&&pv.cat===2){for(const k in show)if(gearTbase(k)===(pv.base||pv.id))delete show[k];show[pv.id]=1}
   const Q=LK_MIR.map(([x,y])=>[F.ox+x*F.s,F.oy+y*F.s]);ctx.save();ctx.beginPath();Q.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.clip();ctx.fillStyle='rgba(7,7,8,0.82)';ctx.fillRect(Q[0][0],Q[0][1],Q[2][0]-Q[0][0],Q[3][1]-Q[0][1]);
   const mw=Q[1][0]-Q[0][0],bw=mw*1.06,bh=bw*4/3,bx=Q[0][0]-mw*0.03,by=Q[0][1]+8*F.s,k=bw/432,B=gearBust(g.sex,suit.id);
   ctx.save();ctx.translate(bx+bw,by);ctx.scale(-k,k);// mirror: flipped
   if(B)ctx.drawImage(B,0,0,432,576);
-  for(const id in show){const p=LK_TROPH[id],ti=gearIt(id),tim=ti&&gearImg(ti.img);if(!p||!tim)continue;const sc=p[2]?p[2]/tim.naturalWidth:p[3]/tim.naturalHeight,w=tim.naturalWidth*sc,h=tim.naturalHeight*sc;ctx.globalAlpha=0.9;ctx.drawImage(tim,p[0]-w/2,p[1]-h/2,w,h);ctx.globalAlpha=1;
-    if(id==='t_crystal'){ctx.globalCompositeOperation='lighter';glowAt(ctx,p[0],p[1],60,'90,170,255',0.22+0.08*Math.sin(t*2.3));ctx.globalCompositeOperation='source-over'}}
+  for(const id in show){const p=LK_TROPH[gearTbase(id)],ti=gearIt(id),tim=ti&&gearTimg(ti);if(!p||!tim)continue;const sc=p[2]?p[2]/tim.naturalWidth:p[3]/tim.naturalHeight,w=tim.naturalWidth*sc,h=tim.naturalHeight*sc;ctx.globalAlpha=0.9;ctx.drawImage(tim,p[0]-w/2,p[1]-h/2,w,h);ctx.globalAlpha=1;
+    if(gearTbase(id)==='t_crystal'){ctx.globalCompositeOperation='lighter';glowAt(ctx,p[0],p[1],60,ti.tc||'90,170,255',0.22+0.08*Math.sin(t*2.3));ctx.globalCompositeOperation='source-over'}}
   const ln=LK_LENS[g.sex];ctx.globalCompositeOperation='lighter';const fl=0.92+0.06*Math.sin(t*11)*Math.sin(t*3.1);for(const[r,a,c]of[[ln[2]*4.2,0.32,lamp.rgb[0]],[ln[2]*1.6,0.75,lamp.rgb[1]],[ln[2]*0.75,0.95,'255,255,255']]){const lg=ctx.createRadialGradient(ln[0],ln[1],0,ln[0],ln[1],r);lg.addColorStop(0,`rgba(${c},${a*fl})`);lg.addColorStop(1,`rgba(${c},0)`);ctx.fillStyle=lg;ctx.fillRect(ln[0]-r,ln[1]-r,r*2,r*2)}
   ctx.globalCompositeOperation='source-over';ctx.restore();
   {const fy=by+bh*0.72,fd=ctx.createLinearGradient(0,fy,0,by+bh+1);fd.addColorStop(0,'rgba(7,7,8,0)');fd.addColorStop(1,'rgba(7,7,8,1)');ctx.fillStyle=fd;ctx.fillRect(Q[0][0]-2,fy,mw+6,bh*0.28+2);
@@ -3396,9 +3400,33 @@ const PAINT={h:[{id:'ph_black',nm:'GUILD BLACK',rgb:null,sw:'#1d1d1f'},{id:'ph_g
     {id:'pt_chrome',nm:'CHROME',rgb:[232,238,242],cr:200},{id:'pt_mint',nm:'MINT',rgb:[106,240,192],cr:200},{id:'pt_violet',nm:'VIOLET',rgb:[170,120,255],cr:200},{id:'pt_gun',nm:'GUNMETAL',rgb:[96,100,108],cr:200}],
   g:[{id:'pg_mint',nm:'MINT',rgb:null,sw:'#5af0c8'},{id:'pg_ice',nm:'ICE BLUE',rgb:[110,190,255]},{id:'pg_amber',nm:'AMBER',rgb:[255,170,60]},
     {id:'pg_red',nm:'PLASMA RED',rgb:[255,70,60],cr:200},{id:'pg_violet',nm:'VIOLET',rgb:[170,110,255],cr:200},{id:'pg_toxic',nm:'TOXIC GREEN',rgb:[140,255,60],cr:200},{id:'pg_white',nm:'SUN WHITE',rgb:[240,240,225],cr:200}]};
+// QM_TRIPLE (Justin: "triple all of the options for sale in the store ... more colors, in every category"): every Quartermaster category now has 3x its
+// entries - HELMET LAMPS 4->12, JUMPSUITS 4->12, TROPHIES 3->9 (colour-tinted variants of the shard / stinger / fang), PAINT TINS hull / trim / glow 4->12
+// each for sale. Nothing is hand-listed: one named Star Wars palette (hue, sat, light) runs through per-category tone rules, walking the palette with a
+// per-category stride and skipping any name or colour too close to one already in that category. Prices follow the existing curve (lamps 150, suits
+// 250-500, tins 200, trophies 1000; fang variants keep the Pit-boss lock). New ids are qx_*, so old saves and owned items are untouched. The store
+// pages 4 cards at a time (PREV / NEXT, page follows the selection); the workbench swatch rows scroll. Earning rates untouched. Revert: QM_TRIPLE=false
+const QM_TRIPLE=true;
+const QX_PAL='NABOO ROYAL BLUE,222,62,42|TATOOINE DUST,36,38,62|HOTH FROST,198,40,84|MUSTAFAR EMBER,14,88,48|ENDOR MOSS,100,36,32|KAMINO STORM,196,24,56|CORUSCANT DUSK,268,34,42|GEONOSIS RUST,22,58,40|KASHYYYK FERN,124,46,38|BESPIN CLOUD,24,72,74|KYBER BLUE,208,96,58|SITH CRIMSON,354,84,44|JEDI JADE,146,70,48|AMETHYST BLADE,282,66,60|RORI SWAMP,92,42,34|THEED GOLD,44,82,54|GUNGAN TEAL,174,56,44|CARBONITE,212,8,30|BESKAR SILVER,210,10,70|ALDERAAN SKY,204,62,70|TWI\u2019LEK ROSE,330,56,64|MON CALA CORAL,8,68,62|NAL HUTTA OLIVE,68,40,38|SCARIF SURF,186,66,52|CRAIT SALT RED,4,72,46|DATHOMIR NIGHT,300,40,30|JAKKU SAND,42,46,72|LOTHAL WHEAT,52,60,62|UTAPAU BONE,40,24,80|FELUCIA BLOOM,318,70,56'.split('|').map(q=>{const a=q.split(',');return{nm:a[0],h:+a[1],s:a[2]/100,l:a[3]/100}});
+function qxRGB(h,s,l){const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1));return[f(0),f(8),f(4)].map(v=>Math.round(v*255))}
+const qxCl=(v,a,b)=>Math.max(a,Math.min(b,v)),qxHex=c=>'#'+c.map(v=>v.toString(16).padStart(2,'0')).join(''),qxMix=(c,w,a)=>c.map(v=>Math.round(v+(w-v)*a)),qxSlug=n=>n.toLowerCase().replace(/[^a-z]+/g,'');
+// qxGen(how many, palette start, stride (coprime with 30), tone(p) -> rgb or null to skip, existing items in that category, build(p,rgb,i)); vivid categories skip greys
+function qxGen(n,st,sd,tone,old,mk){const out=[],pal=QX_PAL,used=old.slice();for(let j=0;out.length<n&&j<pal.length*3;j++){const p=pal[(st+j*sd)%pal.length],c=tone(p);
+  if(!c||used.some(u=>u.nm===p.nm||Math.hypot(u.c[0]-c[0],u.c[1]-c[1],u.c[2]-c[2])<50))continue;used.push({nm:p.nm,c});out.push(mk(p,c,out.length))}return out}
+const qxHexRGB=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),qxOld=(arr,f)=>arr.map(o=>({nm:o.nm,c:f(o)}));
+if(QM_TRIPLE){const L=GEAR.filter(o=>o.cat===0),S=GEAR.filter(o=>o.cat===1),T=GEAR.filter(o=>o.cat===2);
+  GEAR.push(...qxGen(L.length*2,0,7,p=>p.s<0.5?null:qxRGB(p.h,Math.max(p.s,0.8),qxCl(p.l,0.6,0.72)),qxOld(L,o=>o.rgb[0].split(',').map(Number)),(p,c)=>({id:'qx_l_'+qxSlug(p.nm),cat:0,nm:p.nm,cr:150,rgb:[c.join(','),qxMix(c,255,0.4).join(',')],sw:qxHex(qxMix(c,255,0.2))})));
+  GEAR.push(...qxGen(S.length*2,3,11,p=>qxRGB(p.h,p.s*0.9,qxCl(p.l,0.45,0.7)),qxOld(S,o=>qxHexRGB(o.mul||'#d8d8d4')),(p,c,i)=>({id:'qx_s_'+qxSlug(p.nm),cat:1,nm:p.nm,cr:[250,300,400,500][i%4],mul:qxHex(c),sw:qxHex(c.map(v=>Math.round(v*0.62)))})));
+  const tro=[];for(const b of T){const tw=qxGen(2,T.indexOf(b)*9+11,13,p=>p.s<0.5?null:qxRGB(p.h,Math.max(p.s,0.7),0.55),tro.concat({nm:'',c:[90,170,255]}),(p,c)=>({id:'qx_'+b.id.slice(2)+'_'+qxSlug(p.nm),cat:2,nm:p.nm+' '+b.nm.split(' ').pop(),cr:b.cr,img:b.img,base:b.id,tint:qxHex(c),tc:c.join(','),req:b.req}));tro.push(...tw.map(o=>({nm:o.nm.slice(0,o.nm.lastIndexOf(' ')),c:o.tc.split(',').map(Number)})));GEAR.push(...tw)}
+  const tn={h:p=>qxRGB(p.h,p.s*0.75,qxCl(p.l,0.22,0.6)),t:p=>qxRGB(p.h,Math.max(p.s,0.6),qxCl(p.l,0.45,0.75)),g:p=>p.s<0.5?null:qxRGB(p.h,1,qxCl(p.l,0.55,0.68))};
+  [['h',1,17],['t',2,7],['g',5,11]].forEach(([k,st,sd])=>{const sale=PAINT[k].filter(p=>p.cr).length;PAINT[k].push(...qxGen(sale*2,st,sd,tn[k],qxOld(PAINT[k],p=>p.rgb||qxHexRGB(p.sw)),(p,c)=>({id:'qx_p'+k+'_'+qxSlug(p.nm),nm:p.nm,rgb:c,cr:200})))})}
+// tinted trophy art (hue + saturation from the tint, luminance from the painting), cached; untinted = the original image
+const qxTimgs={};function gearTimg(ti){if(!ti)return null;const im=gearImg(ti.img);if(!im||!ti.tint)return im;let c=qxTimgs[ti.id];if(c)return c;c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;
+  const g=c.getContext('2d');g.drawImage(im,0,0);g.globalCompositeOperation='color';g.fillStyle=ti.tint;g.fillRect(0,0,c.width,c.height);g.globalCompositeOperation='destination-in';g.drawImage(im,0,0);c.naturalWidth=c.width;c.naturalHeight=c.height;return qxTimgs[ti.id]=c}
+function gearTbase(id){const o=gearIt(id);return o&&o.base||id}
 for(const[k]of PAINT_ROWS)for(const p of PAINT[k]){p.row=k;if(!p.sw)p.sw=`rgb(${p.rgb.join(',')})`}
 if(WORKBENCH_PAINT){GEAR_TABS.push('PAINT TINS');for(const[k,lb]of PAINT_ROWS)for(const p of PAINT[k])if(p.cr)GEAR.push({id:p.id,cat:3+'htg'.indexOf(k),nm:(k==='g'?'GLOW':lb)+' \u00b7 '+p.nm,cr:p.cr,sw:p.sw,paint:p})}
-var paintSub=0,paintMask=null,paintCanv=null,paintKey='',benchSel=null,benchRow=0,benchImg=null,paintGlowMemo={k:null,v:null};
+var benchOff={},paintSub=0,paintMask=null,paintCanv=null,paintKey='',benchSel=null,benchRow=0,benchImg=null,paintGlowMemo={k:null,v:null};
 function paintIt(k,id){return PAINT[k].find(p=>p.id===id)}
 function paintOwned(p){return !p.cr||!!gearP().own[p.id]}
 function paintCur(){const s=PROG.paint&&typeof PROG.paint==='object'?PROG.paint:{},o={};for(const[k]of PAINT_ROWS){const p=WORKBENCH_PAINT&&paintIt(k,s[k]);o[k]=p&&paintOwned(p)?p.id:PAINT[k][0].id}return o}
@@ -3427,7 +3455,8 @@ function paintGlowFor(id){const p=paintIt('g',id);if(!p||!p.rgb)return PAINT_GLO
 function paintGlow(){return WORKBENCH_PAINT?paintGlowFor(paintCur().g):PAINT_GLOW_DEF}
 function paintApply(sc){for(const[k]of PAINT_ROWS){const p=paintIt(k,sc[k]);if(!p||!paintOwned(p)){SFX.click();gearSay('You don\u2019t own that tin yet. More tins at the Quartermaster.',1);return false}}
   PROG.paint={h:sc.h,t:sc.t,g:sc.g};saveProg();paintTexFor(sc);if(SFX.ok)SFX.ok();else SFX.click();gearSay(paintIsDef(sc)?'Factory scheme restored: black, hazard yellow, mint.':'Paint applied. Your hauler wears it in the mines.');return true}
-function benchOpen(){benchSel=paintCur();benchRow=0;gearMsg=null}
+function benchOpen(){benchSel=paintCur();benchRow=0;gearMsg=null;benchOff={}}
+function benchSee(k,M){const L=benchSw(k),ci=Math.max(0,L.findIndex(p=>p.id===benchSel[k]));let o=benchOff[k]==null?ci-Math.floor(M/2):benchOff[k];if(ci<o)o=ci;else if(ci>=o+M)o=ci-M+1;return benchOff[k]=Math.max(0,Math.min(o,Math.max(0,L.length-M)))}
 function benchSw(k){return PAINT[k].filter(paintOwned)}
 function benchLayout(){const land=W/H>=1.25,touch=touchMode,rowH=land?clamp(H*0.085,touch?40:30,46):clamp(H*0.07,touch?46:36,54),apH=land?0:(touch?50:40),barH=rowH*3+16+(land?0:apH+8),top=touch?60:52;
   return{land,rowH,barH,apH,top,bar:{x:land?Math.max(8,W*0.08):8,y:H-barH-(land?10:12),w:land?W-Math.max(16,W*0.16):W-16,h:barH}}}
@@ -3452,17 +3481,20 @@ function drawBench(t){pauseHits=[];if(!benchSel)benchOpen();const B=benchLayout(
   const lw=B.land?clamp(R.w*0.17,90,150):clamp(R.w*0.27,84,112),fs=clamp(B.rowH*0.34,10,16),sx0=R.x+8+lw,sw0=R.w-16-lw-(B.land?abw+10:0);
   PAINT_ROWS.forEach(([k,lb],ri)=>{const y=R.y+8+ri*B.rowH,list=benchSw(k),cur=benchSel[k],sp=paintIt(k,cur);
     ctx.textAlign='left';ctx.font=`bold ${fs}px ${FW}`;ctx.fillStyle=benchRow===ri?'#ffd27a':'#e8a33d';ctx.fillText(lb,R.x+12,y+B.rowH*0.48,lw-8);ctx.font=`${fs*0.72}px ${FB}`;ctx.fillStyle='rgba(255,215,160,0.7)';ctx.fillText(sp?sp.nm:'',R.x+12,y+B.rowH*0.48+fs*0.95,lw-8);
-    const n=7,gap=4,sz=Math.min(B.rowH-8,(sw0-gap*(n-1))/n);list.forEach((p,i)=>{const x=sx0+i*(sz+gap),yy=y+(B.rowH-sz)/2,on=p.id===cur;ctx.save();rrect(x,yy,sz,sz,4);ctx.fillStyle=p.sw;ctx.fill();
+    const n=7,gap=4,sz=Math.min(B.rowH-8,(sw0-gap*(n-1))/n),ov=QM_TRIPLE&&list.length+(PAINT[k].length>list.length?1:0)>n,M=ov?n-2:n,o0=ov?(benchOff[k]==null?benchSee(k,M):benchOff[k]):0;
+    if(ov)[[0,'\u2039',-1],[n-1,'\u203a',1]].forEach(([si,ch,d])=>{const x=sx0+si*(sz+gap),yy=y+(B.rowH-sz)/2,can=d<0?o0>0:o0+M<list.length;ctx.save();rrect(x,yy,sz,sz,4);ctx.fillStyle='rgba(40,28,14,0.9)';ctx.fill();ctx.strokeStyle=can?'rgba(255,190,110,0.7)':'rgba(255,190,110,0.2)';ctx.stroke();ctx.font=`bold ${sz*0.6}px ${FW}`;ctx.textAlign='center';ctx.fillStyle=can?'#ffd27a':'rgba(255,190,110,0.3)';ctx.fillText(ch,x+sz/2,yy+sz*0.7);ctx.restore();
+      pauseHits.push({x:x-gap/2,y:yy-2,w:sz+gap,h:sz+4,pad:'bench'+(d<0?'L':'R')+k,act:()=>{SFX.click();benchRow=ri;benchOff[k]=Math.max(0,Math.min(o0+d*M,list.length-M))}})});
+    (ov?list.slice(o0,o0+M):list).forEach((p,i)=>{const x=sx0+(ov?i+1:i)*(sz+gap),yy=y+(B.rowH-sz)/2,on=p.id===cur;ctx.save();rrect(x,yy,sz,sz,4);ctx.fillStyle=p.sw;ctx.fill();
       const sh=ctx.createLinearGradient(x,yy,x,yy+sz);sh.addColorStop(0,'rgba(255,255,255,0.18)');sh.addColorStop(0.5,'rgba(255,255,255,0)');sh.addColorStop(1,'rgba(0,0,0,0.35)');ctx.fillStyle=sh;ctx.fill();
       ctx.strokeStyle=on?'#ffd27a':'rgba(255,190,110,0.3)';ctx.lineWidth=on?2.4:1;ctx.stroke();if(k==='g'){ctx.globalCompositeOperation='lighter';glowAt(ctx,x+sz/2,yy+sz/2,sz*0.4,p.rgb?p.rgb.join(','):'90,240,200',0.5)}ctx.restore();
       pauseHits.push({x:x-gap/2,y:yy-2,w:sz+gap,h:sz+4,paint:p.id,act:()=>{SFX.click();benchRow=ri;benchSel[k]=p.id;gearMsg=null}})});
-    const left=PAINT[k].length-list.length;if(left>0){const x=sx0+list.length*(sz+gap);if(x+sz<sx0+sw0+1){ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle='rgba(255,190,110,0.35)';rrect(x,y+(B.rowH-sz)/2,sz,sz,4);ctx.stroke();ctx.restore();ctx.font=`bold ${Math.max(9,sz*0.3)}px ${FW}`;ctx.textAlign='center';ctx.fillStyle='rgba(255,190,110,0.55)';ctx.fillText('+'+left,x+sz/2,y+B.rowH/2+sz*0.11)}}});
+    const left=PAINT[k].length-list.length;if(left>0&&!ov){const x=sx0+list.length*(sz+gap);if(x+sz<sx0+sw0+1){ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle='rgba(255,190,110,0.35)';rrect(x,y+(B.rowH-sz)/2,sz,sz,4);ctx.stroke();ctx.restore();ctx.font=`bold ${Math.max(9,sz*0.3)}px ${FW}`;ctx.textAlign='center';ctx.fillStyle='rgba(255,190,110,0.55)';ctx.fillText('+'+left,x+sz/2,y+B.rowH/2+sz*0.11)}}});
   const same=PAINT_ROWS.every(([k])=>benchSel[k]===paintCur()[k]),ah=B.land?Math.min(R.h-16,B.rowH*2.2):B.apH;padBtn(B.land?R.x+R.w-abw-8:R.x+8,B.land?R.y+(R.h-ah)/2:R.y+R.h-ah-8,B.land?abw:R.w-16,ah,same?'APPLIED':'APPLY',same?{}:{hot:1,sub:'repaint hauler'},()=>{if(!same)paintApply(benchSel);else SFX.click()});
   if(gearMsg){const a=clamp(4-(performance.now()/1000-gearMsg.t),0,1);if(a<=0)gearMsg=null;else{ctx.globalAlpha=a;ctx.font=`${clamp(fs*0.85,11,14)}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=gearMsg.bad?'#ff8a6a':PAD_MINT;ctx.fillText(gearMsg.text,W/2,R.y-10,W-20);ctx.globalAlpha=1}}
   else if(PAINT_ROWS.some(([k])=>benchSw(k).length<PAINT[k].length)){ctx.font=`${clamp(fs*0.75,10,13)}px ${FB}`;ctx.textAlign='center';ctx.fillStyle='rgba(255,215,160,0.6)';ctx.fillText(gameBeaten?'More tins: 200 CR each at the Quartermaster.':'More tins at the Quartermaster, once the contract is done.',W/2,R.y-10,W-20)}}
 function benchKey(k){if(campPage!=='bench'||!WORKBENCH_PAINT)return false;if(!benchSel)benchOpen();const rk=PAINT_ROWS[benchRow][0],L=benchSw(rk);
   if(k==='arrowup'||k==='w'||k==='arrowdown'||k==='s'||k==='tab'){SFX.click();benchRow=(benchRow+(k==='arrowup'||k==='w'?2:1))%3;return true}
-  if(k==='arrowleft'||k==='a'||k==='arrowright'||k==='d'){let i=L.findIndex(p=>p.id===benchSel[rk]);i=(i+(k==='arrowleft'||k==='a'?-1:1)+L.length)%L.length;SFX.click();benchSel[rk]=L[i].id;return true}
+  if(k==='arrowleft'||k==='a'||k==='arrowright'||k==='d'){let i=L.findIndex(p=>p.id===benchSel[rk]);i=(i+(k==='arrowleft'||k==='a'?-1:1)+L.length)%L.length;SFX.click();benchSel[rk]=L[i].id;if(QM_TRIPLE)benchSee(rk,5);return true}
   if(k==='enter'||k===' '){if(PAINT_ROWS.every(([q])=>benchSel[q]===paintCur()[q]))SFX.click();else paintApply(benchSel);return true}
   if(k==='escape'||k==='backspace'){benchSel=null;gearMsg=null;return false}return false}
 // Quartermaster PAINT TINS tab: a HULL / TRIM / GLOW toggle above the 4 tins
@@ -3634,10 +3666,10 @@ function gearCase(im,cx,by,h,t,glow){const ar=im.naturalWidth/im.naturalHeight,w
   ctx.fillStyle='#6a4f2a';rrect(x-3,y-3,w+6,h+6,r+2);ctx.fill();ctx.strokeStyle='rgba(255,214,140,0.55)';ctx.lineWidth=1;rrect(x-2.5,y-2.5,w+5,h+5,r+2);ctx.stroke();
   ctx.beginPath();rrect(x,y,w,h,r);ctx.clip();ctx.fillStyle='#0b0d10';ctx.fillRect(x,y,w,h);
   const iw=Math.min(w,h*ar),ih=iw/ar;ctx.drawImage(im,cx-iw/2,by-ih,iw,ih);
-  if(glow){ctx.globalCompositeOperation='lighter';glowAt(ctx,cx,by-ih*0.5,h*0.7,'90,170,255',0.22+0.1*Math.sin(t*2.3));ctx.globalCompositeOperation='source-over'}
+  if(glow){ctx.globalCompositeOperation='lighter';glowAt(ctx,cx,by-ih*0.5,h*0.7,(typeof glow==='string'?glow:'90,170,255'),0.22+0.1*Math.sin(t*2.3));ctx.globalCompositeOperation='source-over'}
   const sh=ctx.createLinearGradient(x,y,x+w,y+h);sh.addColorStop(0,'rgba(255,255,255,0.16)');sh.addColorStop(0.35,'rgba(255,255,255,0.02)');sh.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=sh;ctx.fillRect(x,y,w,h);ctx.restore()}
-function gearRoomExtras(t){if(campPage!=='room'&&campPage!=='hatch')return;const F=campArtFit();if(gearMine()){const g=gearP();for(const id in g.show){const p=ROOM_TROPH[id],ti=gearIt(id),im=ti&&gearImg(ti.img);if(!p||!im||!im.naturalWidth)continue;
-  gearCase(im,F.ox+p[0]*F.s,F.oy+p[1]*F.s,p[2]*F.s,t,id==='t_crystal')}}
+function gearRoomExtras(t){if(campPage!=='room'&&campPage!=='hatch')return;const F=campArtFit();if(gearMine()){const g=gearP();for(const id in g.show){const p=ROOM_TROPH[gearTbase(id)],ti=gearIt(id),im=ti&&gearTimg(ti);if(!p||!im||!im.naturalWidth)continue;
+  gearCase(im,F.ox+p[0]*F.s,F.oy+p[1]*F.s,p[2]*F.s,t,gearTbase(id)==='t_crystal'&&(ti.tc||true))}}
   if(campPage==='room'&&gearNewTag()){const sp=CAMP_SPOTS.find(o=>o.id==='hangar');if(sp){const b=campSpotScr(sp,F);gearNewPill(clamp(b.x+b.w-14,24,W-24),clamp(b.y+b.h*0.32,touchMode?84:58,H-20),t)}}}
 // PIK_CREDITS_COMM (Justin): Pik tells you once that Pit credits are spendable. Plays after the first finished Endless Pit shift, or, for saves that already
 // hold credits, at the next shift end or Quarters entry. Two comm boxes (Pik portrait), tap/Enter: first reveals the line, then advances. PROG.pikCr=1 once

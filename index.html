@@ -2341,11 +2341,28 @@ function drawTitle(t){if(state==='pan'){drawPan(t);return}drawStars(t);
 // ================= BOX-ART MENU (MENU_V3_BOXART) =================
 let menuPage='main',menuSel=1,menuHits=[],artC=null,artKey='',logoC=null,logoKey='';
 const MENU_ITEMS=['ABOUT','START','CONTROLS','STAGE SELECT'];
+// SETTINGS_MENU (Justin): the start menu's CONTROLS + ABOUT become one SETTINGS page with tabs CONTROLS (unchanged), ABOUT (story text only; the
+// CHARACTERS / CREATUREPEDIA / ARTWORK tabs now live on the Quarters datapad) and RESET (two-step, danger-styled: erases every progress save key -
+// nm_prog (credits, gear, paint, pedia, comm progress, tour flag, best depth), nm_beaten, nm_hi, nm_msgs - keeps audio levels, reloads to a fresh menu). Revert: SETTINGS_MENU=false
+const SETTINGS_MENU=true,SET_TABS=['controls','story','reset'],SAVE_KEEP=['nm_mute','nm_mv','nm_sv'];let rsStep=0;
+function setOpen(tab){SFX.click();menuPage='settings';aboutTab=tab||'controls';rsStep=0;menuHits=[];if(H<520&&W>H)ap.style.display='none'}
+function setCycle(d){SFX.click();aboutTab=SET_TABS[(Math.max(0,SET_TABS.indexOf(aboutTab))+d+SET_TABS.length)%SET_TABS.length];rsStep=0}
+function saveKeys(){const o=[];try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(/^nm_/.test(k)&&!SAVE_KEEP.includes(k))o.push(k)}}catch(e){}return o}
+function eraseAll(){window.__nmWiped=1;for(const k of saveKeys())try{localStorage.removeItem(k)}catch(e){}try{sessionStorage.setItem('nm_fresh','1')}catch(e){}SFX.click();setTimeout(()=>location.reload(),60)}
+function drawResetTab(x,y,w,h,t){const fs=clamp(Math.min(w/30,h/12),11,17),bh=Math.max(touchMode?52:44,fs*2.8);ctx.textAlign='left';
+  ctx.font=boxFont(fs*1.3);ctx.fillStyle='#ff5a3c';ctx.fillText('\u26a0 ERASE ALL PROGRESS',x,y+fs*1.6);y+=fs*2.4;ctx.font=`${fs}px ${FB}`;ctx.fillStyle='#f0e4cc';
+  for(const l of wrapLines(rsStep?'Are you sure? This wipes this device back to a brand-new game and cannot be undone.':'Wipes every save on this device and starts you over from Mission 1: credits, gear and ship paint, Creaturepedia and archive, crew comm progress, the Quarters tour, campaign unlocks, best scores and best Pit depth. Sound settings are kept.',w)){ctx.fillText(l,x,y+fs);y+=fs*1.45}y+=fs;
+  const btn=(bx,bw,lb,red,act)=>{const pu=red?0.5+0.5*Math.sin(t*4):0;rrect(bx,y,bw,bh,8);ctx.fillStyle=red?`rgba(${150+60*pu},22,14,0.95)`:'rgba(40,22,12,0.9)';ctx.fill();ctx.save();rrect(bx,y,bw,bh,8);ctx.clip();if(red){ctx.fillStyle='rgba(0,0,0,0.22)';for(let k=-bh;k<bw;k+=18){ctx.beginPath();ctx.moveTo(bx+k,y+bh);ctx.lineTo(bx+k+9,y+bh);ctx.lineTo(bx+k+9+bh,y);ctx.lineTo(bx+k+bh,y);ctx.fill()}}ctx.restore();
+    rrect(bx,y,bw,bh,8);ctx.strokeStyle=red?'#ffb09a':'rgba(255,210,31,0.6)';ctx.lineWidth=2;ctx.stroke();ctx.font=boxFont(Math.min(fs*1.1,bh*0.4));ctx.textAlign='center';ctx.fillStyle=red?'#fff':'#ffd21f';ctx.fillText(lb,bx+bw/2,y+bh*0.62);ctx.textAlign='left';menuHits.push({x:bx,y,w:bw,h:bh,rs:lb,act})};
+  if(!rsStep)btn(x,Math.min(w,360),'ERASE ALL PROGRESS',true,()=>{SFX.click();rsStep=1});
+  else{const bw=Math.min((w-12)/2,260);btn(x,bw,'CANCEL',false,()=>{SFX.click();rsStep=0});btn(x+bw+12,bw,'YES, ERASE EVERYTHING',true,eraseAll)}
+  if(!touchMode){ctx.font=`${fs*0.8}px ${FB}`;ctx.fillStyle='rgba(240,220,190,0.5)';ctx.fillText(rsStep?'Y = yes, erase  \u00b7  ESC = cancel':'ENTER = erase all progress',x,y+bh+fs*1.4)}}
+
 const ABOUT_TEXT=['The Trade Federation\u2019s invasion is over, but Naboo still runs on plasma. You are a young miner shipped out to the moons Ohma-D\u2019un and Rori to harvest the glowing crystals that keep Theed\u2019s lights burning.',
   'Fly your mining skiff through twisting tunnels. Hover across open caverns, or drop into burrow mode and drill straight through solid rock. Watch your shields, and watch your drill energy.',
   'But the tremors are getting worse, the creatures in the walls are waking up, and not everyone down here is digging for crystals. Keep your eyes open and uncover the plot hidden in the mines.',
   'An 8-mission campaign, then endless sectors.'];
-const CTRL_KEYS=[['WASD / ARROWS','Steer your skiff'],['SPACE / SHIFT','Switch hover \u21c4 burrow'],['J / Z / CLICK','Fire (cannon locks ±40°)'],['MOUSE','Aim inside the cone'],['P / ESC','Pause · Q quit · S stages'],['ENTER','Next line / continue'],['ESC','Skip a briefing'],['M','Mute / unmute']];
+const CTRL_KEYS=[['WASD / ARROWS','Steer your skiff'],['SPACE / SHIFT','Switch hover \u21c4 burrow'],['J / Z / CLICK','Fire (cannon locks ±40°)'],['MOUSE','Aim inside the cone'],['P / ESC','Pause · Q quit'],['ENTER','Next line / continue'],['ESC','Skip a briefing'],['M','Mute / unmute']];
 const CTRL_TOUCH=[['LEFT THUMB','Steer (virtual stick)'],['FIRE / RIGHT SIDE','Fire belly cannon (aim assist)'],['BURROW / HOVER','Switch drill mode'],['II','Pause'],['TAP','Next line / continue']];
 // ABOUT_V2_CHARS / UNLOCKS_V1: story, character dossiers and creaturepedia (each entry unlocks on first contact)
 let aboutTab='story',dossier=0,gameBeaten=(()=>{try{return localStorage.getItem('nm_beaten')==='1'}catch(e){return false}})();
@@ -2369,7 +2386,7 @@ const CREATURE_IDS=CREATURES.map(c=>c.id);
 function unlockAllProg(p){for(const k of ['F','D','R','Vm','V'])p.d[k]=1;for(const k of CREATURE_IDS)p.c[k]=1}
 const PROG=(()=>{let p=null;try{p=JSON.parse(localStorage.getItem('nm_prog')||'null')}catch(e){}if(!p||typeof p!=='object')p={};p.d=p.d||{};p.c=p.c||{};p.best=p.best||{};p.deep=p.deep||0;
   if(gameBeaten)unlockAllProg(p);/* migration: players who already beat the campaign get everything */return p})();
-function saveProg(){try{localStorage.setItem('nm_prog',JSON.stringify(PROG))}catch(e){}}
+function saveProg(){if(window.__nmWiped)return;try{localStorage.setItem('nm_prog',JSON.stringify(PROG))}catch(e){}}
 // QUARTERS_TOUR (Justin): after Mission 1, Survey Chief Vosh (still masked) walks the new miner through Quarters in tap-to-advance comm boxes that
 // spotlight the hatch, locker, workbench, cot and comm station (Quartermaster only once it's unlocked). No skip; Mission 2 is gated until the
 // tour is done (every launch path funnels through startLevel), once per save; saves from before the tour count as done. Revert: QUARTERS_TOUR=false
@@ -2495,9 +2512,9 @@ function stageInfo(lv){if(lv>8&&ENDLESS_PIT)return{num:'\u221e',name:'THE ENDLES
 let stageSel=0,pausePage='main',pauseHits=[],pausePick=0,lockFlash=-9;
 function launchStage(n){campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;if(ENDLESS_PIT&&n===9&&PROG.pitAt>9)n=PROG.pitAt;level=n;startLevel()}
 function lockIcon(x,y,s,col){ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=Math.max(1.5,s*0.16);ctx.beginPath();ctx.arc(x+s/2,y+s*0.42,s*0.27,Math.PI,0);ctx.stroke();rrect(x+s*0.12,y+s*0.42,s*0.76,s*0.58,s*0.1);ctx.fill();ctx.restore()}
-function aboutTabs(cx,y,cw,t,TL){const th=Math.max(clamp(cw/18,24,34),touchMode&&cw<560?44:0);let fs=clamp(cw/18,24,34)*0.5;const tabs=(TL||ABOUT_TABS).map(id=>[id,{story:'STORY',chars:TL?'PROFILES':'CHARACTERS',creatures:cw>640?'CREATUREPEDIA':'CREATURES',art:'ARTWORK',msgs:campDesk?(cw>560?'MISSION LOGS':'LOGS'):'MESSAGES',scans:cw>560?'FOUND SCANS':'SCANS'}[id]]);let x=cx;
+function aboutTabs(cx,y,cw,t,TL,LB){const th=Math.max(clamp(cw/18,24,34),touchMode&&cw<560?44:0);let fs=clamp(cw/18,24,34)*0.5;const tabs=(TL||ABOUT_TABS).map(id=>[id,LB&&LB[id]||{story:'STORY',chars:TL?'PROFILES':'CHARACTERS',creatures:cw>640?'CREATUREPEDIA':'CREATURES',art:'ARTWORK',msgs:campDesk?(cw>560?'MISSION LOGS':'LOGS'):'MESSAGES',scans:cw>560?'FOUND SCANS':'SCANS'}[id]]);let x=cx;
   ctx.font=boxFont(fs);{const tot=()=>tabs.reduce((a,[,lb])=>a+ctx.measureText(lb).width+fs*2.2+10,-10);while(tot()>cw&&fs>8){fs-=0.5;ctx.font=boxFont(fs)}}const gapX=fs*1.1;for(const[id,lb]of tabs){const lk=false,w=ctx.measureText(lb).width+gapX*2+(lk?fs*1.4:0),on=aboutTab===id;rrect(x,y,w,th,5);ctx.fillStyle=on?'#ffd21f':'rgba(40,22,12,0.85)';ctx.fill();ctx.strokeStyle=on?'#3a0a04':'rgba(255,210,31,0.6)';ctx.lineWidth=1.5;ctx.stroke();
-    ctx.fillStyle=on?'#3a0a04':'#ffd21f';ctx.textAlign='left';ctx.fillText(lb,x+fs*1.1,y+th*0.68);if(lk)lockIcon(x+w-fs*2.2,y+th*0.27,fs*1.0,on?'#3a0a04':'#ffd21f');const hp=touchMode?Math.max(0,(44-th)/2):0;menuHits.push({x,y:y-hp,w,h:th+hp*2,tab:id,act:()=>{SFX.click();aboutTab=id;artPage=0;msgScroll=0}});x+=w+10}
+    ctx.fillStyle=on?'#3a0a04':'#ffd21f';ctx.textAlign='left';ctx.fillText(lb,x+fs*1.1,y+th*0.68);if(lk)lockIcon(x+w-fs*2.2,y+th*0.27,fs*1.0,on?'#3a0a04':'#ffd21f');const hp=touchMode?Math.max(0,(44-th)/2):0;menuHits.push({x,y:y-hp,w,h:th+hp*2,tab:id,act:()=>{SFX.click();aboutTab=id;artPage=0;msgScroll=0;rsStep=0}});x+=w+10}
   return y+th+Math.max(10,th*0.45)}
 function drawPortraitCard(d,x,y,w,h,t,locked){ctx.save();rrect(x,y,w,h,6);ctx.fillStyle='#0b0908';ctx.fill();ctx.clip();
   if(locked){const g=ctx.createLinearGradient(0,y,0,y+h);g.addColorStop(0,'#1a1714');g.addColorStop(1,'#0c0a09');ctx.fillStyle=g;ctx.fillRect(x,y,w,h);
@@ -2629,13 +2646,16 @@ function stageButton(x,y,w,h,sel,t){const lockedB=!gameBeaten,sh=performance.now
   const twoL=h>=36;const ly=twoL?y+h*0.42:y+h/2;lockIcon(lx,ly-ls*0.62,ls,sel?'rgba(255,225,150,0.85)':'rgba(198,208,220,0.6)');ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillStyle=sel?'rgba(255,233,168,0.85)':'rgba(198,208,220,0.6)';ctx.fillText('STAGE SELECT',lx+ls+fs*0.45,ly+1);
   if(twoL){ctx.font=`${cs}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=sh<1.2?'#ffd27a':'rgba(200,215,230,0.55)';ctx.fillText('Beat the campaign to unlock',x+w/2,y+h*0.78)}ctx.textBaseline='alphabetic';ctx.restore()}
 function qMenu(){return BASECAMP_V1&&campOn()}/* after Quarters unlocks: START -> QUARTERS, STAGE SELECT moves into Quarters (mission board) */
-function menuAct(i){unlockAudio();menuSel=i;const it=MENU_ITEMS[i];if(it==='START'){if(qMenu()){SFX.click();campOpen('menu');return}startGame();return}if(it==='STAGE SELECT'&&qMenu())return;SFX.click();if(it==='STAGE SELECT'&&!gameBeaten){lockFlash=performance.now()/1000;return}if(it==='STAGE SELECT'){menuPage='stages';stageSel=clamp(stageSel,0,8);menuHits=[];if(H<520&&W>H)ap.style.display='none';return}menuPage=it==='ABOUT'?'about':'controls';if(it==='ABOUT')aboutTab='story';menuHits=[];if(H<520&&W>H)ap.style.display='none'}
-function menuBack(){if(campStageRet&&menuPage==='stages'){SFX.click();campStageRet=false;artView=-1;stageCap=9;campOpen(QUARTERS_HATCH?campStageFrom:'menu');return}SFX.click();artView=-1;menuPage='main';menuHits=[];if(state==='menu')ap.style.display='flex'}
+function menuAct(i){unlockAudio();menuSel=i;const it=MENU_ITEMS[i];if(it==='START'){if(qMenu()){SFX.click();campOpen('menu');return}startGame();return}if(it==='STAGE SELECT'&&qMenu())return;SFX.click();if(it==='STAGE SELECT'&&!gameBeaten){lockFlash=performance.now()/1000;return}if(it==='STAGE SELECT'){menuPage='stages';stageSel=clamp(stageSel,0,8);menuHits=[];if(H<520&&W>H)ap.style.display='none';return}if(SETTINGS_MENU){setOpen(it==='ABOUT'?'story':'controls');return}menuPage=it==='ABOUT'?'about':'controls';if(it==='ABOUT')aboutTab='story';menuHits=[];if(H<520&&W>H)ap.style.display='none'}
+function menuBack(){if(campStageRet&&menuPage==='stages'){SFX.click();campStageRet=false;artView=-1;stageCap=9;campOpen(QUARTERS_HATCH?campStageFrom:'menu');return}SFX.click();artView=-1;if(menuPage==='settings'){aboutTab='story';rsStep=0}menuPage='main';menuHits=[];if(state==='menu')ap.style.display='flex'}
 function menuMove(d){menuSel=menuSel===3?(d<0?1:1):(menuSel+d+3)%3;SFX.click()}
 function menuVert(d){if(qMenu()){if(menuSel===3)menuSel=1;return}menuSel=d>0?3:(menuSel===3?1:menuSel);SFX.click()}
 function menuKey(k){if(menuPage==='main'&&posterOn()){pmKeyNav(k);return}if(menuPage==='main'){if(k==='arrowleft'||k==='a')menuMove(-1);else if(k==='arrowright'||k==='d')menuMove(1);else if(k==='arrowup'||k==='w')menuVert(-1);else if(k==='arrowdown'||k==='s')menuVert(1);else if(k==='tab'){menuSel=(menuSel+1)%(qMenu()?3:4);SFX.click()}else if(k==='enter'||k===' ')menuAct(menuSel)}
   else if(menuPage==='stages'&&(k==='arrowup'||k==='w'||k==='arrowdown'||k==='s')){SFX.click();stageSel=(stageSel+(k==='arrowup'||k==='w'?-1:1)+9)%9}
   else if(menuPage==='stages'&&(k==='enter'||k===' ')){const lv=stageSel<8?stageSel+1:9;QUARTERS_HATCH?hatchPick(lv):launchStage(lv)}
+  else if(menuPage==='settings'&&(k==='tab'||k==='c'||k==='arrowright'||k==='d'||k==='arrowleft'||k==='a'))setCycle(k==='arrowleft'||k==='a'?-1:1)
+  else if(menuPage==='settings'&&aboutTab==='reset'&&rsStep&&(k==='escape'||k==='backspace')){SFX.click();rsStep=0}
+  else if(menuPage==='settings'&&aboutTab==='reset'&&(k==='enter'||k===' '||k==='y')){if(!rsStep&&k!=='y'){SFX.click();rsStep=1}else if(rsStep&&k==='y')eraseAll()}
   else if(menuPage==='about'&&artView>=0)galKey(k)
   else if(menuPage==='about'&&(k==='tab'||k==='c')){SFX.click();const tb=ABOUT_TABS;aboutTab=tb[(tb.indexOf(aboutTab)+1)%tb.length];artPage=0}
   else if(menuPage==='about'&&aboutTab==='art'&&(k==='arrowleft'||k==='a'||k==='arrowright'||k==='d'||k==='arrowup'||k==='w'||k==='arrowdown'||k==='s'))artGridKey(k)
@@ -2762,12 +2782,13 @@ const POSTER_ART={w:720,h:1280,titleBot:1108,slotY:1046,slotX0:140,slotX1:580};/
 const posterImg=new Image();if(POSTER_MENU)posterImg.src=POSTER_MENU_SRC;
 let pmSel=0,pmLockT=-9,pmBlur=null;
 function posterOn(){return POSTER_MENU&&posterImg.complete&&posterImg.naturalWidth>0}
-function pmItems(){const it=[{id:'story',lab:'STORY START'},{id:'shift',lab:'SHIFT START',lock:!gameBeaten}];if(qMenu())it.push({id:'quarters',lab:'QUARTERS'});it.push({id:'about',lab:'ABOUT'},{id:'controls',lab:'CONTROLS'});return it}
+function pmItems(){const it=[{id:'story',lab:'STORY START'},{id:'shift',lab:'SHIFT START',lock:!gameBeaten}];if(qMenu())it.push({id:'quarters',lab:'QUARTERS'});if(SETTINGS_MENU)it.push({id:'settings',lab:'SETTINGS'});else it.push({id:'about',lab:'ABOUT'},{id:'controls',lab:'CONTROLS'});return it}
 // STORY START: Mission 1 again (saved progress, unlocks, credits and the Pit save are kept). SHIFT START: straight into the Endless Pit (resumes the Pit save), after the campaign is beaten
 function pmAct(id){unlockAudio();const k=pmItems().findIndex(o=>o.id===id);if(k>=0)pmSel=k;
   if(id==='story'){startGame();return}
   if(id==='shift'){if(!gameBeaten){SFX.click();pmLockT=performance.now()/1000;return}launchStage(9);return}
   if(id==='quarters'){if(!qMenu())return;SFX.click();campOpen('menu');return}
+  if(id==='settings'){setOpen('controls');return}
   if(id==='about'||id==='controls')menuAct(MENU_ITEMS.indexOf(id.toUpperCase()))}
 function pmKeyNav(k){const L=pmItems(),n=L.length;pmSel=clamp(pmSel,0,n-1);
   if(k==='arrowup'||k==='w'||k==='arrowleft'||k==='a'){pmSel=(pmSel+n-1)%n;SFX.click()}
@@ -2812,7 +2833,7 @@ function drawMainMenu(t){if(posterOn()){drawPosterMenu(t);return}drawStars(t);dr
   const gap=clamp(W*0.025,10,26),bh=clamp(H*0.075,38,56),bw=Math.min(210,(W-gap*2-28)/3);const tot=bw*3+gap*2,x0=(W-tot)/2;
   const g2=H<430?7:clamp(gap*0.7,10,18),bh2=H<430?Math.max(34,bh*0.9):bh,sw=Math.min(W-28,Math.max(bw*1.3,236)),sx=(W-sw)/2;
   const lo=shipY+sz*0.55,hiY=H-apH-bh-g2-bh2-(H<520?26:44);const yb=Math.max(lo,Math.min(hiY,lerp(lo,hiY,H>W?0.22:0.4)));
-  const qm=qMenu();MENU_ITEMS.forEach((lab,i)=>{if(i>2)return;const x=x0+i*(bw+gap);menuButton(x,yb,bw,bh,qm&&lab==='START'?'QUARTERS':lab,menuSel===i,t,lab==='START');menuHits.push({x:x-6,y:yb-6,w:bw+12,h:bh+12,i,act:()=>menuAct(i)})});
+  const qm=qMenu();MENU_ITEMS.forEach((lab,i)=>{if(i>2)return;const x=x0+i*(bw+gap);menuButton(x,yb,bw,bh,qm&&lab==='START'?'QUARTERS':SETTINGS_MENU&&lab==='ABOUT'?'SETTINGS':lab,menuSel===i,t,lab==='START');menuHits.push({x:x-6,y:yb-6,w:bw+12,h:bh+12,i,act:()=>menuAct(i)})});
   const sy=qm?yb+bh-bh2+4:yb+bh+g2;if(!qm){stageButton(sx,sy,sw,bh2,menuSel===3,t);menuHits.push({x:sx-6,y:sy-4,w:sw+12,h:bh2+8,i:3,act:()=>menuAct(3)})}
   ctx.textAlign='center';ctx.fillStyle='#ffd27a';ctx.font=`bold ${H<520?13:15}px ${FB}`;ctx.fillText('HIGH SCORE  '+hi,W/2,sy+bh2+(H<520?18:26));
   if(!touchMode&&H>=520){ctx.font=`14px ${FB}`;ctx.fillStyle='rgba(200,220,240,0.6)';ctx.fillText('\u2190 \u2192 \u2191 \u2193  select     ENTER  confirm',W/2,sy+bh2+48)}}
@@ -2885,14 +2906,15 @@ function padResumeRow(cx,cw,y,hdrW,hdr,bh,t,bs,land){const rh=Math.max(touchMode
 function drawMenu(t){if(menuPage==='main'){drawMainMenu(t);return}if(DATAPAD_SELECT&&menuPage==='stages'){drawMineDP(t,lv=>QUARTERS_HATCH?hatchPick(lv):launchStage(lv),menuBack);menuHits=pauseHits;pauseHits=[];dpLast.ctx='menu';return}const L=boxLayout();menuHits=[];drawBoxShell(L,t);const{ix,iy,iw,ih,hh,sb,ay,ah,fy,fh}=L;
   {// "back of the box" page
     drawArtScene(L,t);const top=iy+hh+sb+1;ctx.fillStyle='rgba(6,4,12,0.86)';ctx.fillRect(ix,top,iw,iy+ih-top);ctx.fillStyle='rgba(6,4,12,0.35)';ctx.fillRect(ix,top,iw,iy+ih-top);
-    const pad=clamp(iw*0.05,14,40),avW=iw-pad*2,bottom=iy+ih-12;const title=menuPage==='about'?'ABOUT THE GAME':menuPage==='stages'?'STAGE SELECT':'CONTROLS';
+    const pad=clamp(iw*0.05,14,40),avW=iw-pad*2,bottom=iy+ih-12;const SP=menuPage==='settings',pg=SP?{story:'about'}[aboutTab]||aboutTab:menuPage,title=SP?'SETTINGS':menuPage==='about'?'ABOUT THE GAME':menuPage==='stages'?'STAGE SELECT':'CONTROLS';
     const tf=clamp(Math.min(iw/14,(bottom-top)/9),18,40);const backH=clamp(tf*1.15,30,46),bw=clamp(tf*4.2,96,170);
-    const cw0=Math.min(avW,menuPage==='controls'?860:760),cx=ix+(iw-cw0)/2;let y=top+tf*0.5+backH*0.5+tf*0.35;
+    const cw0=Math.min(avW,(SP||pg==='controls')?860:760),cx=ix+(iw-cw0)/2;let y=top+tf*0.5+backH*0.5+tf*0.35;
     ctx.font=boxFont(tf);const tfT=Math.min(tf,tf*(cw0-bw-14)/ctx.measureText(title).width);ctx.font=boxFont(tfT);ctx.textAlign='left';ctx.fillStyle='#3a0a04';ctx.fillText(title,cx+3,y+3);ctx.fillStyle='#ffd21f';ctx.fillText(title,cx,y);const tw=ctx.measureText(title).width;
     const bxb=cx+cw0-bw,byb=y-tf*0.72-(backH-tf*0.72)/2;chunkyButton(bxb,byb,bw,backH,'\u25c0 BACK',true,t,true,false);menuHits.push({x:bxb-6,y:byb-6,w:bw+12,h:backH+12,act:menuBack});
     ctx.fillStyle='#e8571c';ctx.fillRect(cx,y+8,Math.min(cw0-bw-12,tw+40),4);ctx.fillStyle='#ffd21f';ctx.fillRect(cx,y+13,Math.min(cw0-bw-12,tw+40)*0.6,2);y+=8+15+Math.max(6,tf*0.3);
-    const avail=bottom-y;ctx.textAlign='left';
-    if(menuPage==='about'){y=aboutTabs(cx,y,cw0,t);if(aboutTab==='art')drawArtwork(cx,y,cw0,bottom-y,t);else if(aboutTab==='chars')drawCharacters(cx,y,cw0,bottom-y,t);else if(aboutTab==='creatures')drawCreatures(cx,y,cw0,bottom-y,t);else{const avail=bottom-y;const fit=(cols,fs)=>{const colW=(cw0-(cols-1)*24)/cols;ctx.font=`${fs}px ${FB}`;const lines=[];ABOUT_TEXT.forEach((p,pi)=>{wrapLines(p,colW).forEach(l=>lines.push([l,pi]));lines.push(['',pi])});lines.pop();let split=lines.length;if(cols===2){let bd=1e9;lines.forEach((l,i)=>{if(!l[0]&&Math.abs(i-lines.length/2)<bd){bd=Math.abs(i-lines.length/2);split=i}})}const rows=cols===2?Math.max(split,lines.length-split-1):lines.length;return{lines,colW,split,h:rows*fs*1.42}};
+    let avail=bottom-y;ctx.textAlign='left';
+    if(SP){y=aboutTabs(cx,y,cw0,t,SET_TABS,{story:'ABOUT',controls:'CONTROLS',reset:'RESET'})+6;avail=bottom-y}
+    if(pg==='reset')drawResetTab(cx,y,cw0,bottom-y,t);else if(pg==='about'){if(!SP)y=aboutTabs(cx,y,cw0,t);if(aboutTab==='art')drawArtwork(cx,y,cw0,bottom-y,t);else if(aboutTab==='chars')drawCharacters(cx,y,cw0,bottom-y,t);else if(aboutTab==='creatures')drawCreatures(cx,y,cw0,bottom-y,t);else{const avail=bottom-y;const fit=(cols,fs)=>{const colW=(cw0-(cols-1)*24)/cols;ctx.font=`${fs}px ${FB}`;const lines=[];ABOUT_TEXT.forEach((p,pi)=>{wrapLines(p,colW).forEach(l=>lines.push([l,pi]));lines.push(['',pi])});lines.pop();let split=lines.length;if(cols===2){let bd=1e9;lines.forEach((l,i)=>{if(!l[0]&&Math.abs(i-lines.length/2)<bd){bd=Math.abs(i-lines.length/2);split=i}})}const rows=cols===2?Math.max(split,lines.length-split-1):lines.length;return{lines,colW,split,h:rows*fs*1.42}};
       let best=null;for(let fs=clamp(Math.min(iw/30,avail/13),12,20);fs>=8.5;fs-=0.5){for(const cols of cw0>560?[1,2]:[1]){const r=fit(cols,fs);if(r.h<=avail){best={...r,cols,fs};break}}if(best)break}
       if(!best){const c2=cw0>560?2:1;best={...fit(c2,8.5),cols:c2,fs:8.5}}const{lines,colW,cols,fs,split}=best;
       lines.forEach(([l,pi],i)=>{if(cols===2&&i===split)return;const c=cols===2&&i>split?1:0,r=c?i-split-1:i;ctx.fillStyle=pi===3?'#8fc':'#f0e4cc';ctx.font=(pi===3?'italic bold ':'')+`${fs}px ${FB}`;ctx.fillText(l,cx+c*(colW+24),y+fs+r*fs*1.42)})}}
@@ -3997,6 +4019,8 @@ function frame(now){const dt=Math.min(0.033,(now-lastT)/1000);lastT=now;const t=
 resize();
 const fontsReady=(document.fonts&&document.fonts.load)?Promise.race([Promise.all([`16px ${FB}`,`bold 16px ${FB}`,`16px ${FW}`,`bold 16px ${FT}`].map(f=>document.fonts.load(f).catch(()=>null))).then(()=>document.fonts.ready),new Promise(r=>setTimeout(r,3000))]):Promise.resolve();
 fontsReady.then(()=>{renderCrawl();lastT=performance.now();requestAnimationFrame(frame)});
+// SETTINGS_MENU: after ERASE ALL PROGRESS the reload lands straight on a fresh start menu (skips the gate + crawl once)
+if(SETTINGS_MENU)try{if(sessionStorage.getItem('nm_fresh')){sessionStorage.removeItem('nm_fresh');setState('menu')}}catch(e){}
 // test hooks
 window.NM={get state(){return state},get ship(){return ship},get mobs(){return mobs},get items(){return items},get cracks(){return cracks},get map(){return map},get MW(){return MW},get got(){return got},get need(){return need},get crystalPlan(){return crystalPlan},get relayPath(){return relayPath},get explorer(){return explorer},get timeMax(){return timeMax},get timeMax(){return timeMax},get pad(){return[padX,padY]},get level(){return level},get score(){return score},
   setLevel(l){level=l},startGame,startLevel,trySpawn,setState,T,setMode,giveCrystals(n){got+=n},get intel(){return[intelGot,intelTotal,intelNeed]},get rescue(){return[rescued,rescueNeed]},get miners(){return miners},get brief(){return[briefIdx,cfg&&cfg.brief.length]},get epi(){return epiIdx},get comm(){return comm},get leader(){return leaderRevealed},get timeLeft(){return timeLeft},get padMode(){return typeof padMode!=='undefined'&&padMode},get music(){return Music.cur&&Music.cur.name},get ac(){return ac&&ac.state},get lightFrames(){return lightFrames},get cam(){return lastCam},lightC,get boss(){return boss},get prog(){return PROG},launchStage,get crates(){return[cratesGot,cratesNeed,cratesTotal]},get debrief(){return[debIdx,cfg&&cfg.debrief?cfg.debrief.length:0]}};

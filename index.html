@@ -1369,7 +1369,10 @@ function briefNext(){if(state!=='briefing')return;SFX.click();if(briefIdx<cfg.br
 function debNext(){if(state!=='debrief')return;SFX.click();const L=cfg.debrief;if(debIdx<L.length&&debT*55<L[debIdx][1].length){debT=999;return}debIdx++;debT=0;if(debIdx>=L.length)endDebrief()}
 function endDebrief(){if(state!=='debrief')return;level++;startLevel()}
 function endBriefing(cine){if(COCKPIT_CINE&&cine&&state==='briefing'){pitBegin();return}if(arr)arrEnd();banner=4;setState('play');lvStats={t0:gameT,kills0:kills,s0:lvStats.s0!=null?lvStats.s0:score}}
-function advance(){if(state==='over'){setState('menu');return}
+// STORY_FAIL_MAP (Justin): a failed story mission no longer dumps you on the start menu - after MISSION FAILED, the next input opens the hangar hub's
+// STORY datapad mine map with the failed mission selected, so you can jump straight back in. Pit runs keep their own flow. Revert: STORY_FAIL_MAP=false
+const STORY_FAIL_MAP=true;
+function advance(){if(state==='over'){if(STORY_FAIL_MAP&&level<=8&&typeof campHatch==='function'){const lv=level;campFrom='menu';campHatch();stageSel=clamp(lv-1,0,Math.max(0,stageCap-1));return}setState('menu');return}
   if(state==='levelDone'){if(level===1&&qtNeed()){campOpen('done');return}if(level===8){markBeaten();setState('epilogue');return}if(level<=8&&cfg.debrief&&cfg.debrief.length){setState('debrief');return}level++;startLevel();return}
   if(state==='debrief'){debNext();return}
   if(state==='epilogue'){if(epiIdx<EPILOGUE.length-1){epiIdx++;epiT=0;SFX.click();return}level++;startLevel()}}

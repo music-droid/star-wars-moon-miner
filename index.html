@@ -3266,15 +3266,19 @@ let rival=null,rivBet=null,rivTexC=null,rivPorImg=null;
 // RIVAL_DAMAGE (Justin): Varro is no longer immune. Bug bites, acid globs, rockfalls and gas blasts spin him out: he stalls (stall s x hit weight), loses back tiles of
 // progress, sparks and smokes, then recovers (never dies). Bugs closer to him than to you (within lure tiles) go for him. One table drives it. Revert: RIVAL_DAMAGE=false
 const RIVAL_DAMAGE=true,RIVAL_HIT={stall:1.1,back:0.7,cd:1.2,lure:4,r:16,lines:['Get these bugs off my hull!','Kriff! That one bit.','Not a scratch. Mostly.','Your bugs, Guild? Figures.']};
-function rivalHit(k){if(!RIVAL_DAMAGE||!rival||!rivBet||!rivBet.done||rival.fin||rival.hcd>0)return false;k=clamp(k||1,0.5,1.5);rival.hcd=RIVAL_HIT.cd;rival.so=RIVAL_HIT.stall*k;rival.spv=(Math.random()<0.5?-1:1)*rnd(10,14);
-  rival.i=Math.max(0,rival.i-RIVAL_HIT.back*k);rival.hits=(rival.hits||0)+1;rival.hf=0.25;
+// RIVAL_SOFTHIT (Justin, M8 iPhone playtest: Vosh got swarmed at the start and never left the line): a monster/hazard hit is now only a minor slowdown -
+// slow x pace for dur s with sparks + flash, no spin-out, no knockback; iframe s of immunity (bugs stop homing and are shoved aside, never body-block him);
+// if he makes no progress for stuck s he is nudged nudge tiles along his path (plug tiles ahead broken). Revert: RIVAL_SOFTHIT=false (old spin-out stall)
+const RIVAL_SOFTHIT=true,SOFTHIT={slow:0.75,dur:0.65,iframe:1.5,stuck:2,nudge:2.5};
+function rivalHit(k){if(!RIVAL_DAMAGE||!rival||!rivBet||!rivBet.done||rival.fin||rival.hcd>0)return false;k=clamp(k||1,0.5,1.5);if(RIVAL_SOFTHIT){rival.hcd=SOFTHIT.iframe;rival.sl=SOFTHIT.dur}else{rival.hcd=RIVAL_HIT.cd;rival.so=RIVAL_HIT.stall*k;rival.spv=(Math.random()<0.5?-1:1)*rnd(10,14);
+  rival.i=Math.max(0,rival.i-RIVAL_HIT.back*k)}rival.hits=(rival.hits||0)+1;rival.hf=0.25;
   for(let q=0;q<16;q++){const a=Math.random()*6.283,v=rnd(60,200);parts.push({x:rival.x,y:rival.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.25,0.5),max:0.5,c:q%3?'#ffd27a':'#fff4c8',s:rnd(1.5,2.6),drag:3,g:1})}
   if(Math.abs(rival.x-ship.x)<W&&Math.abs(rival.y-ship.y)<H)SFX.crack();if(!rival.cap&&Math.random()<0.6)rivalSay((L=>L[(Math.random()*L.length)|0])(rivL().hit||RIVAL_HIT.lines));return true}
-function rivalDmgTick(dt){rival.hcd=Math.max(0,(rival.hcd||0)-dt);rival.hf=Math.max(0,(rival.hf||0)-dt);
+function rivalDmgTick(dt){rival.hcd=Math.max(0,(rival.hcd||0)-dt);rival.sl=Math.max(0,(rival.sl||0)-dt);rival.hf=Math.max(0,(rival.hf||0)-dt);
   if(rival.so>0){rival.so-=dt;rival.spa=(rival.spa||0)+rival.spv*dt;rival.spv*=Math.exp(-1.8*dt);if(Math.random()<dt*24)parts.push({x:rival.x+rnd(-8,8),y:rival.y+rnd(-8,8),vx:rnd(-15,15),vy:rnd(-35,-10),life:0.9,max:0.9,c:Math.random()<0.5?'rgba(70,70,74,0.6)':'rgba(120,110,100,0.5)',s:rnd(3,6),drag:0.8})}
   else if(rival.spa){let a=rival.spa%6.283;if(a>Math.PI)a-=6.283;if(a<-Math.PI)a+=6.283;a*=Math.exp(-8*dt);rival.spa=Math.abs(a)<0.01?0:a}
   if(state!=='play'||rival.fin)return;for(const m of mobs){if(m.dead||m.dormant||m.asleep||m.type==='boss')continue;const dx=m.x-rival.x,dy=m.y-rival.y,d=Math.hypot(dx,dy)||1;
-    if(d<m.r+RIVAL_HIT.r&&rivalHit(MOB[m.type].dmg/12)){m.vx=dx/d*160;m.vy=dy/d*160;m.stun=0.7;m.lunge=0;m.wind=0}}}
+    if(d<m.r+RIVAL_HIT.r&&(rivalHit(MOB[m.type].dmg/12)||RIVAL_SOFTHIT)){m.vx=dx/d*160;m.vy=dy/d*160;m.stun=0.7;m.lunge=0;m.wind=0}}}
 // RIVAL_SHOVE (Justin): when Varro's hull meets yours with rock behind you it is a deliberate SHOVE, not a bump: sometimes he swerves in on purpose (wind s), then an
 // impact flash, rock chips and dust burst off the wall, your ship jolts, twists and is wedged flush against the rock for hold s, and he gloats. Pushes are collision-safe
 // and an unstick pass frees you if anything ever leaves the hull inside rock (burrowing still works). Revert: RIVAL_SHOVE=false (old bump)
@@ -3301,7 +3305,7 @@ function rivalGrind(dt,nx,ny){rival.gr=GRIND.hold;const k=Math.exp(-GRIND.drag*d
   for(let q=0;q<GRIND.sparks;q++){const v=rnd(60,180);parts.push({x:cx+rnd(-3,3),y:cy+rnd(-3,3),vx:tx*v*sd*(Math.random()<0.3?-1:1)+rnd(-40,40),vy:ty*v*sd*(Math.random()<0.3?-1:1)+rnd(-40,40),life:rnd(0.15,0.35),max:0.35,c:Math.random()<0.6?'#ffd9a0':'#ffb060',s:rnd(1.3,2.8),drag:3,g:1})}
   if(Math.random()<dt*6)parts.push({x:cx,y:cy,vx:rnd(-15,15),vy:rnd(-15,15),life:0.5,max:0.5,c:'rgba(150,140,130,0.45)',s:rnd(2,3.5),drag:2});shake=Math.max(shake,2.5);
   if(!rival.bumped){rivalSay(rivL().bump);rival.bumped=1}}
-function rivalLure(m,d,spd){if(!RIVAL_DAMAGE||!rival||!rivalOn()||rival.fin||!rivBet||!rivBet.done||m.asleep)return null;const rx=rival.x-m.x,ry=rival.y-m.y,rd=Math.hypot(rx,ry)||1;return rd<d&&rd<T*RIVAL_HIT.lure?[rx/rd*spd,ry/rd*spd]:null}
+function rivalLure(m,d,spd){if(!RIVAL_DAMAGE||!rival||!rivalOn()||rival.fin||!rivBet||!rivBet.done||m.asleep||RIVAL_SOFTHIT&&rival.hcd>0)return null;const rx=rival.x-m.x,ry=rival.y-m.y,rd=Math.hypot(rx,ry)||1;return rd<d&&rd<T*RIVAL_HIT.lure?[rx/rd*spd,ry/rd*spd]:null}
 function rivalOn(){return RIVAL_RACE&&!!tunPath&&!!cfg&&!!cfg.tunnel}
 const VR=()=>M8_VOSH_RACE&&level===8&&rivalOn(),rivL=()=>VR()?VOSH_R:RIVAL_LINES,rivNm=()=>VR()?'VOSH':'VARRO',rivC=()=>VR()?VOSH_RED:RIVAL_YEL;
 function rivalInit(){rival=null;rivBet=null;if(!rivalOn())return;
@@ -3327,9 +3331,11 @@ function rivalTick(dt){if(!rivalOn()||!rival||!rivBet||!rivBet.done||arr)return;
   rival.cd=Math.max(0,rival.cd-dt);if(RIVAL_GRIND)rival.gr=Math.max(0,(rival.gr||0)-dt);if(RIVAL_DAMAGE)rivalDmgTick(dt);const so=RIVAL_DAMAGE&&rival.so>0;
   if(!rival.fin){const g=rival.i-rival.pi,late=rival.i/N>0.85,m=clamp(1-g*RIVAL_RB,late?0.8:0.5,late?1.15:1.45),j=Math.min(N-1,Math.floor(rival.i)+1),q=P[j];
     rival.dig=map[q[1]*MW+q[0]]===ROCK;
-    if(rival.dig){rival.dt+=so?0:dt;rival.lane=Math.max(0,rival.lane-dt*3);if(Math.random()<dt*30)parts.push({x:rival.x+Math.cos(rival.a)*22+rnd(-6,6),y:rival.y+Math.sin(rival.a)*22+rnd(-6,6),vx:rnd(-40,40),vy:rnd(-40,40),life:0.5,max:0.5,c:'#b08a52',s:2.5,drag:2,g:1});
+    const sk=RIVAL_SOFTHIT&&rival.sl>0?SOFTHIT.slow:1;if(rival.dig){rival.dt+=so?0:dt*sk;rival.lane=Math.max(0,rival.lane-dt*3);if(Math.random()<dt*30)parts.push({x:rival.x+Math.cos(rival.a)*22+rnd(-6,6),y:rival.y+Math.sin(rival.a)*22+rnd(-6,6),vx:rnd(-40,40),vy:rnd(-40,40),life:0.5,max:0.5,c:'#b08a52',s:2.5,drag:2,g:1});
       if(rival.dt>=RIVAL_DIG){rival.dt=0;breakTile(q[0],q[1],true)}}
-    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt*(so?0.12:1)*(RIVAL_GRIND&&rival.gr>0?GRIND.slow:1))}
+    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt*(so?0.12:sk)*(RIVAL_GRIND&&rival.gr>0?GRIND.slow:1))}
+    if(RIVAL_SOFTHIT&&state==='play'){if(rival.i>(rival.sk||0)+0.3||rival.dig&&!so){rival.sk=Math.max(rival.sk||0,rival.i);rival.skt=0}else if((rival.skt=(rival.skt||0)+dt)>SOFTHIT.stuck){rival.skt=0;rival.so=0;rival.unst=(rival.unst||0)+1;
+      for(let s=1;s<=4;s++){const q=P[Math.min(N-1,Math.floor(rival.i)+s)];if(map[q[1]*MW+q[0]]===ROCK)breakTile(q[0],q[1],true)}rival.i=Math.min(N-1,rival.i+SOFTHIT.nudge);rival.sk=rival.i}}
     if(rival.i>=N-1){rival.fin=gameT||0.001;rivalSay(rivL().win);toast(rivNm()+' REACHED THE RELAY FIRST',null,null,rivC());if(VR())rival.vl=2.6}
     const ld=rival.i-rival.pi>2?1:rival.i-rival.pi<-2?-1:rival.lead;if(ld!==rival.lead){if(rival.lead!==0&&gameT-rival.ovT>6){rivalSay(ld>0?rivL().pass:rivL().passed);rival.ovT=gameT}rival.lead=ld}}
   rivalPlace();

@@ -268,6 +268,16 @@ let leaderRevealed=false;
 // One crate pocket has a scorpion guard. At the end the lift is dead, the gallery caves in on the cockpit and Brakka + PIK divert
 // you into the old service tunnel that becomes Mission 7. Revert: M6_POCKETS=false (old open intel, no crates) / M6_CAVEIN=false (old lift exit).
 const M6_POCKETS=true,M6_CAVEIN=true;
+// M6_REDO (Justin): 'The Agitator Cell' rebuilt. FOUR sealed pockets (same amber-seam burrow walls); every pocket holds one of the four
+// recordings, pockets 1+3 also hold a trapped miner, pockets 2+4 a baradium crate. New setup comms (Sykes -> Pik cuts in with Brakka -> go).
+// Once the first miner, first recording and first crate are all in, three back-to-back top comms (Brakka, Pik, Sykes). Ending unchanged.
+// Revert: M6_REDO=false (old 6-pocket intel+crate mission and briefing).
+const M6_REDO=true,M6_MID=[['F','Kid, those walls didn\u2019t fall on their own. Somebody buried my crews and cut their comms. Find out who\u2019s behind this. I want a NAME.'],
+  ['D','I almost have enough data to trace where these messages originate, sir. The jammer is chatty, which is rude of it. Keep searching the mine.'],
+  ['R','This is it, miner. The agitator cell isn\u2019t on Naboo. It\u2019s HERE, on this moon, right under our feet.']];
+let m6Mid=0;
+function m6MidTick(){if(m6Mid===0&&rescued>=1&&intelGot>=1&&cratesGot>=1)m6Mid=1;if(m6Mid!==1||commQ.length)return;m6Mid=2;
+  for(const[who,text]of M6_MID){const c={who,text,t:0,max:Math.max(5,text.length*0.062),hold:1};if(!comm)comm=c;else commQ.push(c)}}
 // M7_V2 (Justin): Mission 7 starts in the service tunnel from the M6 cave-in: a long arched, lamp-lit hallway that opens into a new maze.
 // One short briefing line, the rest arrives as in-mission comms. Few crystals, scorpions only, scattered optional intel, more static and tremors.
 // The hive queen sleeps on the EXIT PORTAL in the centre; she wakes when you get close or shoot her. Her HP is lower (111, was 132) and she calls
@@ -338,7 +348,15 @@ const CAMPAIGN={
     ['F','Agitators. In MY mine. Find out who, kid.'],
     M6_POCKETS?['D','The cell sealed four transmissions and two baradium crates inside bedrock pockets, sir. Each pocket has one soft wall with amber seams. Burrow through it. Bring me all four transmissions and I can decrypt the sender.']:['D','The transmissions are scattered through this sector. Collect all four and I can decrypt the sender\u2019s identity.']],
   intel:[['transmission','V','\u201cThe Senator will vote against the Military Creation Act. She must never reach Coruscant.\u201d'],['transmission','V','\u201cThe baradium goes aboard the royal cruiser before it leaves the Theed landing platform.\u201d'],
-    ['datapad','V','\u201cOur people inside the Guild will clear the cargo manifests. Nobody checks mining freight.\u201d'],['transmission','V','DECRYPTED. Sender identified: SURVEY CHIEF DELLAN VOSH.']]},
+    ['datapad','V','\u201cOur people inside the Guild will clear the cargo manifests. Nobody checks mining freight.\u201d'],['transmission','V','DECRYPTED. Sender identified: SURVEY CHIEF DELLAN VOSH.']],
+  ...(M6_REDO&&M6_POCKETS?{m6redo:1,rescue:2,pocketN:4,
+  rescueLines:['Comms died an hour before the wall came down. We figured nobody was coming. Thank you, pilot!','They jammed our beacon and blew the seam behind us. This wasn\u2019t an accident!'],
+  brief:[['R','Before you go down, miner. My team heard rumblings of an agitator cell while we were working Naboo. Every lead ran back to this moon. That\u2019s why I followed your trail.'],
+    ['R','I need someone who knows these tunnels. If you\u2019d help me find the conspirators, I could\u2014'],
+    ['D','Apologies for interrupting the Captain\u2019s recruitment speech, sir. Miners are trapped all over the mine, and their comms aren\u2019t failing. They\u2019re being jammed. Intentionally.'],
+    ['F','My crews, sealed behind fresh rock with their beacons dead. Somebody wanted them quiet.'],
+    ['F','Recruit the kid later, Captain. Get down there and free my miners. Now.'],
+    ['D','Each sealed pocket has one soft wall with amber seams, sir. Burrow through it. Bring back anyone and anything the cell left behind.']]}:{})},
 7:M7_V2?{moon:'OHMA-D\u2019UN DEPTHS',name:'Queen of the Deep',crystals:6,spawnMul:0.5,boss:true,music:'explore',cells:13,hall:true,only:'scorpion',maxMobs:5,pad:'EXIT PORTAL',quakes:true,static:true,intelNeed:0,
   brief:[['D','We\u2019re through, sir. This service tunnel leads under the old hive galleries. Follow it and find us a way out.']],
   intel:[['datapad','V','Vosh\u2019s personal log: \u201cIf the queen wakes, the mine buries the evidence for us.\u201d'],['datapad','V','Vosh\u2019s itinerary: Senator Amidala\u2019s cruiser departs Theed at dawn.'],
@@ -902,7 +920,7 @@ function genLevel(lv){
   padX=(ptx+0.5)*T;padY=(pty+0.5)*T;
   // M6_V2 sealed pockets: a maze dead-end cell (2x2 floor) is sealed in a 2-thick bedrock shell; its one corridor becomes soft rock (the amber seam)
   pockets=[];weakSet=null;pocketGuard=null;
-  if(cfg.pockets){const want=cfg.intel.length+(cfg.crates||0)+(cfg.epPockets||0),dP=bfs(4,4,9999),C=[];weakSet=new Set();
+  if(cfg.pockets){const want=cfg.pocketN||cfg.intel.length+(cfg.crates||0)+(cfg.epPockets||0),dP=bfs(4,4,9999),C=[];weakSet=new Set();
     for(let cy=0;cy<cells;cy++)for(let cx=0;cx<cells;cx++){const ox=3+cx*4,oy=3+cy*4;if(dist(ox+1,oy+1,4,4)<12||dist(ox+1,oy+1,ptx,pty)<10)continue;
       for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const lk=[];for(let j=0;j<2;j++)for(let o=0;o<2;o++)lk.push(dx?(oy+o)*MW+(dx>0?ox+2+j:ox-1-j):(dy>0?oy+2+j:oy-1-j)*MW+ox+o);
         let ok=lk.every(i=>map[i]===FLOOR)&&dP[(oy+dy*4)*MW+ox+dx*4]>0;
@@ -934,12 +952,13 @@ function genLevel(lv){
   miners=[];rescued=0;rescueNeed=cfg.rescue||0;
   if(rescueNeed){const cand=floors.filter(i=>d[i]>15).sort(()=>R()-0.5);for(const i of cand){if(miners.length>=rescueNeed)break;const x=i%MW,y=(i/MW)|0;if(miners.every(m=>dist(m.tx,m.ty,x,y)>MW*0.25)&&dist(x,y,ptx,pty)>6)miners.push({tx:x,ty:y,x:(x+0.5)*T,y:(y+0.5)*T,done:false,ph:R()*6})}
     for(const i of cand){if(miners.length>=rescueNeed)break;const x=i%MW,y=(i/MW)|0;if(!miners.some(m=>m.tx===x&&m.ty===y))miners.push({tx:x,ty:y,x:(x+0.5)*T,y:(y+0.5)*T,done:false,ph:0})}rescueNeed=miners.length}
+  if(cfg.m6redo&&pockets.length>=4){miners=[0,2].map(k=>{const p=pockets[k];return{tx:p.x,ty:p.y,x:(p.x+0.5)*T,y:(p.y+0.5)*T,done:false,ph:k}});rescueNeed=2}
   intelGot=0;intelTotal=cfg.intel.length;intelNeed=Math.min(intelTotal,cfg.intelNeed||0);
   let pk=0;for(const[kind]of cfg.intel){const pp=pockets[pk++];const i=pp?(pp.y+1)*MW+pp.x+1:kind==='crate'?(pick(deep)??pick(rocks)):pick(floors);if(i!=null)items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'intel',kind,ph:Math.random()*6})}
   intelTotal=items.filter(i=>i.type==='intel').length;intelNeed=Math.min(intelNeed,intelTotal);
   // M4M5_V1 baradium crates: sealed inside solid rock, spread apart, dug out in burrow mode
-  cratesGot=0;cratesTotal=0;cratesNeed=0;if(cfg.crates&&pockets.length>cfg.intel.length){const pc=pockets.slice(cfg.intel.length,cfg.intel.length+cfg.crates);
-    for(const p of pc)items.push({x:(p.x+1)*T,y:(p.y+1)*T,type:'baradium',ph:Math.random()*6,rot:R()*0.6-0.3});cratesTotal=pc.length;cratesNeed=Math.min(cfg.crateNeed||cfg.crates,cratesTotal);
+  cratesGot=0;cratesTotal=0;cratesNeed=0;if(cfg.crates&&(cfg.m6redo?pockets.length>=4:pockets.length>cfg.intel.length)){const pc=cfg.m6redo?[pockets[1],pockets[3]]:pockets.slice(cfg.intel.length,cfg.intel.length+cfg.crates);
+    for(const p of pc)items.push({x:(p.x+(cfg.m6redo?0.5:1))*T,y:(p.y+(cfg.m6redo?0.5:1))*T,type:'baradium',ph:Math.random()*6,rot:R()*0.6-0.3});cratesTotal=pc.length;cratesNeed=Math.min(cfg.crateNeed||cfg.crates,cratesTotal);
     const g=pc[0];if(g)pocketGuard={x:(g.x+1+g.dx*4)*T,y:(g.y+1+g.dy*4)*T}}
   else if(cfg.crates){const cand=deep.concat(rocks).filter(i=>map[i]===ROCK&&dist(i%MW,(i/MW)|0,4,4)>9&&dist(i%MW,(i/MW)|0,ptx,pty)>4).sort(()=>R()-0.5),cs=[];
     for(const sp of[MW*0.22,MW*0.12,0])for(const i of cand){if(cs.length>=cfg.crates)break;const x=i%MW,y=(i/MW)|0;if(!cs.includes(i)&&cs.every(c=>dist(c%MW,(c/MW)|0,x,y)>=sp))cs.push(i)}
@@ -1273,7 +1292,7 @@ function startLevel(){padLast=null;genLevel(level);ship=newShip();mobs=[];bolts=
   cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(4,4,8);explored[Math.floor(padY/T)*MW+Math.floor(padX/T)]=1;updateMinimap();
   comm=null;commQ=[];intelLog=[];leaderRevealed=level>6&&level<=8;
   if(RIVAL_RACE)rivalInit();briefIdx=0;briefT=0;setState('briefing');Music.play(cfg.music);Music.battle(0);
-  lvStats={t0:gameT,kills0:kills,s0:score};laneQ=[];caveS=0;caveT0=0;m7=cfg.hall?{}:null;m7Collapse=false;if(cfg.hall){ship.x=5*T;ship.y=5.5*T;ship.a=0;if('ta'in ship)ship.ta=0;cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(6,5,8);for(let x=5;x<MW-2;x+=4)markExplored(x,5,3);updateMinimap();const q=spawnMob('boss',padX,padY);q.dormant=true;q.hp=q.max=90+level*3}if(pocketGuard)spawnMob('scorpion',pocketGuard.x,pocketGuard.y);if(raceBlk)for(const b of raceBlk)spawnMob(b.t,b.x,b.y);if(leaderRevealed)unlockDossier('V');if(level>8&&level>PROG.deep){PROG.deep=level;saveProg()}if(epOn()&&ep)epStart()}
+  lvStats={t0:gameT,kills0:kills,s0:score};laneQ=[];caveS=0;caveT0=0;m6Mid=0;m7=cfg.hall?{}:null;m7Collapse=false;if(cfg.hall){ship.x=5*T;ship.y=5.5*T;ship.a=0;if('ta'in ship)ship.ta=0;cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(6,5,8);for(let x=5;x<MW-2;x+=4)markExplored(x,5,3);updateMinimap();const q=spawnMob('boss',padX,padY);q.dormant=true;q.hp=q.max=90+level*3}if(pocketGuard)spawnMob('scorpion',pocketGuard.x,pocketGuard.y);if(raceBlk)for(const b of raceBlk)spawnMob(b.t,b.x,b.y);if(leaderRevealed)unlockDossier('V');if(level>8&&level>PROG.deep){PROG.deep=level;saveProg()}if(epOn()&&ep)epStart()}
 let briefIdx=0,briefT=0,epiIdx=0,epiT=0;
 function briefLen(){return cfg.brief[briefIdx]?cfg.brief[briefIdx][1].length:0}
 function briefNext(){if(state!=='briefing')return;SFX.click();if(briefIdx<cfg.brief.length&&briefT*55<briefLen()){briefT=999;return}briefIdx++;briefT=0;if(briefIdx>cfg.brief.length)endBriefing(1)}
@@ -1384,7 +1403,7 @@ function updatePlay(dt){
       for(let k=0;k<24;k++)parts.push({x:m.x+rnd(-8,8),y:m.y+rnd(-8,8),vx:rnd(-20,20),vy:rnd(-160,-40),life:0.8,max:0.8,c:'#9fe',s:2.5,drag:1,g:1});
       sayComm('M',(cfg.rescueLines||[])[rescued-1]||'Thank you, pilot!');if(rescued===rescueNeed)toast('All survivors aboard!',null,null,'#9f8')}}
   laneTick();
-  if(comm){comm.t+=dt;if(commQ.length&&comm.t>Math.max(comm.text.length/70+1.8,2.5)&&comm.max-comm.t>0.45)comm.max=comm.t+0.45;if(comm.t>comm.max){comm=commQ.shift()||null;if(comm)comm.t=0}}
+  if(comm){comm.t+=dt;if(commQ.length&&!comm.hold&&comm.t>Math.max(comm.text.length/70+1.8,2.5)&&comm.max-comm.t>0.45)comm.max=comm.t+0.45;if(comm.t>comm.max){comm=commQ.shift()||null;if(comm)comm.t=0}}
   // cracks / spawning
   if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=epOn()&&ep&&!tunPath?epSpawnGap():Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN[level]:1)*(tunPath?RACE_SPAWN:1);trySpawn()}}
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
@@ -1452,6 +1471,7 @@ function updatePlay(dt){
     if(timed&&timeLeft<=0){timeLeft=0;die(level===8?'The mine collapsed. The evidence never reached the RSF.':'The moon\u2019s crust collapsed before you reached the lift.')}}
   // extraction
   const padActive=padIsActive();
+  if(cfg.m6redo)m6MidTick();
   if(cfg.caveIn&&COCKPIT_CINE)caveTick(padActive);
   else if(padActive&&dist(ship.x,ship.y,padX,padY)<30&&state==='play')completeLevel(1);
 }
@@ -1473,7 +1493,8 @@ function caveTick(pa){if(state!=='play')return;
   if(caveS===2){shake=Math.max(shake,5);if(Math.random()<0.2)parts.push({x:cam.x+Math.random()*W,y:cam.y+Math.random()*H*0.3,vx:0,vy:rnd(40,110),life:1.2,max:1.2,c:'#a88866',s:rnd(1,3),drag:0});if(gameT-caveT0>2.6)completeLevel('cave')}}
 function padIsActive(){return got>=need&&intelGot>=intelNeed&&rescued>=rescueNeed&&cratesGot>=cratesNeed&&(!bossLevel||bossDead)}
 
-function objectiveText(){if(rescued<rescueNeed)return`Rescue stranded miners (${rescued}/${rescueNeed}) — follow the yellow beacons`;
+function objectiveText(){if(cfg.m6redo&&(rescued<rescueNeed||intelGot<intelNeed||cratesGot<cratesNeed))return`Pockets: miners ${rescued}/${rescueNeed} \u00b7 recordings ${intelGot}/${intelNeed} \u00b7 baradium ${cratesGot}/${cratesNeed} \u2014 burrow the amber seams`;
+  if(rescued<rescueNeed)return`Rescue stranded miners (${rescued}/${rescueNeed}) — follow the yellow beacons`;
   if(cratesGot<cratesNeed)return weakSet?`Recover baradium crates (${cratesGot}/${cratesNeed}) — sealed pockets: burrow through the amber seams`:`Dig out baradium crates (${cratesGot}/${cratesNeed}) — sealed in the walls, magenta on the scanner`;
   if(got<need)return`Collect plasma crystals (${got}/${need})`;if(intelGot<intelNeed)return`Recover intel (${intelGot}/${intelNeed})`+(weakSet?' — sealed pockets: burrow through the amber seams':cfg.intel.some(i=>i[0]==='crate')?' — caches are sealed in rock':'');
   if(bossLevel&&!bossDead)return cfg.hall?(bossWoke?'Deal with the hive queen — the exit portal is under her':'Follow the tunnel into the maze — the exit portal is at its heart'):bossWoke?'Destroy '+(boss&&boss.ep?boss.ep.name:'the Hive Mother'):'Approach the lift…';if(m7Collapse)return'The passage is collapsing — reach the EXIT PORTAL!';return level===8?'Reach the COMM RELAY and transmit!':tunPath?'Burrow to the TUNNEL EXIT!':'Reach the extraction lift'}

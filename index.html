@@ -561,13 +561,13 @@ const ENDLESS_PIT=true;
 // per-part revert flags (each one line): depth cycle, quota curve, hazard schedule, peaceful pacing, procedural bosses, credits, depth HUD, autosave/resume
 const EP_CYCLE=true,EP_QUOTA=true,EP_HAZARDS=true,EP_PEACE=true,EP_BOSSGEN=true,EP_CREDITS=true,EP_HUD=true,EP_SAVE=true;
 const EP_HZ=[['pockets',2,'AMBER POCKETS'],['gas',3,'GAS POCKETS'],['quakes',4,'CAVE-INS'],['dark',6,'DARKNESS'],['unstable',8,'UNSTABLE CRYSTALS'],['flood',10,'FLOODED'],['static',12,'STATIC'],['collapse',14,'COLLAPSE ESCAPE']];
-const EP_BONUS={mine:20,rescue:40,race:40,boss:75,maze:40,heavy:40};
+const EP_BONUS={mine:20,rescue:40,race:40,boss:75,maze:40,heavy:40,hunt:40};
 // PIT_FLOW_V2 (Justin): the Pit runs in 5-step loops that repeat with rising depth: 1 quiet seam (barely any monsters), 2 mining (moderate),
 // 3 a pick of RESCUE / MAZE / RIVAL RACE (weights below), 4 a MONSTER-HEAVY rich vein (3-5 rich crystals, 5 cr each) or an extra RESCUE, 5 a procedural boss.
 // Picks are seeded by depth, so a resumed save lands on the same step. Revert: PIT_FLOW_V2=false (old mine,mine,rescue,boss/race cycle)
 const PIT_FLOW_V2=true;
 const EP_STEP3_W={rescue:1,maze:1,race:1},EP_STEP3_INTRO=['rescue','race','maze'],EP_STEP4_HEAVY=0.5,EP_RICH=5; // step-3 pick weights (equal), chance step 4 is the heavy rich vein, credits per rich crystal
-const EP_KNAME={mine:'MINING',quiet:'QUIET SEAM',rescue:'RESCUE',maze:'MAZE',race:'RIVAL RACE',heavy:'RICH VEIN',boss:'BOSS'};
+const EP_KNAME={mine:'MINING',quiet:'QUIET SEAM',rescue:'RESCUE',maze:'MAZE',race:'RIVAL RACE',heavy:'RICH VEIN',hunt:'MONSTER HUNT',boss:'BOSS'};
 // PIT_LOOP_10 (Justin): a boss every 10th Pit level. Steps 1-4 as before (quiet, mining, rescue/maze/race pick, rich vein/rescue pick), 5 = an ordinary
 // mining level, 6-9 repeat 1-4, 10 = boss. epSub maps a 10-step to its old 5-step role. Revert: PIT_LOOP_10=false (5-step loop)
 // HEAVY_SOFTER (Justin): rich-vein levels ~30% calmer: monster cap x0.7 (never below mining cap+1), spawn gap 0.45 -> 0.6 of normal, a third -> a quarter of
@@ -607,9 +607,15 @@ function crackMark(c,px,py,x,y){const h=hash(x*7+3,y*13+5),h2=hash(y*5+1,x*3+7);
     c.moveTo(px+T*(0.45+h2*0.2)+ox,py+T*(0.4+h*0.2)+ox);c.lineTo(px+T+ox,py+T*(0.25+h2*0.5)+ox);c.moveTo(px+ox,py+T*(0.55+h*0.3)+ox);c.lineTo(px+T*(0.3+h*0.2)+ox,py+T*(0.65+h2*0.2)+ox);c.stroke()}
   c.fillStyle='rgba(0,0,0,0.35)';for(let k=0;k<4;k++)c.fillRect(px+hash(x+k*3,y)*T*0.9,py+hash(y+k*5,x)*T*0.9,2,2);c.restore()}
 function epPick3(c){const R=mulberry((Math.imul(c,40503)+7)>>>0);R();const w=Object.entries(EP_STEP3_W).filter(([k,v])=>v>0&&(k!=='maze'||(typeof MAZE_LEVELS!=='undefined'&&MAZE_LEVELS)));if(!w.length)return'rescue';const intro=EP_STEP3_INTRO.filter(k=>w.some(x=>x[0]===k)),j=(c-3)/5;if(j>=0&&j<intro.length&&j===Math.floor(j))return intro[j];let r=R()*w.reduce((a,b)=>a+b[1],0);for(const[k,v]of w)if((r-=v)<0)return k;return w[w.length-1][0]}
-function epPick4(c){const R=mulberry((Math.imul(c,69069)+3)>>>0);R();return R()<EP_STEP4_HEAVY?'heavy':'rescue'}
+// PIT_HUNT (Justin): MONSTER HUNT replaces the rich vein in the step-4 slot (loop steps 4 and 9; the 50/50 with RESCUE stays). A kill quota (q) instead of a crystal
+// quota (HUD: BOUNTY k/q); every kill pays cr credits (bounty rate approved by Justin); shards (all purple) are optional and worth shard credits each; the lift stays locked
+// until the bounty is in. Nests keep respawning (awake, every gap x the normal Pit gap) up to cap; the 7-9 s breather after a kill streak stays. Bonus 40. Revert: PIT_HUNT=false
+const PIT_HUNT=true;
+const HUNT={q:c=>Math.min(80,40+Math.round(c*0.8)),cr:5,shard:10,shards:c=>2+(c%4),cap:c=>Math.min(10,epCap(c)+5),gap:0.35,awake:1};
+function epHunt(){return PIT_HUNT&&!!ep&&ep.kind==='hunt'}
+function epPick4(c){const R=mulberry((Math.imul(c,69069)+3)>>>0);R();return R()<EP_STEP4_HEAVY?(PIT_HUNT?'hunt':'heavy'):'rescue'}
 function epQuiet1(){return PIT_FLOW_V2&&EP_CYCLE&&!!ep&&ep.kind==='mine'&&epSub(ep.c)===1}
-function epCapNow(){const c=ep.c,k=epCap(c);if(!PIT_FLOW_V2)return k;if(ep.kind==='heavy')return HEAVY_SOFTER?Math.max(k+1,Math.round(Math.min(8,k+3)*0.7)):Math.min(8,k+3);if(ep.kind==='maze')return 0;return epQuiet1()?Math.max(1,k-1):k}
+function epCapNow(){const c=ep.c,k=epCap(c);if(!PIT_FLOW_V2)return k;if(ep.kind==='hunt')return HUNT.cap(c);if(ep.kind==='heavy')return HEAVY_SOFTER?Math.max(k+1,Math.round(Math.min(8,k+3)*0.7)):Math.min(8,k+3);if(ep.kind==='maze')return 0;return epQuiet1()?Math.max(1,k-1):k}
 const EP_ATK=['ring','volley','brood','charge','spiral','rockrain','nova','strike'];
 const EP_BMOD=[['armored','ARMORED'],['swift','SWIFT'],['frenzied','FRENZIED'],['regen','REGENERATING'],['brooding','BROODING']];
 const EP_BN1=['Vor','Kreth','Ash','Sable','Grav','Moro','Xil','Thul','Nyx','Ombr','Skar','Vael'],EP_BN2=['ax','esh','ura','ith','okk','yne','amar','oth'],EP_BN3=['the Unburied','Mother of Shafts','the Deep Hunger','Who Waits Below','the Hollow Queen','of the Black Vein','the Seam-Eater','the Lightless'];
@@ -676,16 +682,17 @@ function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),
   else if(kind==='rescue'){cfg.crystals=Math.round(Q*0.5);cfg.rescue=Math.min(5,3+Math.floor(c/10));cfg.name='Lost Crew \u00b7 '+SECTORS[(c+3)%SECTORS.length];
     cfg.rescueLines=['Pilot! Thought we\u2019d die down here.','Another one! Tell the Guild we\u2019re still breathing.','Get me out of this hole, I\u2019m done with mining.','Watch the nests on the way back, they\u2019re everywhere.','That\u2019s all of us. Go, go!']}
   else if(kind==='heavy'){const R=mulberry((Math.imul(c,2246822519)+11)>>>0);R();const n=3+((R()*3)|0);cfg.crystals=n;cfg.rich=n;cfg.richNeed=Math.max(3,n-1);cfg.name='Rich Vein \u00b7 '+SECTORS[(c+6)%SECTORS.length];cfg.music='tension';cfg.maxMobs=Math.min(8,epCap(c)+3)}
+  else if(kind==='hunt'){cfg.crystals=0;cfg.huntQ=HUNT.q(c);cfg.shards=HUNT.shards(c);cfg.name='Monster Hunt \u00b7 '+SECTORS[(c+6)%SECTORS.length];cfg.music='tension';cfg.maxMobs=HUNT.cap(c)}
   else if(kind==='maze'){const R=mulberry((Math.imul(c,1597334677)+5)>>>0);R();const n=4+((R()*3)|0);cfg.crystals=n;cfg.maze=true;cfg.mazeN=n;cfg.mazeNeed=n-1;cfg.cells=MAZE_HARDER?MAZE_HARD.cells(c):Math.min(13,9+Math.floor(c/12));cfg.name='The Warrens \u00b7 '+SECTORS[(c+2)%SECTORS.length];cfg.maxMobs=0}
   else if(kind==='boss'){cfg.crystals=Math.round(Q*0.4);cfg.boss=true;cfg.music='tension';if(EP_BOSSGEN){cfg.pit.boss=epBossGen(c);cfg.name='Lair of '+cfg.pit.boss.name.split(' ')[0].charAt(0)+cfg.pit.boss.name.split(' ')[0].slice(1).toLowerCase()}else cfg.name='The Hive Lair'}
   else{cfg.crystals=0;cfg.tunnel=true;cfg.timed=1;cfg.cells=15;cfg.music='tension';cfg.pad='TUNNEL EXIT';cfg.name='Collapsed Haul Tunnel';cfg.spawnMul=1.4;delete cfg.maxMobs}
-  if(has('pockets')&&kind!=='race'&&kind!=='heavy'){cfg.pockets=true;cfg.epPockets=Math.min(5,2+Math.floor(c/6))}
+  if(has('pockets')&&kind!=='race'&&kind!=='heavy'&&kind!=='hunt'){cfg.pockets=true;cfg.epPockets=Math.min(5,2+Math.floor(c/6))}
   if(has('quakes'))cfg.quakes=true;if(has('static'))cfg.static=true;
   const hz=cfg.pit.names.length?' Hazards: '+cfg.pit.names.join(', ').toLowerCase()+'.':'';
-  const what=kind==='maze'?`No bugs on the scope, sir. Only an old bedrock labyrinth, and ${cfg.mazeN} crystals tucked away in its dead ends. Bring up ${cfg.mazeNeed}. Bedrock won\u2019t drill, but a few walls are cracked through. Burrow those if you find them.`:kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epSub(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
+  const what=kind==='maze'?`No bugs on the scope, sir. Only an old bedrock labyrinth, and ${cfg.mazeN} crystals tucked away in its dead ends. Bring up ${cfg.mazeNeed}. Bedrock won\u2019t drill, but a few walls are cracked through. Burrow those if you find them.`:kind==='hunt'?`Guild notice, sir: this tunnel is so overrun they\u2019ve stopped counting. Five credits a bug, and any purple shards you find are worth ten. Bring the count to ${cfg.huntQ} and I\u2019ll unlock the lift. I suggest you do not run out of shields.`:kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epSub(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
   cfg.brief=[['D',`The Pit, depth ${c}. ${what}${hz}`]];
   if(c===1)cfg.brief.unshift(['F','The campaign\u2019s over, kid, but the Guild still pays. Every crystal you bring up is a credit in your account, and they\u2019re yours to keep even if you crash. Most of the bugs down here are asleep. Let \u2019em lie.']);
-  if(c===1&&PIT_FLOW_V2&&EP_CYCLE)cfg.brief.push(['D','Shifts run in fives. Two seams, a wildcard, a rich vein or a rescue, then whatever is nesting at the bottom. Then you do it again, deeper.']);
+  if(c===1&&PIT_FLOW_V2&&EP_CYCLE)cfg.brief.push(['D','Shifts run in fives. Two seams, a wildcard, '+(PIT_HUNT?'a monster hunt':'a rich vein')+' or a rescue, then whatever is nesting at the bottom. Then you do it again, deeper.']);
   const tips={gas:'Green clouds are gas pockets. A blaster bolt will light them up, so shoot them from a distance or use them on the bugs.',dark:'Lamps are out on this level, sir. You only have your headlight.',unstable:'Red crystals are unstable. Get close and they start to crack. Grab them fast and they count double, or back off.',flood:'Parts of this level are flooded. The water will slow you down.',collapse:'This one is going to collapse once the quota is in. When it starts, head straight for the lift.',pockets:'Some crystal caches are sealed behind amber seams. Burrow through to get them.'};
   const intro=EP_HZ.find(h=>h[1]===c);if(intro&&tips[intro[0]]&&has(intro[0]))cfg.brief.push(['D',tips[intro[0]]]);
   return cfg}
@@ -707,6 +714,8 @@ function epGen(dd){const P=cfg.pit,c=P.c,has=k=>P.mods.includes(k),R=mulberry((D
     ep.mazeOK=pick.every(e=>dd2[(cy(e))*MW+cx(e)]>0)&&dd2[Math.floor(padY/T)*MW+Math.floor(padX/T)]>0}
   if(P.kind==='heavy'&&cfg.rich){const cr=items.filter(it=>it.type==='crystal'&&!it.cache).sort((a,b)=>dist(b.x,b.y,4*T,4*T)-dist(a.x,a.y,4*T,4*T)),keep=new Set(cr.slice(0,cfg.rich));
     items=items.filter(it=>it.type!=='crystal'||it.cache||keep.has(it));for(const it of keep)it.rich=1;need=Math.min(cfg.richNeed,keep.size);if(crystalPlan)crystalPlan.need=need}
+  if(P.kind==='hunt'&&PIT_HUNT){const cr=items.filter(it=>it.type==='crystal').sort((a,b)=>dist(b.x,b.y,4*T,4*T)-dist(a.x,a.y,4*T,4*T)),keep=new Set(cr.slice(0,cfg.shards));
+    items=items.filter(it=>it.type!=='crystal'||keep.has(it));for(const it of keep){it.rich=1;it.shard=1;it.cache=0}need=0;if(crystalPlan)crystalPlan.need=0;ep.hq=cfg.huntQ;ep.hk=0;ep.nestT=2}
   if(has('unstable')){const cr=items.filter(it=>it.type==='crystal'&&!it.cache&&!it.rich);for(const it of cr)if(R()<0.22)it.unst=1}if(WATER_REWORK&&has('flood'))waterGen(R,c)}
 // WATER_REWORK (Justin): flooded levels are wet from the walls. Seeps: water weeps out of a wall face (streaks + droplets, wider ones as falls) and pools
 // across the tunnel floor next to it (tile pools, slow you like the old blobs). Weeping rock: marked wet rock on flood levels; burrow it and the water
@@ -804,21 +813,23 @@ function waterDraw(t,vis){const pool=WATER_BLOCKS?()=>{}:(tiles,a,deep)=>{ctx.be
     ctx.strokeStyle='rgba(170,220,255,0.35)';ctx.lineWidth=1.2;for(const i of deep){const cx=(i%MW+0.5)*T,cy=(((i/MW)|0)+0.5)*T;if(!vis(cx,cy,T))continue;const o=((t*9+i*5)%T)-T/2;ctx.beginPath();for(let k=0;k<=6;k++){const xx=cx-T*0.35+k*T*0.12,yy=cy+o*0.5+Math.sin(t*4+k*1.2+i)*2;k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)}ctx.stroke()}}
   ctx.restore()}
 // called at the end of startLevel: sleeping nests + pacing
-function epStart(){if(!ep)return;const c=ep.c;spawnT=EP_PEACE?epGap(c)*0.6*(epQuiet1()?1.6:PIT_FLOW_V2&&ep.kind==='heavy'?0.4:1):spawnT;
-  if(tunPath||!EP_PEACE||(PIT_FLOW_V2&&ep.kind==='maze'))return;const cap=epCapNow(),N=epQuiet1()?Math.max(2,Math.round(cap*4/3)):PIT_FLOW_V2&&ep.kind==='heavy'?Math.min(16,Math.round(cap*2)):Math.min(10,Math.round(cap*7/3)),fl=epFloorList(10).sort(()=>Math.random()-0.5),nests=[];let made=0;
+function epStart(){if(!ep)return;const c=ep.c;spawnT=EP_PEACE?epGap(c)*0.6*(epQuiet1()?1.6:PIT_FLOW_V2&&(ep.kind==='heavy'||ep.kind==='hunt')?0.4:1):spawnT;
+  if(tunPath||!EP_PEACE||(PIT_FLOW_V2&&ep.kind==='maze'))return;const cap=epCapNow(),N=epQuiet1()?Math.max(2,Math.round(cap*4/3)):epHunt()?cap:PIT_FLOW_V2&&ep.kind==='heavy'?Math.min(16,Math.round(cap*2)):Math.min(10,Math.round(cap*7/3)),fl=epFloorList(10).sort(()=>Math.random()-0.5),nests=[];let made=0;
   for(const i of fl){if(made>=N)break;const x=i%MW,y=(i/MW)|0;if(!nests.every(n=>dist(n[0],n[1],x,y)>7))continue;nests.push([x,y]);
     const r0=Math.random(),t=r0<0.4?'crawler':r0<0.7?'spitter':'scorpion',k=t==='crawler'?Math.min(3,N-made):1;
     for(let j=0;j<k;j++){const m=spawnMob(t,(x+0.5)*T+rnd(-8,8),(y+0.5)*T+rnd(-8,8));m.asleep=1;made++}}
+  if(epHunt()){const sl=mobs.filter(m=>m.asleep&&m.type!=='boss');sl.forEach((m,i)=>{if(i<Math.round(sl.length*HUNT.awake))m.asleep=0})}
   if(PIT_FLOW_V2&&ep.kind==='heavy'){ep.heavy=1;mobs.filter(m=>m.asleep&&m.type!=='boss').forEach((m,i)=>{if(i%(HEAVY_SOFTER?4:3)===0)m.asleep=0})}}
 function epAwake(){return mobs.filter(m=>!m.asleep&&m.type!=='boss').length}
 function epCanSpawn(){if(!EP_PEACE)return mobs.length<(cfg.maxMobs||8);return gameT>=ep.quiet&&epAwake()+cracks.length<epCapNow()}
-function epSpawnGap(){if(!EP_PEACE)return Math.max(1.6,4.5-ep.c*0.08);return epGap(ep.c)*rnd(0.85,1.15)*(epQuiet1()?1.5:PIT_FLOW_V2&&ep.kind==='heavy'?(HEAVY_SOFTER?0.6:0.45):1)}
+function epSpawnGap(){if(!EP_PEACE)return Math.max(1.6,4.5-ep.c*0.08);return epGap(ep.c)*rnd(0.85,1.15)*(epQuiet1()?1.5:epHunt()?HUNT.gap:PIT_FLOW_V2&&ep.kind==='heavy'?(HEAVY_SOFTER?0.6:0.45):1)}
 function epOnMob(m){if(m.type==='boss'||!EP_PEACE)return;m.hp=m.max=MOB[m.type].hp+Math.floor(ep.c/8);if(Math.random()<epVet(ep.c)){m.vet=1;m.hp=m.max=Math.ceil(m.max*1.7)}}
-function epQuietNow(){if(!EP_PEACE)return;ep.quiet=Math.max(ep.quiet,gameT+(PIT_FLOW_V2&&ep.kind==='heavy'?(HEAVY_SOFTER?rnd(7,9):rnd(5,7)):rnd(15,20)));spawnT=Math.max(spawnT,ep.quiet-gameT)}
-function epOnKill(m){if(m.type==='boss'){const bn=m.ep?m.ep.name:'';toast(bn+' SLAIN!',null,null,'#f8f');return}if(m.vet){score+=MOB[m.type].pts;toast('VETERAN',m.x,m.y-12,'#ffd27a')}
+function epQuietNow(){if(!EP_PEACE)return;ep.quiet=Math.max(ep.quiet,gameT+(PIT_FLOW_V2&&(ep.kind==='heavy'||epHunt())?(HEAVY_SOFTER||epHunt()?rnd(7,9):rnd(5,7)):rnd(15,20)));spawnT=Math.max(spawnT,ep.quiet-gameT)}
+function epOnKill(m){if(m.type==='boss'){const bn=m.ep?m.ep.name:'';toast(bn+' SLAIN!',null,null,'#f8f');return}if(epHunt()){ep.hk=(ep.hk||0)+1;epCredit(HUNT.cr);toast('+'+HUNT.cr+' CR',m.x,m.y-20,'#ffd27a');if(ep.hk===ep.hq){toast('BOUNTY MET \u00b7 LIFT UNLOCKED',null,null,'#9ff5cf');SFX.blip&&SFX.blip('droid')}}if(m.vet){score+=MOB[m.type].pts;toast('VETERAN',m.x,m.y-12,'#ffd27a')}
   ep.kt=ep.kt.filter(t=>gameT-t<3);ep.kt.push(gameT);if(ep.kt.length>=2){ep.kt=[];epQuietNow()}}
 function epOnHurt(){epQuietNow()}
-function epCrystal(it){const n=it.rich&&PIT_FLOW_V2?EP_RICH:it.unst?2:1;if(it.rich&&PIT_FLOW_V2)toast('RICH +'+EP_RICH+' CR',it.x,it.y-18,'#e8a6ff');ep.cr+=n;if(EP_CREDITS){PROG.cr=(PROG.cr||0)+n;if(EP_SAVE)saveProg()}if(it.unst)toast('UNSTABLE \u00d72',it.x,it.y-18,'#ff8a6a')}
+function epCredit(n){ep.cr+=n;if(EP_CREDITS){PROG.cr=(PROG.cr||0)+n;if(EP_SAVE)saveProg()}}
+function epCrystal(it){if(it.shard&&PIT_HUNT){toast('SHARD +'+HUNT.shard+' CR',it.x,it.y-18,'#e8a6ff');epCredit(HUNT.shard);return}const n=it.rich&&PIT_FLOW_V2?EP_RICH:it.unst?2:1;if(it.rich&&PIT_FLOW_V2)toast('RICH +'+EP_RICH+' CR',it.x,it.y-18,'#e8a6ff');ep.cr+=n;if(EP_CREDITS){PROG.cr=(PROG.cr||0)+n;if(EP_SAVE)saveProg()}if(it.unst)toast('UNSTABLE \u00d72',it.x,it.y-18,'#ff8a6a')}
 // sleeping mobs: wake on sight at short range, on damage, or when a nest-mate wakes
 function epSleep(m,d){if(!m.asleep)return false;if(m.hp<m.max||(d<T*5&&los(m.x,m.y,ship.x,ship.y))){m.asleep=0;m.cd=Math.max(m.cd,0.8);toast('!',m.x,m.y-16,'#ff8a5a');for(const o of mobs)if(o.asleep&&dist(o.x,o.y,m.x,m.y)<T*4){o.asleep=0;o.cd=Math.max(o.cd,1.2)}return false}
   m.vx=m.vy=0;if(Math.random()<0.006)parts.push({x:m.x+6,y:m.y-10,vx:rnd(4,10),vy:-18,life:1.4,max:1.4,c:'rgba(200,220,255,0.6)',s:2.2,drag:0.3});return true}
@@ -826,7 +837,7 @@ function epInFlood(x,y){if(!ep)return false;if(WATER_REWORK&&ep.wet){const tx=Ma
 function epGasBoom(g){if(g.dead)return;g.dead=true;boom(g.x,g.y,2.2,'#bf6');shake=Math.max(shake,16);for(let k=0;k<26;k++){const a=Math.random()*6.283,s=rnd(40,200);parts.push({x:g.x,y:g.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0.7,max:0.7,c:k%2?'#cf6':'#fd6',s:3,drag:2,g:1})}
   const R2=g.r*1.7;for(const m of mobs)if(!m.dead&&dist(m.x,m.y,g.x,g.y)<R2){m.hp-=m.type==='boss'?8:6;m.hf=0.1;m.asleep=0;if(m.hp<=0)kill(m)}
   if(dist(ship.x,ship.y,g.x,g.y)<g.r*1.4)hurtShip(15);if(RIVAL_DAMAGE&&rival&&dist(rival.x,rival.y,g.x,g.y)<g.r*1.4)rivalHit(1.3);for(const o of ep.gas)if(!o.dead&&o.fuse<0&&dist(o.x,o.y,g.x,g.y)<g.r*2.6)o.fuse=0.3}
-function epTick(dt){if(!ep)return;const c=ep.c;
+function epTick(dt){if(!ep)return;const c=ep.c;if(epHunt())huntTick(dt);
   for(const g of ep.gas){if(g.dead)continue;g.ph+=dt;if(g.fuse>=0){g.fuse-=dt;if(g.fuse<=0)epGasBoom(g);continue}for(const b of bolts)if(!b.dead&&dist(b.x,b.y,g.x,g.y)<g.r){b.dead=true;epGasBoom(g);break}}
   ep.gas=ep.gas.filter(g=>!g.dead);
   if(WATER_REWORK&&ep.weeps)waterTick(dt);
@@ -837,6 +848,10 @@ function epTick(dt){if(!ep)return;const c=ep.c;
     else{it.fuse-=dt;if(it.fuse<=0){it.dead=true;boom(it.x,it.y,1,'#f64');if(dist(it.x,it.y,ship.x,ship.y)<52)hurtShip(10);const i=ep.floors[(Math.random()*ep.floors.length)|0];if(i!=null)items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'crystal',ph:0})}}}
   if(cfg.pit.mods.includes('collapse')&&!ep.collapse&&padIsActive()&&!bossLevel){ep.collapse=true;const dd=bfs(Math.floor(padX/T),Math.floor(padY/T),9999),si=Math.floor(ship.y/T)*MW+Math.floor(ship.x/T),pd=dd[si]>0?dd[si]:dist(ship.x,ship.y,padX,padY)/T*1.5;
     timed=true;timeMax=timeLeft=Math.max(25,Math.ceil((pd*T/110*1.7+10)/5)*5);quakeT=0.5;toast('COLLAPSE! REACH THE LIFT',null,null,'#ff8a5a');sayComm('D',`Quota is in and the level is collapsing, sir! You have ${timeMax} seconds to reach the lift.`)}}
+// PIT_HUNT nests: a fresh awake nest (2-3 bugs) at least 9 tiles from the ship whenever the breather is over and the hunt is under its cap
+function huntTick(dt){if(ep.hk>=ep.hq)return;ep.nestT-=dt;if(ep.nestT>0||gameT<ep.quiet||epAwake()+cracks.length>=epCapNow())return;ep.nestT=epGap(ep.c)*HUNT.gap*rnd(0.85,1.15);
+  const sx=ship.x/T,sy=ship.y/T,fl=ep.floors.filter(i=>dist(i%MW+0.5,((i/MW)|0)+0.5,sx,sy)>9);if(!fl.length)return;const i=fl[(Math.random()*fl.length)|0],x=i%MW,y=(i/MW)|0,r0=Math.random(),tp=r0<0.45?'crawler':r0<0.75?'spitter':ep.c>=12&&r0>0.93?'worm':'scorpion',k=Math.min(tp==='crawler'?3:2,epCapNow()-epAwake());
+  for(let j=0;j<k;j++){const m=spawnMob(tp,(x+0.5)*T+rnd(-8,8),(y+0.5)*T+rnd(-8,8));m.cd=Math.max(m.cd,1.2)}}
 // ---- procedural boss
 function epBossInit(m){if(!EP_BOSSGEN)return;const B=cfg.pit&&cfg.pit.boss;if(!B)return;m.ep=Object.assign({i:0,cd:3,wind:0,act:null,tele:null,dash:0,hitT:0,stream:0},B);let hp=80+ep.c*7;if(B.mods.includes('armored'))hp*=1.4;m.hp=m.max=Math.round(hp);if(BOSS_CHIMERA&&B.chim)try{chimDraw(document.createElement('canvas').getContext('2d'),B.chim,0,m.r,null,false,0)}catch(e){}}
 function epBossTick(m,dt,d,dx,dy,spd){const E=m.ep,mod=k=>E.mods.includes(k),ph2=m.hp<m.max/2,M=epMul(ep.c);spd*=(mod('swift')?1.25:1)*(ph2?1.3:1);
@@ -869,7 +884,7 @@ function epRunEnd(ok){if(!ep)return;let b=0;if(ok&&EP_CREDITS){b=EP_BONUS[ep.kin
 function epHud(L,t){if(!ep||!EP_HUD)return;const sm=L.sm,x=12;let y=L.top+(sm?40:52)+(touchMode?16:30);ctx.save();ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FB}`;ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';
   const s='DEPTH '+ep.c;ctx.strokeText(s,x,y);ctx.fillStyle='rgba(255,196,110,0.95)';ctx.fillText(s,x,y);
   if(PIT_FLOW_V2&&EP_CYCLE){const st=epStep(ep.c),px=x+ctx.measureText(s).width+8,L10=EP_LOOP>5,pr=L10?(sm?2.4:3):sm?3:3.5;for(let k=1;k<=EP_LOOP;k++){ctx.beginPath();ctx.arc(px+(k-1)*pr*(L10?2.7:3)+(L10&&k>5?pr*1.6:0),y-(sm?3.5:4),k===st?pr+0.8:pr,0,6.283);ctx.fillStyle=k<st?'rgba(255,196,110,0.75)':k===st?'#fff2c8':'rgba(0,0,0,0.45)';ctx.fill();ctx.lineWidth=1;ctx.strokeStyle=L10&&k===EP_LOOP?'rgba(255,90,70,0.95)':'rgba(255,196,110,0.8)';ctx.stroke()}
-    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.font=`bold ${sm?8:9}px ${FW}`;y+=sm?11:13;const kn=`${st}/${EP_LOOP} \u00b7 `+(epQuiet1()?EP_KNAME.quiet:EP_KNAME[ep.kind]||'');ctx.strokeText(kn,x,y);ctx.fillStyle=ep.kind==='heavy'?'rgba(225,160,255,0.95)':'rgba(255,220,160,0.9)';ctx.fillText(kn,x,y)}ctx.font=`${sm?8:9}px ${FW}`;
+    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';ctx.font=`bold ${sm?8:9}px ${FW}`;y+=sm?11:13;const kn=`${st}/${EP_LOOP} \u00b7 `+(epQuiet1()?EP_KNAME.quiet:EP_KNAME[ep.kind]||'');ctx.strokeText(kn,x,y);ctx.fillStyle=ep.kind==='heavy'||ep.kind==='hunt'?'rgba(225,160,255,0.95)':'rgba(255,220,160,0.9)';ctx.fillText(kn,x,y)}ctx.font=`${sm?8:9}px ${FW}`;
   for(const n of cfg.pit.names.slice(0,3)){y+=sm?11:13;ctx.strokeText(n,x,y);ctx.fillStyle='rgba(255,150,110,0.85)';ctx.fillText(n,x,y)}ctx.restore()}
 // world layer (under mobs): flood water, gas clouds, unstable crystal warnings
 function epDrawWorld(t,vis){if(!ep)return;if(WATER_BLOCKS)wbDraw(t,vis);if(WATER_REWORK&&ep.seeps)waterDraw(t,vis);
@@ -1564,9 +1579,9 @@ function caveTick(pa){if(state!=='play')return;
   if(caveS===1){if(Math.random()<0.012){shake=Math.max(shake,5+Math.random()*6);for(let k=0;k<14;k++)parts.push({x:cam.x+Math.random()*W,y:cam.y+Math.random()*H,vx:0,vy:rnd(30,90),life:rnd(0.6,1.4),max:1.4,c:'#a88866',s:rnd(1,3),drag:0})}
     if(dist(ship.x,ship.y,padX,padY)<30){caveS=2;caveT0=gameT;toast('LIFT OFFLINE \u2014 NO RESPONSE FROM THE SHAFT',null,null,'#ff6a5a');comm=null;commQ=[];sayComm('F','Lift\u2019s not answering! Kid, the shaft above you is coming down!');shake=Math.max(shake,16);SFX.crack()}}
   if(caveS===2){shake=Math.max(shake,5);if(Math.random()<0.2)parts.push({x:cam.x+Math.random()*W,y:cam.y+Math.random()*H*0.3,vx:0,vy:rnd(40,110),life:1.2,max:1.2,c:'#a88866',s:rnd(1,3),drag:0});if(gameT-caveT0>2.6)completeLevel('cave')}}
-function padIsActive(){return got>=need&&intelGot>=intelNeed&&rescued>=rescueNeed&&cratesGot>=cratesNeed&&(!bossLevel||bossDead)}
+function padIsActive(){return !(epOn()&&epHunt()&&ep.hk<ep.hq)&&got>=need&&intelGot>=intelNeed&&rescued>=rescueNeed&&cratesGot>=cratesNeed&&(!bossLevel||bossDead)}
 
-function objectiveText(){if(cfg.m6redo&&(rescued<rescueNeed||intelGot<intelNeed||cratesGot<cratesNeed))return`Pockets: miners ${rescued}/${rescueNeed} \u00b7 recordings ${intelGot}/${intelNeed} \u00b7 baradium ${cratesGot}/${cratesNeed} \u2014 burrow the amber seams`;
+function objectiveText(){if(epOn()&&epHunt()&&ep.hk<ep.hq)return`Bounty: ${ep.hk}/${ep.hq} bugs \u00b7 5 CR each \u00b7 purple shards 10 CR`;if(cfg.m6redo&&(rescued<rescueNeed||intelGot<intelNeed||cratesGot<cratesNeed))return`Pockets: miners ${rescued}/${rescueNeed} \u00b7 recordings ${intelGot}/${intelNeed} \u00b7 baradium ${cratesGot}/${cratesNeed} \u2014 burrow the amber seams`;
   if(rescued<rescueNeed)return`Rescue stranded miners (${rescued}/${rescueNeed}) — follow the yellow beacons`;
   if(cratesGot<cratesNeed)return weakSet?`Recover baradium crates (${cratesGot}/${cratesNeed}) — sealed pockets: burrow through the amber seams`:`Dig out baradium crates (${cratesGot}/${cratesNeed}) — sealed in the walls, magenta on the scanner`;
   if(got<need)return`Collect plasma crystals (${got}/${need})`;if(intelGot<intelNeed)return`Recover intel (${intelGot}/${intelNeed})`+(weakSet?' — sealed pockets: burrow through the amber seams':cfg.intel.some(i=>i[0]==='crate')?' — caches are sealed in rock':'');
@@ -2041,12 +2056,14 @@ function icon(kind,x,y,s,rgb,a){ctx.save();ctx.translate(x,y);ctx.fillStyle=`rgb
   else if(kind==='crate'){ctx.lineJoin='round';ctx.moveTo(0,-s*0.52);ctx.lineTo(s*0.56,s*0.44);ctx.lineTo(-s*0.56,s*0.44);ctx.closePath();ctx.stroke();ctx.fillRect(-s*0.07,-s*0.16,s*0.14,s*0.34);ctx.fillRect(-s*0.07,s*0.25,s*0.14,s*0.1)}
   else if(kind==='surv'){ctx.fillRect(-s*0.14,-s*0.5,s*0.28,s);ctx.fillRect(-s*0.5,-s*0.14,s,s*0.28)}
   else if(kind==='time'){ctx.arc(0,0,s*0.45,0,6.283);ctx.stroke();ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-s*0.3);ctx.moveTo(0,0);ctx.lineTo(s*0.22,0);ctx.stroke()}
+  else if(kind==='tgt'){ctx.arc(0,0,s*0.34,0,6.283);ctx.stroke();ctx.beginPath();ctx.moveTo(-s*0.56,0);ctx.lineTo(-s*0.14,0);ctx.moveTo(s*0.14,0);ctx.lineTo(s*0.56,0);ctx.moveTo(0,-s*0.56);ctx.lineTo(0,-s*0.14);ctx.moveTo(0,s*0.14);ctx.lineTo(0,s*0.56);ctx.stroke()}
   else if(kind==='ok'){ctx.lineWidth=1.8;ctx.moveTo(-s*0.35,0);ctx.lineTo(-s*0.08,s*0.28);ctx.lineTo(s*0.4,-s*0.3);ctx.stroke()}
   ctx.restore()}
 function hudChips(){const c=[];
   if(rescueNeed)c.push({k:'surv',rgb:HC.surv,txt:`${rescued}/${rescueNeed}`,done:rescued>=rescueNeed});
   if(cratesTotal)c.push({k:'crate',rgb:HC.crate,txt:`${cratesGot}/${cratesNeed}`,done:cratesGot>=cratesNeed});
-  c.push({k:'cry',rgb:HC.cry,txt:need?`${got}/${need}`:`${got}`,done:need&&got>=need});
+  if(epOn()&&epHunt())c.push({k:'tgt',rgb:'255,130,110',txt:`BOUNTY ${ep.hk}/${ep.hq}`,done:ep.hk>=ep.hq});
+  c.push({k:'cry',rgb:HC.cry,txt:need?`${got}/${need}`:epOn()&&epHunt()?`${got}/${cfg.shards}`:`${got}`,done:need&&got>=need,opt:epOn()&&epHunt()});
   if(intelTotal)c.push({k:'intel',rgb:HC.intel,txt:`${intelGot}/${intelTotal}`,done:intelGot>=intelTotal,opt:!intelNeed});
   if(timed&&!(RIVAL_RACE&&rivalOn())){const m=Math.floor(timeLeft/60),s2=Math.floor(timeLeft%60);c.push({k:'time',rgb:timeLeft<20?HC.danger:'255,190,120',txt:`${m}:${String(s2).padStart(2,'0')}`,urgent:timeLeft<20,lab:level===8?'SENATOR':tunPath&&epOn()?'TUNNEL':'COLLAPSE'})}
   return c}
@@ -3138,7 +3155,7 @@ const DONE_LINES={1:['F','Full quota on the lift and my drill came back in one p
 if(M7_V2)DONE_LINES[7]=['F','Out from under the queen and a collapsing tunnel, all in one shift. Kid\u2026 I owe you a drink. Several.'];
 if(M6_CAVEIN)DONE_LINES[6]=['R','Vosh. A Guild survey chief running an agitator cell, and now he\u2019s trying to bury you with the evidence. Follow that service tunnel, miner. I\u2019ll find you a way out.'];
 function doneComm(){if(M8_VOSH_RACE&&level===8&&rival&&rival.res==='win')return{who:'V',text:VOSH_R.mourn[0][1],tag:'RED SKIFF'};if(BASECAMP_V1&&level===1)return{who:'S',text:'Nice work, kid. Your quarters are off the hauler deck: bunk, desk, a window on Naboo. Go take a look. I\u2019d like you settled in.',tag:'QUARTERS'};const d=level<=8&&cfg&&cfg.debrief&&cfg.debrief.length?cfg.debrief[0]:DONE_LINES[level]||['F','Sector cleared and the hauler\u2019s full. Lift\u2019s heading back down for the next one, kid.'];return{who:d[0],text:d[1],tag:'DEBRIEF'}}
-function doneMetrics(){const ms=[];if(need)ms.push(['CRYSTALS',`${got}/${need}`]);if(intelTotal)ms.push(['INTEL',`${intelGot}/${intelTotal}`]);if(rescueNeed)ms.push(['SURVIVORS',`${rescued}/${rescueNeed}`]);if(cratesTotal)ms.push(['CRATES',`${cratesGot}/${cratesTotal}`]);
+function doneMetrics(){const ms=[];if(epOn()&&epHunt()){ms.push(['BOUNTY',`${ep.hk}/${ep.hq}`]);ms.push(['SHARDS',`${got}/${cfg.shards||0}`])}if(need)ms.push(['CRYSTALS',`${got}/${need}`]);if(intelTotal)ms.push(['INTEL',`${intelGot}/${intelTotal}`]);if(rescueNeed)ms.push(['SURVIVORS',`${rescued}/${rescueNeed}`]);if(cratesTotal)ms.push(['CRATES',`${cratesGot}/${cratesTotal}`]);
   const tm=(lvStats&&lvStats.time)||0;ms.push(['TIME',`${Math.floor(tm/60)}:${String(Math.floor(tm%60)).padStart(2,'0')}`]);ms.push(['CREATURES',String((lvStats&&lvStats.kills)||0)]);ms.push(['SHIELDS',Math.round(ship?Math.max(0,ship.sh):0)+'%']);return ms}
 function doneScores(){const s0=(lvStats&&lvStats.s0)||0,ms=lvStats&&lvStats.ms!=null?lvStats.ms:Math.max(0,score-s0),bonus=(lvStats&&lvStats.bonus)||0,r=[];
   const parts=[];if(got)parts.push([`CRYSTALS \u00d7${got}`,got*100]);if(intelGot)parts.push([`INTEL \u00d7${intelGot}`,intelGot*250]);if(cratesGot)parts.push([`BARADIUM \u00d7${cratesGot}`,cratesGot*400]);if(rescued)parts.push([`RESCUES \u00d7${rescued}`,rescued*500]);

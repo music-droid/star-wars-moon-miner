@@ -865,6 +865,12 @@ const CRASH={tMin:30,tMax:150,pow:1.5,mps:25,hull:100,lanes:5,yaw:40,rof:0.18,r0
 var CRASH_TOUGH=true;
 const CRASH_TG={r0:0.66,rD:0.01,ramp:36,v0:1.6,vR:60,vMax:3.0,wv:18,wn:3,wg:60};
 Object.assign(CRASH,{v0:1,vR:90,wv:0,wn:0,wg:0},CRASH_TOUGH?CRASH_TG:{});
+// CRASH_DEEP (survival only; top-down HP untouched): the old flat +1 HP at depth 20 (+2 at 40) made deep crashes unwinnable even for perfect aim. Now the extra HP
+// phases in: expected bonus dk*(depth-19) (fractional part = chance of +1 per spawn), and the depth term of the spawn rate stops growing past dCap. Depths 1-19 unchanged.
+// Revert: CRASH_DEEP=false (floor(depth/20) HP, uncapped rD*depth)
+var CRASH_DEEP=true;
+Object.assign(CRASH,{dk:0.04,dCap:20});
+function crashDeepHp(R){const e=Math.max(0,crs.depth-19)*CRASH.dk;if(e<=0)return 0;const f=Math.floor(e);return f+(R()<e-f?1:0)}
 const CRASH_T={crawler:{hp:1,dmg:10,v:0.22,sz:0.8,at:0,nm:'charger'},scorpion:{hp:3,dmg:12,v:0.14,sz:1.15,at:20,nm:'scorpion'},spitter:{hp:2,dmg:8,v:0.13,sz:0.85,at:40,nm:'mite'},worm:{hp:4,dmg:15,v:0.105,sz:1.1,at:60,nm:'worm'}};
 // CRASH_AIMFIX (Justin: couldn't reach creatures on the far left): every lane + debris-peek spot spawns inside the turret's reach (|th| <= yaw - margin);
 // peeks only from wreck edges inside that arc, any creature outside it eases back in, and the auto-aim cone is at least the margin wide (so the slider ends hit edge creatures). Revert: CRASH_AIMFIX=false
@@ -1092,7 +1098,7 @@ function crashSpawn(){const t=crs.ft,R=Math.random,ty=Object.keys(CRASH_T).filte
   const peek=crs.wreck.filter(w=>w.z>0.24&&w.z<0.9&&Math.abs(w.th)<CRASH.yaw+30&&(!CRASH_AIMFIX||crashPeekSides(w).length));let m;
   if(peek.length&&R()<CRASH_FX.peek){const w=peek[(R()*peek.length)|0],hw=Math.atan((w.sz*CRASH_FX.wrk*crashS(w.z)*0.5)/crs.geo.f)*180/Math.PI,side=CRASH_AIMFIX?(S=>S[(R()*S.length)|0])(crashPeekSides(w)):R()<0.5?-1:1;m={type:k,th:w.th+side*hw*0.95,th0:w.th+side*hw*0.35,z:w.z+0.025,peek:0.9,pk:0.9,w}}
   else{const l=(R()*CRASH.lanes)|0;m={type:k,th:(l-(CRASH.lanes-1)/2)*CRASH_FX.lane+(R()-0.5)*4,z:1,peek:0}}
-  m.hp=P.hp+Math.floor(crs.depth/20);m.ph=R()*6;m.hf=0;m.spit=-1;crs.mobs.push(m)}
+  m.hp=P.hp+(CRASH_DEEP?crashDeepHp(R):Math.floor(crs.depth/20));m.ph=R()*6;m.hf=0;m.spit=-1;crs.mobs.push(m)}
 function crashHit(m,dmg){m.hp-=dmg;m.hf=0.1;if(m.hp>0)return;m.dead=1;crs.kills++;const x=crashX(m.th),y=crashY(m.z),s=crashS(m.z);for(let k=0;k<10;k++)crs.sp.push({x,y:y-s*0.2,vx:rnd(-1,1)*s*1.5,vy:rnd(-1.4,0.2)*s*1.5,l:0.45,c:m.type==='spitter'?'#9cf':m.type==='scorpion'?'#5fd':'#f84'});SFX.boom(0.6)}
 function crashDamage(d){crs.hull=Math.max(0,crs.hull-d);crs.hurt=0.35;crs.shake=Math.max(crs.shake,10);SFX.hurt();if(GAMEPAD_V1)gpRumble(160,0.7)}
 function crashUpdate(dt){const g=crashGeo();crs.ct+=dt;
@@ -1103,7 +1109,7 @@ function crashUpdate(dt){const g=crashGeo();crs.ct+=dt;
   if(crs.ph==='fadein'&&crs.ct>=CRASH_FX.slow){crs.ph='fight';crs.ft=0}
   const live=crs.ph==='fight'||crs.ph==='rescue'||crs.ph==='over';
   if(crs.ph==='fight'){crs.ft+=dt;crs.tl=Math.max(0,crs.T-crs.ft);const t=crs.ft;
-    if(t>1.2){crs.acc+=(CRASH.r0+CRASH.rD*crs.depth)*(1+t/CRASH.ramp)*dt;while(crs.acc>=1){crs.acc-=1;if(crs.mobs.length<CRASH_FX.maxMobs)crashSpawn()}
+    if(t>1.2){crs.acc+=(CRASH.r0+CRASH.rD*(CRASH_DEEP?Math.min(crs.depth,CRASH.dCap):crs.depth))*(1+t/CRASH.ramp)*dt;while(crs.acc>=1){crs.acc-=1;if(crs.mobs.length<CRASH_FX.maxMobs)crashSpawn()}
       if(CRASH.wv){if(crs.nw==null)crs.nw=CRASH.wv;if(t>=crs.nw){crs.nw+=CRASH.wv;for(let i=0,n=CRASH.wn+(CRASH.wg?Math.floor(t/CRASH.wg):0);i<n&&crs.mobs.length<CRASH_FX.maxMobs;i++){const n0=crs.mobs.length;crashSpawn();const m=crs.mobs[n0];if(m&&!m.peek)m.z+=i*0.06}}}}
     crs.fire-=dt;if(crs.fire<=0){crs.fire+=CRASH.rof;crashShoot()}
     if(crs.tl<=0){crs.ph='rescue';crs.ot=0;crs.out='rescued';crs.kept=crashSettle(CRASH.keep);SFX.mech&&SFX.mech(true)}

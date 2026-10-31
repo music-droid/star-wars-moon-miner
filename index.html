@@ -419,7 +419,16 @@ const M8_VOSH_RACE=true,VOSH_RED='#ff4a3a',VOSH_R={
 // M8_PRERACE_TALK (Justin): every Mission 8 line happens BEFORE the race in one tap-through comm (music silent): Vosh's congratulations, his offer (choices greyed),
 // the Sykes and Pik cut-ins, then his taunts and 'Very well' as parting shots. Dialogue ends -> race starts at once with the mission music; no comms, captions or
 // pop-up dialogue during the race (only his 'relay is mine' line if he wins = loss handling, unchanged). Post-win mourning unchanged. Revert: M8_PRERACE_TALK=false
-const M8_PRERACE_TALK=true,VOSH_TALK=[['V',VOSH_R.brief,'solo'],['V',VOSH_R.ask,'ask'],[...VOSH_R.cut[0],'cut'],[...VOSH_R.cut[1],'cut'],
+// M8_RACE_FIX (Justin): pre-race talk is exactly 3 lines (Vosh pitch, Sykes, Pik), no choice bubble; the rival blinks + shows the player's shield bubble +
+// slows when hit (player values: inv 0.6s, shield 0.5s); rival contact never spins/flings (no shove, no twist; mild mutual slowdown + capped separation);
+// Mission 8 monsters cut to 25% (ambient spawn rate x0.25, 1 in 4 blocker monsters). Rockfalls/rubble unchanged. Revert: M8_RACE_FIX=false
+var M8_RACE_FIX=true;
+const M8F={inv:0.6,shf:0.5,slowDur:0.6,slow:0.75,cSlow:0.7,drag:1.0,sep:120,deep:8,deepK:0.35,spawn:0.25,keep:4,
+  v:'Congratulations aside, miner: one tunnel, one relay, one of us. Beat me there and your evidence flies. Lose, and it\u2019s buried with you.',
+  r:'Don\u2019t let him talk you into a wall, miner. That relay is our only uplink to Theed. Fly.',
+  d:'Route plotted, sir. Amber rubble ahead; burrow through it. I suggest we go. Now.'};
+function M8RF(){return M8_RACE_FIX&&typeof VR==='function'&&VR()}
+const M8_PRERACE_TALK=true,VOSH_TALK=M8_RACE_FIX?[['V',M8F.v,'solo','\u25cf RED SKIFF \u00b7 OPEN CHANNEL'],['R',M8F.r,'solo','\u25cf RSF \u00b7 SECURE CHANNEL'],['D',M8F.d,'solo','\u25cf PIK \u00b7 COCKPIT LINK']]:[['V',VOSH_R.brief,'solo'],['V',VOSH_R.ask,'ask'],[...VOSH_R.cut[0],'cut'],[...VOSH_R.cut[1],'cut'],
   ['V',VOSH_R.taunt[2]+' '+VOSH_R.taunt[3],'solo'],['V',VOSH_R.taunt[0]+' '+VOSH_R.taunt[1],'solo'],['V',VOSH_R.taunt[5]+' '+VOSH_R.taunt[6],'solo'],['V',VOSH_R.taunt[4]+' '+VOSH_R.go,'solo']];
 const EPILOGUE=[...(M8_VOSH_RACE?VOSH_R.mourn.slice(1):[]),['R','Your evidence came through. Honestly? Command thinks a miner\u2019s story about bugs and baradium sounds far-fetched.'],
   ['R',M8_VOSH_RACE?VOSH_R.arrest:'But it\u2019s credible enough. Survey Chief Dellan Vosh was arrested at the Theed hangar an hour ago.'],
@@ -1811,7 +1820,7 @@ function startLevel(){if(qtNeed()&&level>=2&&level<=8){level=1;campOpen('menu');
   cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(4,4,8);explored[Math.floor(padY/T)*MW+Math.floor(padX/T)]=1;updateMinimap();
   comm=null;commQ=[];intelLog=[];leaderRevealed=level>6&&level<=8;
   if(RIVAL_RACE)rivalInit();briefIdx=0;briefT=0;setState('briefing');Music.play(cfg.music);Music.battle(0);
-  lvStats={t0:gameT,kills0:kills,s0:score};laneQ=[];caveS=0;caveT0=0;m6Mid=0;m7=cfg.hall?{}:null;m7Collapse=false;if(cfg.hall){ship.x=5*T;ship.y=5.5*T;ship.a=0;if('ta'in ship)ship.ta=0;cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(6,5,8);for(let x=5;x<MW-2;x+=4)markExplored(x,5,3);updateMinimap();const q=spawnMob('boss',padX,padY);q.dormant=true;q.hp=q.max=90+level*3}if(pocketGuard)spawnMob('scorpion',pocketGuard.x,pocketGuard.y);if(raceBlk)for(const b of raceBlk)spawnMob(b.t,b.x,b.y);if(leaderRevealed)unlockDossier('V');if(level>8&&level>PROG.deep){PROG.deep=level;saveProg()}if(epOn()&&ep)epStart()}
+  lvStats={t0:gameT,kills0:kills,s0:score};laneQ=[];caveS=0;caveT0=0;m6Mid=0;m7=cfg.hall?{}:null;m7Collapse=false;if(cfg.hall){ship.x=5*T;ship.y=5.5*T;ship.a=0;if('ta'in ship)ship.ta=0;cam.x=ship.x-W/2;cam.y=ship.y-H/2;markExplored(6,5,8);for(let x=5;x<MW-2;x+=4)markExplored(x,5,3);updateMinimap();const q=spawnMob('boss',padX,padY);q.dormant=true;q.hp=q.max=90+level*3}if(pocketGuard)spawnMob('scorpion',pocketGuard.x,pocketGuard.y);if(raceBlk)raceBlk.forEach((b,k)=>{if(!M8RF()||k%M8F.keep===0)spawnMob(b.t,b.x,b.y)});if(leaderRevealed)unlockDossier('V');if(level>8&&level>PROG.deep){PROG.deep=level;saveProg()}if(epOn()&&ep)epStart()}
 let briefIdx=0,briefT=0,epiIdx=0,epiT=0;
 function briefLen(){return cfg.brief[briefIdx]?cfg.brief[briefIdx][1].length:0}
 function briefNext(){if(state!=='briefing')return;SFX.click();if(briefIdx<cfg.brief.length&&briefT*55<briefLen()){briefT=999;return}briefIdx++;briefT=0;if(briefIdx>cfg.brief.length)endBriefing(1)}
@@ -1927,7 +1936,7 @@ function updatePlay(dt){
   laneTick();
   if(comm){comm.t+=dt;if(commQ.length&&!comm.hold&&comm.t>Math.max(comm.text.length/70+1.8,2.5)&&comm.max-comm.t>0.45)comm.max=comm.t+0.45;if(comm.t>comm.max){comm=commQ.shift()||null;if(comm)comm.t=0}}
   // cracks / spawning
-  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=epOn()&&ep&&!tunPath?epSpawnGap():Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN[level]:1)*(tunPath?RACE_SPAWN:1);trySpawn()}}
+  if(!bossLevel||!boss||boss.dormant){spawnT-=dt;if(spawnT<=0){spawnT=epOn()&&ep&&!tunPath?epSpawnGap():Math.max(1.6,6.5-level*0.45)*1.35*rnd(0.6,1.4)/(cfg.spawnMul||1)/EASE*(midCalm()?MID_SPAWN[level]:1)*(tunPath?RACE_SPAWN:1)/(M8RF()?M8F.spawn:1);trySpawn()}}
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
     if(c.type==='boss')shake=Math.max(shake,4+c.t*4);if(c.t>=c.max){c.done=true;burst(c)}}
   cracks=cracks.filter(c=>!c.done);
@@ -4094,11 +4103,11 @@ const RIVAL_DAMAGE=true,RIVAL_HIT={stall:1.1,back:0.7,cd:1.2,lure:4,r:16,lines:[
 // slow x pace for dur s with sparks + flash, no spin-out, no knockback; iframe s of immunity (bugs stop homing and are shoved aside, never body-block him);
 // if he makes no progress for stuck s he is nudged nudge tiles along his path (plug tiles ahead broken). Revert: RIVAL_SOFTHIT=false (old spin-out stall)
 const RIVAL_SOFTHIT=true,SOFTHIT={slow:0.75,dur:0.65,iframe:1.5,stuck:2,nudge:2.5};
-function rivalHit(k){if(!RIVAL_DAMAGE||!rival||!rivBet||!rivBet.done||rival.fin||rival.hcd>0)return false;k=clamp(k||1,0.5,1.5);if(RIVAL_SOFTHIT){rival.hcd=SOFTHIT.iframe;rival.sl=SOFTHIT.dur}else{rival.hcd=RIVAL_HIT.cd;rival.so=RIVAL_HIT.stall*k;rival.spv=(Math.random()<0.5?-1:1)*rnd(10,14);
-  rival.i=Math.max(0,rival.i-RIVAL_HIT.back*k)}rival.hits=(rival.hits||0)+1;rival.hf=0.25;
-  for(let q=0;q<16;q++){const a=Math.random()*6.283,v=rnd(60,200);parts.push({x:rival.x,y:rival.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.25,0.5),max:0.5,c:q%3?'#ffd27a':'#fff4c8',s:rnd(1.5,2.6),drag:3,g:1})}
+function rivalHit(k){if(!RIVAL_DAMAGE||!rival||!rivBet||!rivBet.done||rival.fin||rival.hcd>0)return false;k=clamp(k||1,0.5,1.5);if(RIVAL_SOFTHIT){const f=M8RF();rival.hcd=f?M8F.inv:SOFTHIT.iframe;rival.sl=f?M8F.slowDur:SOFTHIT.dur;if(f){rival.inv=M8F.inv;rival.shf=M8F.shf}}else{rival.hcd=RIVAL_HIT.cd;rival.so=RIVAL_HIT.stall*k;rival.spv=(Math.random()<0.5?-1:1)*rnd(10,14);
+  rival.i=Math.max(0,rival.i-RIVAL_HIT.back*k)}rival.hits=(rival.hits||0)+1;rival.hf=M8RF()?0:0.25;if(M8RF())for(let k=0;k<8;k++)parts.push({x:rival.x,y:rival.y,vx:rnd(-150,150),vy:rnd(-150,150),life:0.4,max:0.4,c:'#8ef',s:2.5,drag:2,g:1});
+  if(!M8RF())for(let q=0;q<16;q++){const a=Math.random()*6.283,v=rnd(60,200);parts.push({x:rival.x,y:rival.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rnd(0.25,0.5),max:0.5,c:q%3?'#ffd27a':'#fff4c8',s:rnd(1.5,2.6),drag:3,g:1})}
   if(Math.abs(rival.x-ship.x)<W&&Math.abs(rival.y-ship.y)<H)SFX.crack();if(!rival.cap&&Math.random()<0.6)rivalSay((L=>L[(Math.random()*L.length)|0])(rivL().hit||RIVAL_HIT.lines));return true}
-function rivalDmgTick(dt){rival.hcd=Math.max(0,(rival.hcd||0)-dt);rival.sl=Math.max(0,(rival.sl||0)-dt);rival.hf=Math.max(0,(rival.hf||0)-dt);
+function rivalDmgTick(dt){rival.hcd=Math.max(0,(rival.hcd||0)-dt);if(M8_RACE_FIX){rival.inv=Math.max(0,(rival.inv||0)-dt);rival.shf=Math.max(0,(rival.shf||0)-dt)}rival.sl=Math.max(0,(rival.sl||0)-dt);rival.hf=Math.max(0,(rival.hf||0)-dt);
   if(rival.so>0){rival.so-=dt;rival.spa=(rival.spa||0)+rival.spv*dt;rival.spv*=Math.exp(-1.8*dt);if(Math.random()<dt*24)parts.push({x:rival.x+rnd(-8,8),y:rival.y+rnd(-8,8),vx:rnd(-15,15),vy:rnd(-35,-10),life:0.9,max:0.9,c:Math.random()<0.5?'rgba(70,70,74,0.6)':'rgba(120,110,100,0.5)',s:rnd(3,6),drag:0.8})}
   else if(rival.spa){let a=rival.spa%6.283;if(a>Math.PI)a-=6.283;if(a<-Math.PI)a+=6.283;a*=Math.exp(-8*dt);rival.spa=Math.abs(a)<0.01?0:a}
   if(state!=='play'||rival.fin)return;for(const m of mobs){if(m.dead||m.dormant||m.asleep||m.type==='boss')continue;const dx=m.x-rival.x,dy=m.y-rival.y,d=Math.hypot(dx,dy)||1;
@@ -4124,7 +4133,7 @@ function shoveTick(dt,dx,dy,d){rival.shcd=(rival.shcd==null?4:rival.shcd)-dt;if(
 // RIVAL_GRIND (Justin): hull-to-hull contact no longer bounces. While the hulls touch they grind: sparks spray from the seam (like a wall scrape), you drag at
 // drag/s and Varro's pace drops to slow x. Revert: RIVAL_GRIND=false (old bounce)
 const RIVAL_GRIND=true,GRIND={drag:3.2,slow:0.45,hold:0.15,sparks:5};
-function rivalGrind(dt,nx,ny){rival.gr=GRIND.hold;const k=Math.exp(-GRIND.drag*dt);ship.vx*=k;ship.vy*=k;rival.grT=(rival.grT||0)+dt;
+function rivalGrind(dt,nx,ny){rival.gr=GRIND.hold;const k=Math.exp(-(M8RF()?M8F.drag:GRIND.drag)*dt);ship.vx*=k;ship.vy*=k;rival.grT=(rival.grT||0)+dt;
   const cx=(ship.x+rival.x)/2,cy=(ship.y+rival.y)/2,tx=-ny,ty=nx,sd=Math.sign(tx*(ship.vx||1)+ty*(ship.vy||0))||1;
   for(let q=0;q<GRIND.sparks;q++){const v=rnd(60,180);parts.push({x:cx+rnd(-3,3),y:cy+rnd(-3,3),vx:tx*v*sd*(Math.random()<0.3?-1:1)+rnd(-40,40),vy:ty*v*sd*(Math.random()<0.3?-1:1)+rnd(-40,40),life:rnd(0.15,0.35),max:0.35,c:Math.random()<0.6?'#ffd9a0':'#ffb060',s:rnd(1.3,2.8),drag:3,g:1})}
   if(Math.random()<dt*6)parts.push({x:cx,y:cy,vx:rnd(-15,15),vy:rnd(-15,15),life:0.5,max:0.5,c:'rgba(150,140,130,0.45)',s:rnd(2,3.5),drag:2});shake=Math.max(shake,2.5);
@@ -4155,16 +4164,16 @@ function rivalTick(dt){if(!rivalOn()||!rival||!rivBet||!rivBet.done||arr)return;
   rival.cd=Math.max(0,rival.cd-dt);if(RIVAL_GRIND)rival.gr=Math.max(0,(rival.gr||0)-dt);if(RIVAL_DAMAGE)rivalDmgTick(dt);const so=RIVAL_DAMAGE&&rival.so>0;
   if(!rival.fin){const g=rival.i-rival.pi,late=rival.i/N>0.85,m=clamp(1-g*RIVAL_RB,late?0.8:0.5,late?1.15:1.45),j=Math.min(N-1,Math.floor(rival.i)+1),q=P[j];
     rival.dig=map[q[1]*MW+q[0]]===ROCK;
-    const sk=RIVAL_SOFTHIT&&rival.sl>0?SOFTHIT.slow:1;if(rival.dig){rival.dt+=so?0:dt*sk;rival.lane=Math.max(0,rival.lane-dt*3);if(Math.random()<dt*30)parts.push({x:rival.x+Math.cos(rival.a)*22+rnd(-6,6),y:rival.y+Math.sin(rival.a)*22+rnd(-6,6),vx:rnd(-40,40),vy:rnd(-40,40),life:0.5,max:0.5,c:'#b08a52',s:2.5,drag:2,g:1});
+    const sk=RIVAL_SOFTHIT&&rival.sl>0?(M8RF()?M8F.slow:SOFTHIT.slow):1;if(rival.dig){rival.dt+=so?0:dt*sk;rival.lane=Math.max(0,rival.lane-dt*3);if(Math.random()<dt*30)parts.push({x:rival.x+Math.cos(rival.a)*22+rnd(-6,6),y:rival.y+Math.sin(rival.a)*22+rnd(-6,6),vx:rnd(-40,40),vy:rnd(-40,40),life:0.5,max:0.5,c:'#b08a52',s:2.5,drag:2,g:1});
       if(rival.dt>=RIVAL_DIG){rival.dt=0;breakTile(q[0],q[1],true)}}
-    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt*(so?0.12:sk)*(RIVAL_GRIND&&rival.gr>0?GRIND.slow:1))}
+    else{rival.lane=Math.min(1,rival.lane+dt*1.5);rival.i=Math.min(N-1,rival.i+RIVAL_SPD*m*dt*(so?0.12:sk)*(RIVAL_GRIND&&rival.gr>0?(M8RF()?M8F.cSlow:GRIND.slow):1))}
     if(RIVAL_SOFTHIT&&state==='play'){if(rival.i>(rival.sk||0)+0.3||rival.dig&&!so){rival.sk=Math.max(rival.sk||0,rival.i);rival.skt=0}else if((rival.skt=(rival.skt||0)+dt)>SOFTHIT.stuck){rival.skt=0;rival.so=0;rival.unst=(rival.unst||0)+1;
       for(let s=1;s<=4;s++){const q=P[Math.min(N-1,Math.floor(rival.i)+s)];if(map[q[1]*MW+q[0]]===ROCK)breakTile(q[0],q[1],true)}rival.i=Math.min(N-1,rival.i+SOFTHIT.nudge);rival.sk=rival.i}}
     if(rival.i>=N-1){rival.fin=gameT||0.001;rivalSay(rivL().win);toast(rivNm()+' REACHED THE RELAY FIRST',null,null,rivC());if(VR())rival.vl=2.6}
     const ld=rival.i-rival.pi>2?1:rival.i-rival.pi<-2?-1:rival.lead;if(ld!==rival.lead){if(rival.lead!==0&&gameT-rival.ovT>6){rivalSay(ld>0?rivL().pass:rivL().passed);rival.ovT=gameT}rival.lead=ld}}
   rivalPlace();
-  if(ship.mode!=='burrow'&&state==='play'){let dx=ship.x-rival.x,dy=ship.y-rival.y,d=Math.hypot(dx,dy);if(RIVAL_SHOVE){shoveTick(dt,dx,dy,d);dx=ship.x-rival.x;dy=ship.y-rival.y;d=Math.hypot(dx,dy)}
-    if(d<RIVAL_R&&d>0.01){const nx=dx/d,ny=dy/d;if(RIVAL_SHOVE&&(rival.sw||rival.cd<=0&&shoveWall(nx,ny)))doShove(nx,ny);else{if(RIVAL_SHOVE)rivalSep(nx,ny,RIVAL_R-d);else{ship.x+=nx*(RIVAL_R-d);ship.y+=ny*(RIVAL_R-d)}
+  if(ship.mode!=='burrow'&&state==='play'){let dx=ship.x-rival.x,dy=ship.y-rival.y,d=Math.hypot(dx,dy);if(RIVAL_SHOVE&&!M8RF()){shoveTick(dt,dx,dy,d);dx=ship.x-rival.x;dy=ship.y-rival.y;d=Math.hypot(dx,dy)}
+    if(d<RIVAL_R&&d>0.01){const nx=dx/d,ny=dy/d;if(RIVAL_SHOVE&&!M8RF()&&(rival.sw||rival.cd<=0&&shoveWall(nx,ny)))doShove(nx,ny);else{if(M8RF()){const o=RIVAL_R-d;rivalSep(nx,ny,Math.min(o,M8F.sep*dt+Math.max(0,o-M8F.deep)*M8F.deepK))}else if(RIVAL_SHOVE)rivalSep(nx,ny,RIVAL_R-d);else{ship.x+=nx*(RIVAL_R-d);ship.y+=ny*(RIVAL_R-d)}
       if(RIVAL_GRIND)rivalGrind(dt,nx,ny);else if(rival.cd<=0){ship.vx+=nx*RIVAL_BUMP;ship.vy+=ny*RIVAL_BUMP;rival.cd=0.6;rival.bumps=(rival.bumps||0)+1;shake=Math.max(shake,5);SFX.click();if(!rival.bumped){rivalSay(rivL().bump);rival.bumped=1}if(!rival.fin)rival.i=Math.max(0,rival.i-0.4)}}}else if(RIVAL_GRIND&&d<RIVAL_R+2&&d>0.01&&!rival.sw)rivalGrind(dt,dx/d,dy/d);if(RIVAL_SHOVE)rivalUnstick()}
   rival.pt+=dt;if(!rival.dig&&!rival.fin&&rival.pt>0.04){rival.pt=0;const ca=Math.cos(rival.a),sa=Math.sin(rival.a),G=rivalGlow();parts.push({x:rival.x-ca*30*HANDLING.vis,y:rival.y-sa*30*HANDLING.vis,vx:-ca*40,vy:-sa*40,life:HANDLING.trailLife,max:HANDLING.trailLife,c:Math.random()<0.5?G[5]:G[6],s:2.2,drag:1.5,g:1})}
   if(rival.cap){rival.cap.t-=dt;if(rival.cap.t<=0)rival.cap=null}
@@ -4180,7 +4189,10 @@ function rivalTex(){const vr=VR();if(rivTexC&&rivTexC.vr===vr)return rivTexC;if(
   c.vr=vr;rivTexC=c;return c}
 function rivalLights(light){if(!rival)return;light(rival.x,rival.y,90,0.85);light(rival.x+Math.cos(rival.a)*60,rival.y+Math.sin(rival.a)*60,120,0.35)}
 function rivalDraw(t){if(!rivalOn()||!rival)return;const vr=VR();if(vr){ctx.globalCompositeOperation='lighter';glowAt(ctx,rival.x,rival.y,56,'255,60,40',0.22+0.06*Math.sin(t*5));ctx.globalCompositeOperation='source-over'}
-  drawShip(rival.x,rival.y,rival.a+(RIVAL_DAMAGE&&rival.spa||0),'hover',t,HANDLING.vis*(vr?0.88:1),{fit:1,plume:HANDLING.plume,en:100,drill:rival.dig?1:0,drilling:rival.dig,thr:rival.dig||rival.fin||!(rivBet&&rivBet.done)?0.15:0.75,spin:t*12,tex:rivalTex(),glow:rivalGlow()});
+  if(!(M8RF()&&rival.inv>0&&state==='play'&&((t*20)|0)%2))drawShip(rival.x,rival.y,rival.a+(RIVAL_DAMAGE&&rival.spa||0),'hover',t,HANDLING.vis*(vr?0.88:1),{fit:1,plume:HANDLING.plume,en:100,drill:rival.dig?1:0,drilling:rival.dig,thr:rival.dig||rival.fin||!(rivBet&&rivBet.done)?0.15:0.75,spin:t*12,tex:rivalTex(),glow:rivalGlow()});
+  if(M8RF()&&rival.shf>0){const k=rival.shf/0.5;ctx.save();ctx.translate(rival.x,rival.y);ctx.rotate(rival.a);ctx.lineWidth=1.4;
+      for(let i=0;i<9;i++){const fl=Math.sin(t*61+i*2.3)>-0.2?1:0.25;ctx.strokeStyle=`rgba(120,255,215,${0.75*k*fl})`;const a0=i*0.698+t*1.5;ctx.beginPath();ctx.ellipse(-4.5,0,36,22,0,a0,a0+0.5);ctx.stroke()}
+      const g=ctx.createRadialGradient(-4.5,0,8,-4.5,0,36);g.addColorStop(0,'rgba(80,255,205,0)');g.addColorStop(1,`rgba(80,255,205,${0.16*k})`);ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(-4.5,0,36,22,0,0,6.283);ctx.fill();ctx.restore()}
   if(RIVAL_DAMAGE&&rival.hf>0){ctx.globalCompositeOperation='lighter';glowAt(ctx,rival.x,rival.y,48,'255,200,90',rival.hf*2.4);ctx.globalCompositeOperation='source-over'}
   ctx.save();ctx.textAlign='center';ctx.font=`bold 10px ${FW}`;ctx.fillStyle=rivC();ctx.globalAlpha=0.85;ctx.fillText(rivNm(),rival.x,rival.y+34);ctx.globalAlpha=1;
   if(rival.cap){const s=rival.cap.text,fs=touchMode?12:13;ctx.font=`${fs}px ${FB}`;const L=wrapLines(s,200),w=Math.max(...L.map(l=>ctx.measureText(l).width))+16,h=L.length*(fs+3)+10,x=clamp(rival.x-w/2,cam.x+6,cam.x+W-w-6),y=Math.max(cam.y+6,rival.y-40-h);
@@ -4215,7 +4227,7 @@ function voshAdv(){const L=voshLine()[1];if(rivBet.pt<L.length/55){rivBet.pt=L.l
   rivBet.open=false;rivBet.done=true;rivBet.bet=0;toast('BEAT VOSH TO THE RELAY',null,null,VOSH_RED);if(M8_PRERACE_TALK){Music.play(cfg.music);Music.battle(0);rivBet.go=gameT}else rivalSay(VOSH_R.go)}
 function voshDraw(t){const now=performance.now()/1000;rivBet.pt+=Math.min(0.1,now-(rivBet.lt||now));rivBet.lt=now;const[who,txt]=voshLine();if(rivBet.pt>txt.length/55+(rivBet.ph?2.6:3.2))voshAdv();
   const port=H>W,w=Math.min(640,W-16),x=(W-w)/2,cp=!port&&H<500?1:0,sm=w<500;ctx.save();ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
-  if(M8_PRERACE_TALK&&voshLine()[2]==='solo'){const yy=port?Math.max(touchMode?60:20,H*0.1):8;rivBet.hits=[];ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FW}`;ctx.fillStyle='#ff6a50';ctx.fillText('\u25cf RED SKIFF \u00b7 OPEN CHANNEL',x+4,yy+(cp?8:10));
+  if(M8_PRERACE_TALK&&voshLine()[2]==='solo'){const yy=port?Math.max(touchMode?60:20,H*0.1):8;rivBet.hits=[];ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FW}`;ctx.fillStyle=who==='R'?'#8fc8ff':who==='D'?'#9fe8c0':'#ff6a50';ctx.fillText(voshLine()[3]||'\u25cf RED SKIFF \u00b7 OPEN CHANNEL',x+4,yy+(cp?8:10));
     dialogBox(who,txt,x,yy+(cp?11:16),w,Math.floor(rivBet.pt*55),t,cp);ctx.textAlign='center';ctx.font=`${sm?11:12}px ${FB}`;ctx.fillStyle='rgba(235,225,205,0.7)';ctx.fillText((touchMode?'Tap to continue':'ENTER / click to continue')+`  \u00b7  ${rivBet.ph+1}/${VOSH_TALK.length}`,W/2,H-(port?24:8));ctx.restore();return}
   let y=port?Math.max(touchMode?60:20,H*0.1):8;const vh=dlgH(VOSH_R.ask,w,cp);ctx.globalAlpha=voshCut()?0.55:1;dialogBox('V',VOSH_R.ask,x,y,w,voshCut()?999:Math.floor(rivBet.pt*55),t,cp);ctx.globalAlpha=1;y+=vh+(cp?6:10);
   const sh=voshCut()||rivBet.pt>VOSH_R.ask.length/55*0.6,bh=cp?30:40,gw=10,bw=(w-gw)/2;rivBet.hits=[];

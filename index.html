@@ -653,7 +653,7 @@ function epBossGen(c){const R=mulberry((c*2654435761+17)>>>0),pk=a=>a[(R()*a.len
   const hue=Math.floor(R()*300)+30,rgbs=['255,90,60','90,200,255','255,210,70','120,255,140','255,90,200','180,120,255'];
   const B={name:(pk(EP_BN1)+pk(EP_BN2)).toUpperCase()+' '+pk(EP_BN3).toUpperCase(),short:'',atk:A,mods:M.map(m=>m[0]),modNames:M.map(m=>m[1]),hue,rgb:pk(rgbs)};
   if(BOSS_SHAPES){B.shape=bossShape(c,hue);const sg=BOSS_PLANS[B.shape.plan].sig;if(!A.includes(sg))A[2]=sg}
-  if(BOSS_CHIMERA){const C=B.chim=chimGen(c,B);B.atk=C.atk;B.atk2=C.atk2;B.name=B.name.split(' ')[0]+' THE '+C.title.toUpperCase()}return B}
+  if(BOSS_CHIMERA){const C=B.chim=chimGen(c,B);B.atk=C.atk;B.atk2=C.atk2;B.name=B.name.split(' ')[0]+' THE '+C.title.toUpperCase()}if(PIT_BOSS_RULES)pbGen(B,c);return B}
 // BOSS_CHIMERA (Justin): Pit bosses are stitched together from the painted creature art: legs, body, rear (tail/abdomen) and head are cut out of the
 // crawler / mite / scorpion / worm / Hive Mother sprites (feathered-ellipse masks), recoloured with a luminance tint and assembled at Hive Mother size.
 // Each part brings its donor's attack and the minions it summons (scorpion tail -> tail strike + scorpions, roach -> charge + chargers, spitter -> acid +
@@ -701,13 +701,13 @@ function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),
   else if(kind==='heavy'){const R=mulberry((Math.imul(c,2246822519)+11)>>>0);R();const n=3+((R()*3)|0);cfg.crystals=n;cfg.rich=n;cfg.richNeed=Math.max(3,n-1);cfg.name='Rich Vein \u00b7 '+SECTORS[(c+6)%SECTORS.length];cfg.music='tension';cfg.maxMobs=Math.min(8,epCap(c)+3)}
   else if(kind==='hunt'){cfg.crystals=0;cfg.huntQ=HUNT.q(c);cfg.shards=HUNT.shards(c);cfg.name='Monster Hunt \u00b7 '+SECTORS[(c+6)%SECTORS.length];cfg.music='tension';cfg.maxMobs=HUNT.cap(c)}
   else if(kind==='maze'){const R=mulberry((Math.imul(c,1597334677)+5)>>>0);R();const n=4+((R()*3)|0);cfg.crystals=n;cfg.maze=true;cfg.mazeN=n;cfg.mazeNeed=n-1;cfg.cells=MAZE_HARDER?MAZE_HARD.cells(c):Math.min(13,9+Math.floor(c/12));cfg.name='The Warrens \u00b7 '+SECTORS[(c+2)%SECTORS.length];cfg.maxMobs=0}
-  else if(kind==='boss'){cfg.crystals=Math.round(Q*0.4);cfg.boss=true;cfg.music='tension';if(EP_BOSSGEN){cfg.pit.boss=epBossGen(c);cfg.name='Lair of '+cfg.pit.boss.name.split(' ')[0].charAt(0)+cfg.pit.boss.name.split(' ')[0].slice(1).toLowerCase()}else cfg.name='The Hive Lair'}
+  else if(kind==='boss'){cfg.crystals=Math.round(Q*0.4);cfg.boss=true;cfg.music='tension';if(EP_BOSSGEN){cfg.pit.boss=epBossGen(c);cfg.name=PIT_BOSS_RULES?pbLair(cfg.pit.boss):'Lair of '+cfg.pit.boss.name.split(' ')[0].charAt(0)+cfg.pit.boss.name.split(' ')[0].slice(1).toLowerCase()}else cfg.name='The Hive Lair'}
   else{cfg.crystals=0;cfg.tunnel=true;cfg.timed=1;cfg.cells=15;cfg.music='tension';cfg.pad='TUNNEL EXIT';cfg.name='Collapsed Haul Tunnel';cfg.spawnMul=1.4;delete cfg.maxMobs}
   if(has('pockets')&&kind!=='race'&&kind!=='heavy'&&kind!=='hunt'){cfg.pockets=true;cfg.epPockets=Math.min(5,2+Math.floor(c/6))}
   if(has('quakes'))cfg.quakes=true;if(has('static'))cfg.static=true;
   const hz=cfg.pit.names.length?' Hazards: '+cfg.pit.names.join(', ').toLowerCase()+'.':'';
-  const what=kind==='maze'?`No bugs on the scope, sir. Only an old bedrock labyrinth, and ${cfg.mazeN} crystals tucked away in its dead ends. Bring up ${cfg.mazeNeed}. Bedrock won\u2019t drill, but a few walls are cracked through. Burrow those if you find them.`:kind==='hunt'?`Guild notice, sir: this tunnel is so overrun they\u2019ve stopped counting. Five credits a bug, and any purple shards you find are worth ten. Bring the count to ${cfg.huntQ} and I\u2019ll unlock the lift. I suggest you do not run out of shields.`:kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epSub(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
-  cfg.brief=[['D',`The Pit, depth ${c}. ${what}${hz}`]];
+  const what=kind==='maze'?`No bugs on the scope, sir. Only an old bedrock labyrinth, and ${cfg.mazeN} crystals tucked away in its dead ends. Bring up ${cfg.mazeNeed}. Bedrock won\u2019t drill, but a few walls are cracked through. Burrow those if you find them.`:kind==='hunt'?`Guild notice, sir: this tunnel is so overrun they\u2019ve stopped counting. Five credits a bug, and any purple shards you find are worth ten. Bring the count to ${cfg.huntQ} and I\u2019ll unlock the lift. I suggest you do not run out of shields.`:kind==='heavy'?`The vein is thin but rich down here, sir: ${cfg.rich} deep crystals, five credits apiece. Bring up ${cfg.richNeed}. The nests are wide awake, so mind your shields.`:PIT_FLOW_V2&&kind==='mine'&&epSub(c)===1?`A quiet seam to start the shift. Quota: ${Q} crystals.`:kind==='mine'?`Quota: ${Q} crystals.`:kind==='rescue'?`${cfg.rescue} miners are trapped down here, sir, and the quota is ${cfg.crystals} crystals.`:kind==='boss'&&PIT_BOSS_RULES&&cfg.pit.boss?pbBrief(cfg,c)+` Quota: ${cfg.crystals} crystals, or the creature’s own.`:kind==='boss'?`Deep vein. Something big is nesting by the lift: I am calling it ${cfg.pit.boss?cfg.pit.boss.name:'the Hive Mother'}. Quota: ${cfg.crystals} crystals.`:'A haul tunnel has collapsed between us and the next shaft. Burrow through it before the timer runs out.';
+  cfg.brief=[['D',`The Pit, depth ${c}. ${what}${hz}`]];if(PIT_BOSS_RULES&&kind!=='boss'){const pa=pbAhead(c);if(pa)cfg.brief.push(['D',pa])}
   if(c===1)cfg.brief.unshift(['F','The campaign\u2019s over, kid, but the Guild still pays. '+(CRASH_SURVIVAL?'Every crystal you bring up is a credit, paid out when you reach the lift. Crash, and you keep half if rescue gets to you first.':'Every crystal you bring up is a credit in your account, and they\u2019re yours to keep even if you crash.')+' Most of the bugs down here are asleep. Let \u2019em lie.']);
   if(c===1&&PIT_FLOW_V2&&EP_CYCLE&&PIT_RANDOM)cfg.brief.push(['D','No two shifts alike down here. Seams, rescues, races, the Warrens, '+(PIT_HUNT?'monster hunts':'rich veins')+' — no job comes round twice inside three shifts. Every tenth level, whatever is nesting at the bottom.']);else if(c===1&&PIT_FLOW_V2&&EP_CYCLE)cfg.brief.push(['D','Shifts run in fives. Two seams, a wildcard, '+(PIT_HUNT?'a monster hunt':'a rich vein')+' or a rescue, then whatever is nesting at the bottom. Then you do it again, deeper.']);
   const tips={gas:'Green clouds are gas pockets. A blaster bolt will light them up, so shoot them from a distance or use them on the bugs.',dark:'Lamps are out on this level, sir. You only have your headlight.',unstable:'Red crystals are unstable. Get close and they start to crack. Grab them fast and they count double, or back off.',flood:'Parts of this level are flooded. The water will slow you down.',collapse:'This one is going to collapse once the quota is in. When it starts, head straight for the lift.',pockets:'Some crystal caches are sealed behind amber seams. Burrow through to get them.'};
@@ -715,7 +715,7 @@ function epCfg(lv){const c=lv-8,kind=epKind(c),Q=epQuota(c),mods=epMods(c,kind),
   return cfg}
 function epFloorList(minD,dd){dd=dd||bfs(4,4,9999);const out=[];for(let y=3;y<MH-3;y++)for(let x=3;x<MW-3;x++){const i=y*MW+x;if(map[i]===FLOOR&&dd[i]>(minD||0)&&dist(x+0.5,y+0.5,padX/T,padY/T)>4)out.push(i)}return out}
 // called from genLevel once the items are placed
-function epGen(dd){if(CRASH_SURVIVAL&&PROG.held>0)crashSettle(CRASH.keep);const P=cfg.pit,c=P.c,has=k=>P.mods.includes(k),R=mulberry((Date.now()^(c*31337))>>>0);
+function epGen(dd){if(CRASH_SURVIVAL&&PROG.held>0)crashSettle(CRASH.keep);const P=cfg.pit,c=P.c,has=k=>P.mods.includes(k),R=mulberry(((PIT_BOSS_RULES?pbSeedS:Date.now())^(c*31337))>>>0);
   ep={c,kind:P.kind,cr:0,gas:[],flood:[],quiet:0,kt:[],collapse:false,floors:epFloorList(6,dd)};
   // amber pockets: leftover sealed pockets get a 3-crystal cache
   if(cfg.epPockets&&pockets.length>cfg.intel.length+(cfg.crates||0))for(const p of pockets.slice(cfg.intel.length+(cfg.crates||0)))
@@ -861,7 +861,7 @@ function epTick(dt){if(!ep)return;const c=ep.c;if(epHunt())huntTick(dt);
   const wetLv=ep.flood.length||WATER_REWORK&&ep.wet&&ep.wet.size;
   if(wetLv&&epInFlood(ship.x,ship.y)){const k=Math.exp(-2.4*dt);ship.vx*=k;ship.vy*=k;if(Math.random()<dt*8)parts.push({x:ship.x+rnd(-14,14),y:ship.y+rnd(-14,14),vx:rnd(-20,20),vy:rnd(-20,20),life:0.5,max:0.5,c:'rgba(120,190,255,0.6)',s:2,drag:2})}
   if(wetLv)for(const m of mobs)if(m.type!=='boss'&&epInFlood(m.x,m.y)){m.vx*=Math.exp(-2*dt);m.vy*=Math.exp(-2*dt)}
-  for(const it of items){if(!it.unst||it.dead)continue;if(it.fuse==null){if(dist(it.x,it.y,ship.x,ship.y)<T*3&&passable(tileAt(Math.floor(it.x/T),Math.floor(it.y/T)))){it.fuse=3;SFX.crack()}}
+  for(const it of items){if(!it.unst||it.dead)continue;if(it.fuse==null){if(dist(it.x,it.y,ship.x,ship.y)<T*3&&passable(tileAt(Math.floor(it.x/T),Math.floor(it.y/T)))){it.fuse=it.pbB?6:3;SFX.crack()}}
     else{it.fuse-=dt;if(it.fuse<=0){it.dead=true;boom(it.x,it.y,1,'#f64');if(dist(it.x,it.y,ship.x,ship.y)<52)hurtShip(10);const i=ep.floors[(Math.random()*ep.floors.length)|0];if(i!=null)items.push({x:(i%MW+0.5)*T,y:(((i/MW)|0)+0.5)*T,type:'crystal',ph:0})}}}
   if(cfg.pit.mods.includes('collapse')&&!ep.collapse&&padIsActive()&&!bossLevel){ep.collapse=true;const dd=bfs(Math.floor(padX/T),Math.floor(padY/T),9999),si=Math.floor(ship.y/T)*MW+Math.floor(ship.x/T),pd=dd[si]>0?dd[si]:dist(ship.x,ship.y,padX,padY)/T*1.5;
     timed=true;timeMax=timeLeft=Math.max(25,Math.ceil((pd*T/110*1.7+10)/5)*5);quakeT=0.5;toast('COLLAPSE! REACH THE LIFT',null,null,'#ff8a5a');sayComm('D',`Quota is in and the level is collapsing, sir! You have ${timeMax} seconds to reach the lift.`)}}
@@ -1223,8 +1223,8 @@ function crashFrame(dt,t){crashUpdate(dt);const c=crs,g=crashGeo();
   if(c.ph==='over'){ctx.fillStyle=`rgba(0,0,0,${clamp(c.ot/3,0,1)})`;ctx.fillRect(0,0,W,H)}
   if(c.ph==='pad')crashPad(t)}
 // ---- end pads (Mission Complete layout)
-function crashBtns(){return[['START SHIFT',{hot:true},()=>crashGo('shift')],['QUARTERS',{},()=>crashGo('quarters')],['MAIN MENU',{},()=>crashGo('menu')]]}
-function crashGo(k){if(!crs||crs.ph!=='pad'||crs.pt<0.5)return;SFX.click();if(PROG.held)crashSettle(0);crs=null;if(k==='menu'){padGoMenu();return}if(k==='quarters'){campOpen('menu');return}
+function crashBtns(){return[[PIT_BOSS_RULES&&pbRe?'CREATUREPEDIA':'START SHIFT',{hot:true},()=>crashGo('shift')],['QUARTERS',{},()=>crashGo('quarters')],['MAIN MENU',{},()=>crashGo('menu')]]}
+function crashGo(k){if(!crs||crs.ph!=='pad'||crs.pt<0.5)return;SFX.click();if(PROG.held)crashSettle(0);crs=null;if(PIT_BOSS_RULES&&pbRe){if(k==='shift'){pbReturn();return}pbEnd()}if(k==='menu'){padGoMenu();return}if(k==='quarters'){campOpen('menu');return}
   hubFrom='menu';campFrom='menu';campStageRet=false;campCap=null;campPage='room';setState('menu');elevOpen('hub')}
 function crashPadBtn(x,y,w,h,label,o,act,light){if(!light){padBtn(x,y,w,h,label,o,act);return}const fs=Math.min(h*0.36,15);ctx.save();rrect(x,y,w,h,5);ctx.fillStyle=o.hot?'#ffd27a':'#ffffff';ctx.fill();ctx.strokeStyle=o.hot?'#b06a10':'#5a6474';ctx.lineWidth=o.sel?2.6:1.3;ctx.stroke();
   ctx.font=`bold ${fs}px ${FW}`;ctx.textAlign='center';ctx.fillStyle='#1a222c';ctx.fillText(label,x+w/2,y+h/2+fs*0.36,w-8);ctx.restore();pauseHits.push({x,y,w,h,act,pad:label})}
@@ -1283,8 +1283,8 @@ function epBossFire(m,E){const a=E.act,te=E.tele;E.tele=null;SFX.spit();
 function epWeak(m){const q=m.a+Math.PI;return{x:m.x+Math.cos(q)*m.r*0.62,y:m.y+Math.sin(q)*m.r*0.62}}
 function epHit(m,b){if(!m.ep)return 1;const w=epWeak(m);if(dist(b.x,b.y,w.x,w.y)<16){toast('WEAK SPOT',w.x,w.y-10,'#ffb347');return 3}return 1}
 // run end: bonus credits + autosave (PROG.cr, PROG.pitAt = depth to resume)
-function epRunEnd(ok){if(!ep)return;if(PIT_RANDOM&&PIT_FLOW_V2&&EP_CYCLE&&!ep.prDone){ep.prDone=1;prPush(ep.kind)}let b=0;if(CRASH_SURVIVAL&&EP_CREDITS){if(ok)PROG.cr=(PROG.cr||0)+(ep.cr||0);PROG.held=0;PROG.heldLv=0}if(ok&&EP_CREDITS){b=EP_BONUS[ep.kind]||0;if(ep.kind==='race'&&(RIVAL_RACE&&rivalOn()&&rival?rival.res==='win':timeMax&&timeLeft>=timeMax*0.25))b=60;PROG.cr=(PROG.cr||0)+b}if(EP_SAVE)PROG.pitAt=ok?level+1:level;
-  ep.bonus=b;if(ok&&ep.kind==='boss')PROG.pitBoss=1;if(EP_CREDITS&&typeof lvStats==='object'&&lvStats){lvStats.cr=ep.cr+b;lvStats.crB=b}if(level>PROG.deep)PROG.deep=level;if(TWO_MOONS){const z=tmP()[tmCur()];if(EP_SAVE)z.at=PROG.pitAt;z.deep=Math.max(z.deep,ep.c);if(ok)z.last=ep.c;z.t+=typeof lvStats==='object'&&lvStats&&lvStats.t0!=null?Math.max(0,gameT-lvStats.t0):0;z.cr+=EP_CREDITS?(ep.cr||0)+b:0}if(EP_SAVE)saveProg()}
+function epRunEnd(ok){if(!ep)return;if(PIT_BOSS_RULES&&pbRe){pbRunEnd(ok);return}if(PIT_RANDOM&&PIT_FLOW_V2&&EP_CYCLE&&!ep.prDone){ep.prDone=1;prPush(ep.kind)}let b=0;if(CRASH_SURVIVAL&&EP_CREDITS){if(ok)PROG.cr=(PROG.cr||0)+(ep.cr||0);PROG.held=0;PROG.heldLv=0}if(ok&&EP_CREDITS){b=EP_BONUS[ep.kind]||0;if(ep.kind==='race'&&(RIVAL_RACE&&rivalOn()&&rival?rival.res==='win':timeMax&&timeLeft>=timeMax*0.25))b=60;PROG.cr=(PROG.cr||0)+b}if(EP_SAVE)PROG.pitAt=ok?level+1:level;
+  ep.bonus=b;if(ok&&ep.kind==='boss')PROG.pitBoss=1;if(EP_CREDITS&&typeof lvStats==='object'&&lvStats){lvStats.cr=ep.cr+b;lvStats.crB=b}if(level>PROG.deep)PROG.deep=level;if(TWO_MOONS){const z=tmP()[tmCur()];if(EP_SAVE)z.at=PROG.pitAt;z.deep=Math.max(z.deep,ep.c);if(ok)z.last=ep.c;z.t+=typeof lvStats==='object'&&lvStats&&lvStats.t0!=null?Math.max(0,gameT-lvStats.t0):0;z.cr+=EP_CREDITS?(ep.cr||0)+b:0}if(EP_SAVE)saveProg();if(PIT_BOSS_RULES&&ok)pbWin()}
 function epHud(L,t){if(!ep||!EP_HUD)return;const sm=L.sm,x=12;let y=L.top+(sm?40:52)+(touchMode?16:30);ctx.save();ctx.textAlign='left';ctx.font=`bold ${sm?10:12}px ${FB}`;ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,0.65)';
   const s='DEPTH '+ep.c;ctx.strokeText(s,x,y);ctx.fillStyle='rgba(255,196,110,0.95)';ctx.fillText(s,x,y);
   if(PIT_FLOW_V2&&EP_CYCLE){const st=epStep(ep.c),px=x+ctx.measureText(s).width+8,L10=EP_LOOP>5,pr=L10?(sm?2.4:3):sm?3:3.5;for(let k=1;k<=EP_LOOP;k++){ctx.beginPath();ctx.arc(px+(k-1)*pr*(L10?2.7:3)+(L10&&k>5?pr*1.6:0),y-(sm?3.5:4),k===st?pr+0.8:pr,0,6.283);ctx.fillStyle=k<st?'rgba(255,196,110,0.75)':k===st?'#fff2c8':'rgba(0,0,0,0.45)';ctx.fill();ctx.lineWidth=1;ctx.strokeStyle=L10&&k===EP_LOOP?'rgba(255,90,70,0.95)':'rgba(255,196,110,0.8)';ctx.stroke()}
@@ -1334,7 +1334,7 @@ function arenaDraw(t,vis){if(!bArena)return;const x=(bArena.tx+0.5)*T,y=(bArena.
   ctx.strokeStyle=open?'rgba(200,90,255,0.35)':'rgba(120,95,80,0.6)';ctx.lineWidth=1.5;for(let k=0;k<9;k++){const a=k*0.7+bArena.r,l=T*(open?1.3:0.6+0.5*((k*37)%10)/10);ctx.beginPath();ctx.moveTo(x+Math.cos(a)*T*0.3,y+Math.sin(a)*T*0.3);ctx.lineTo(x+Math.cos(a+0.2)*l*0.6,y+Math.sin(a+0.2)*l*0.6);ctx.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);ctx.stroke()}
   if(!bossWoke){ctx.globalAlpha=0.25+0.15*Math.sin(t*2.2);ctx.fillStyle='#c4f';ctx.beginPath();ctx.arc(x,y,T*0.35,0,6.283);ctx.fill()}ctx.restore()}
 function genLevel(lv){
-  const R=mulberry((Date.now()^Math.imul(lv,7919))>>>0);
+  pbSeedS=PIT_BOSS_RULES&&pbForce!=null?pbForce:(Date.now()|0);pbForce=null;pbNearSaid=false;const R=mulberry((pbSeedS^Math.imul(lv,7919))>>>0);
   ep=null;wDeep=null;cfg=levelCfg(lv);const cells=cfg.cells||Math.min(24,7+lv*2);MW=MH=cells*4+3;
   map=new Uint8Array(MW*MH).fill(ROCK);thp=new Float32Array(MW*MH);explored=new Uint8Array(MW*MH);
   const set=(x,y,v)=>{if(x>=2&&y>=2&&x<MW-2&&y<MH-2)map[y*MW+x]=v};
@@ -1378,6 +1378,7 @@ function genLevel(lv){
   if(cfg.hall){const cx0=MW/2,cy0=(11+MH-3)/2;let bd=1e9;for(let i=0;i<d.length;i++){if(d[i]<0||map[i]!==FLOOR)continue;const x=i%MW,y=(i/MW)|0;if(y<14)continue;const q=Math.hypot(x-cx0,y-cy0);if(q<bd){bd=q;bi=i}}}
   if(tunPath){const e=tunPath[tunPath.length-1];bi=e[1]*MW+e[0]}
   if(mazePad>=0)bi=mazePad;
+  if(PIT_BOSS_RULES&&pbLvl()){const q=pbMid(d);if(q>=0)bi=q}
   const ptx=bi%MW,pty=(bi/MW)|0;if(mazePad<0)circ(ptx,pty,cfg.hall?4.6:tunPath?2.6:3.2);
   for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)set(ptx+a,pty+b,PAD);
   padX=(ptx+0.5)*T;padY=(pty+0.5)*T;
@@ -1654,7 +1655,7 @@ function kill(m){logCreature(m.type,m);if(BOSS_PEDIA&&m.ep&&!m.bpDone)bossPedia(
   if(m.type==='worm')for(const s of m.seg)boom(s.x,s.y,0.3,'#c88');
   toast('+'+p,m.x,m.y,'#ffd27a');
   const r=Math.random();
-  if(m.type==='boss'){boss=null;bossDead=true;shake=30;if(!m.ep)toast('THE HIVE MOTHER IS SLAIN!',null,null,'#f8f');if(cfg.hall){m7Collapse=true;quakeT=1.2;toast('SERVICE PASSAGE COLLAPSING',null,null,'#ff8a5a');comm=null;commQ=[];sayComm('D','Queen down! Sir, the service passage is collapsing. Get to the exit portal NOW!')}for(let k=0;k<6;k++)itemDrop({x:m.x+rnd(-50,50),y:m.y+rnd(-50,50),type:k<3?'crystal':k<5?'energy':'shield',ph:0});Music.play(cfg.music)}
+  if(m.type==='boss'){boss=null;bossDead=true;shake=30;if(!m.ep)toast('THE HIVE MOTHER IS SLAIN!',null,null,'#f8f');if(cfg.hall){m7Collapse=true;quakeT=1.2;toast('SERVICE PASSAGE COLLAPSING',null,null,'#ff8a5a');comm=null;commQ=[];sayComm('D','Queen down! Sir, the service passage is collapsing. Get to the exit portal NOW!')}if(PIT_BOSS_RULES&&m.ep&&pbLvl())pbBurst(m);else for(let k=0;k<6;k++)itemDrop({x:m.x+rnd(-50,50),y:m.y+rnd(-50,50),type:k<3?'crystal':k<5?'energy':'shield',ph:0});Music.play(cfg.music)}
   else if(m.type==='worm'&&r<0.6)itemDrop({x:m.x,y:m.y,type:'crystal',ph:0});
   else if(r<(m.type==='spitter'?0.35:0.14))itemDrop({x:m.x,y:m.y,type:Math.random()<0.6?'energy':'shield',ph:0});
   m.dead=true}
@@ -1700,7 +1701,7 @@ function drawReticle(t){const m=ship.tgt;if(!m||ship.lk<=0.02||ship.aimM)return;
 // ================= INPUT =================
 const K={};let mouse={x:0,y:0,down:false},touchMode=!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches),joy={id:null,ox:0,oy:0,x:0,y:0},tFire=false,fireId=null;
 const KEYMAP={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right',j:'fire',z:'fire'};
-addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright','tab','backspace'].includes(k))e.preventDefault();
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(PIT_BOSS_RULES&&pbKeyIn(e,k))return;if([' ','arrowup','arrowdown','arrowleft','arrowright','tab','backspace'].includes(k))e.preventDefault();
   unlockAudio();if(KEYMAP[k])K[KEYMAP[k]]=true;if(e.repeat)return;onKey(k)});
 function onKey(k){
   if(k==='m'){toggleMute();return}
@@ -1722,7 +1723,7 @@ function onKey(k){
   if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8&&(k==='enter'||k===' '))advance()}
 addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(KEYMAP[k])K[KEYMAP[k]]=false});
 addEventListener('blur',()=>{for(const k in K)K[k]=false;mouse.down=false;if(state==='play')setState('pause')});
-function screenTap(x,y){unlockAudio();if(CRASH_SURVIVAL&&state==='crash'){crashPtr(x,y,0,'m');return}if(RIVAL_RACE&&rivBet&&rivBet.open){rivTap(x,y);return}if(PIK_CREDITS_COMM&&pikCom){pikTap();return}if(BASECAMP_V1&&state==='camp'){campTap(x,y);return}if(COCKPIT_CINE&&pitShot()){pitSkip();return}if(state==='gate')setState('crawl');else if(state==='crawl'||state==='pan')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='debrief')debNext();else if(state==='pause')pauseTap(x,y);
+function screenTap(x,y){unlockAudio();if(PIT_BOSS_RULES&&pbNaming&&pbNaming.mode==='rename'){pbTap(x,y);return}if(CRASH_SURVIVAL&&state==='crash'){crashPtr(x,y,0,'m');return}if(RIVAL_RACE&&rivBet&&rivBet.open){rivTap(x,y);return}if(PIK_CREDITS_COMM&&pikCom){pikTap();return}if(BASECAMP_V1&&state==='camp'){campTap(x,y);return}if(COCKPIT_CINE&&pitShot()){pitSkip();return}if(state==='gate')setState('crawl');else if(state==='crawl'||state==='pan')setState('menu');else if(state==='menu')menuClick(x,y);else if(state==='briefing')briefNext();else if(state==='debrief')debNext();else if(state==='pause')pauseTap(x,y);
   else if(state==='levelDone'&&COMPLETE_DATAPAD)doneTap(x,y);
   else if((state==='levelDone'||state==='over'||state==='epilogue')&&stateT>0.8)advance()}
 // ICON_V1: canvas sits inside the safe area, so pointer coordinates are taken relative to it
@@ -1830,7 +1831,7 @@ function endBriefing(cine){if(COCKPIT_CINE&&cine&&state==='briefing'){pitBegin()
 // STORY_FAIL_MAP (Justin): a failed story mission no longer dumps you on the start menu - after MISSION FAILED, the next input opens the hangar hub's
 // STORY datapad mine map with the failed mission selected, so you can jump straight back in. Pit runs keep their own flow. Revert: STORY_FAIL_MAP=false
 const STORY_FAIL_MAP=true;
-function advance(){if(state==='over'){if(STORY_FAIL_MAP&&level<=8&&typeof campHatch==='function'){const lv=level;campFrom='menu';campHatch();stageSel=clamp(lv-1,0,Math.max(0,stageCap-1));return}setState('menu');return}
+function advance(){if(PIT_BOSS_RULES&&pbNaming&&pbNaming.mode==='win')return;if(PIT_BOSS_RULES&&pbRe&&(state==='over'||state==='levelDone')){pbReturn();return}if(state==='over'){if(STORY_FAIL_MAP&&level<=8&&typeof campHatch==='function'){const lv=level;campFrom='menu';campHatch();stageSel=clamp(lv-1,0,Math.max(0,stageCap-1));return}setState('menu');return}
   if(state==='levelDone'){if(level===1&&qtNeed()){campOpen('done');return}if(level===8){markBeaten();setState('epilogue');return}if(level<=8&&cfg.debrief&&cfg.debrief.length){setState('debrief');return}level++;startLevel();return}
   if(state==='debrief'){debNext();return}
   if(state==='epilogue'){if(epiIdx<EPILOGUE.length-1){epiIdx++;epiT=0;SFX.click();return}level++;startLevel()}}
@@ -1940,8 +1941,9 @@ function updatePlay(dt){
   for(const c of cracks){c.t+=dt;if(Math.random()<dt*10)parts.push({x:(c.tx+Math.random())*T,y:(c.ty+Math.random())*T,vx:rnd(-20,20),vy:rnd(10,40),life:0.6,max:0.6,c:'#8a6a4a',s:rnd(1,2.5),drag:1});
     if(c.type==='boss')shake=Math.max(shake,4+c.t*4);if(c.t>=c.max){c.done=true;burst(c)}}
   cracks=cracks.filter(c=>!c.done);
-  if(bossLevel&&!bossWoke&&(cfg.hall?boss&&(dist(ship.x,ship.y,boss.x,boss.y)<T*11||boss.hp<boss.max):(bArena?dist(ship.x,ship.y,(bArena.tx+0.5)*T,(bArena.ty+0.5)*T)<T*(bArena.r+ARENA.wake):dist(ship.x,ship.y,padX,padY)<T*10))){bossWoke=true;if(cfg.hall){boss.dormant=false;shake=Math.max(shake,22);boom(boss.x,boss.y,2,'#c4f')}else if(bArena)addCrack(bArena.tx,bArena.ty,'boss',2.4);else addCrack(Math.floor(padX/T),Math.floor(padY/T),'boss',2.4);
-    toast(cfg.hall?'SEISMIC ALERT — the hive queen is awake!':bArena?'SEISMIC ALERT — something huge is rising from the arena floor!':'SEISMIC ALERT — something huge is rising beneath the lift!',null,null,'#f6f');Music.play('mars');if(epOn()&&cfg.pit&&cfg.pit.boss)sayComm('D',`Contact: ${cfg.pit.boss.name}. Watch for the red warning markers, sir, and aim for the amber node on its back.`);else sayComm('F','That\u2019s her. The hive queen! Vosh\u2019s blasting drove her mad. Light her up, kid!')}
+  if(PIT_BOSS_RULES)pbNear();
+  if(bossLevel&&!bossWoke&&(cfg.hall?boss&&(dist(ship.x,ship.y,boss.x,boss.y)<T*11||boss.hp<boss.max):(bArena?dist(ship.x,ship.y,(bArena.tx+0.5)*T,(bArena.ty+0.5)*T)<T*(bArena.r+ARENA.wake):dist(ship.x,ship.y,padX,padY)<T*10))){bossWoke=true;if(cfg.hall){boss.dormant=false;shake=Math.max(shake,22);boom(boss.x,boss.y,2,'#c4f')}else if(bArena){const q=PIT_BOSS_RULES&&pbLvl()?pbSpawn():null;if(q)addCrack(q[0],q[1],'boss',2.4);else addCrack(bArena.tx,bArena.ty,'boss',2.4)}else addCrack(Math.floor(padX/T),Math.floor(padY/T),'boss',2.4);
+    toast(cfg.hall?'SEISMIC ALERT — the hive queen is awake!':bArena?'SEISMIC ALERT — something huge is rising from the arena floor!':'SEISMIC ALERT — something huge is rising beneath the lift!',null,null,'#f6f');Music.play('mars');if(epOn()&&cfg.pit&&cfg.pit.boss&&PIT_BOSS_RULES)sayComm('D',pbContact());else if(epOn()&&cfg.pit&&cfg.pit.boss)sayComm('D',`Contact: ${cfg.pit.boss.name}. Watch for the red warning markers, sir, and aim for the amber node on its back.`);else sayComm('F','That\u2019s her. The hive queen! Vosh\u2019s blasting drove her mad. Light her up, kid!')}
   // mobs
   let threat=0;
   if(cfg.hall)m7Tick(dt);
@@ -2545,7 +2547,7 @@ function drawHUD(t){if(cfg&&cfg.static&&state==='play')drawStatic(t);if(HUD.ship
      ctx.font=`bold ${fs}px ${FB}`;ctx.textAlign='left';ctx.fillStyle=`rgba(${c.rgb},${(c.opt&&!c.done?0.7:1)*pul})`;ctx.fillText(c.txt,xx,cy+fs*0.36);if(c.done)icon('ok',xx+ctx.measureText(c.txt).width+is*0.6,cy,is*0.8,c.rgb,0.95);
      x+=ws[i]+gap});
    // boss health hangs under the strip
-   if(boss&&!boss.dormant){const bw2=L.port?W-40:Math.min(360,W-40),bx=W/2-bw2/2,by=L.port?L.top+L.mm+20:stripB+(sm?16:20);ctx.textAlign='center';ctx.font=`${sm?8:9}px ${FW}`;ctx.fillStyle='rgba(235,160,255,0.9)';ctx.fillText(boss.ep?boss.ep.name+(boss.ep.modNames.length?'  \u00b7  '+boss.ep.modNames.join(' \u00b7 '):''):'HIVE MOTHER',W/2,by-5);
+   if(boss&&!boss.dormant){const bw2=L.port?W-40:Math.min(360,W-40),bx=W/2-bw2/2,by=L.port?L.top+L.mm+20:stripB+(sm?16:20);ctx.textAlign='center';ctx.font=`${sm?8:9}px ${FW}`;ctx.fillStyle='rgba(235,160,255,0.9)';ctx.fillText(boss.ep?boss.ep.name+(boss.ep.modNames.length&&!(PIT_BOSS_RULES&&boss.ep.pbU)?'  \u00b7  '+boss.ep.modNames.join(' \u00b7 '):''):'HIVE MOTHER',W/2,by-5);
      ctx.fillStyle='rgba(20,6,26,0.6)';ctx.fillRect(bx,by,bw2,5);const g=ctx.createLinearGradient(bx,0,bx+bw2,0);g.addColorStop(0,'#a1f');g.addColorStop(1,'#f4a');ctx.fillStyle=g;ctx.fillRect(bx,by,bw2*clamp(boss.hp/boss.max,0,1),5);ctx.strokeStyle='rgba(235,160,255,0.35)';ctx.strokeRect(bx-0.5,by-0.5,bw2+1,6);stripB=by+8}
    // brief guidance hint, fades away
    if(HUD.objT>0&&banner<=0){if(L.port&&!boss)stripB=Math.max(stripB,L.top+L.mm-4);const a=Math.min(1,HUD.objT/1.2,(5.5-HUD.objT)*3);ctx.globalAlpha=a*0.9;ctx.textAlign='center';ctx.font=`${sm?11:13}px ${FB}`;const ls=wrapLines(HUD.obj,L.port?W-150:Math.min(W-24,520));
@@ -2907,6 +2909,115 @@ function creatureEntries(){return CREATURES.map(c=>PROG.c[c.id]?c:{img:c.img,loc
 // BOSS_PEDIA (Justin): the first time a new procedural Pit boss shows itself, PIK writes it a Creaturepedia entry {id,img,name,role,col,threat,bio}: generated name, a role line, threat from its stats,
 // a 3-sentence bio assembled from fragments for its real attacks, mods and colouring, and a small dataURL portrait. Kept in PROG.bp (newest 30), marked NEW until opened. Revert: BOSS_PEDIA=false
 const BOSS_PEDIA=true,BP_CAP=30;const BP_IMG={};
+// PIT_BOSS_RULES (Justin): Pit bosses (every 10th depth; the M7 Hive Queen is untouched) are UNIDENTIFIED CREATUREs until you name them.
+// The lift sits in the middle of the boss map, PIK warns of an off-the-charts life form two levels out, one level out and on the level itself,
+// a slain boss bursts into the whole crystal quota (unstable, the odd purple), and the win shows a naming screen (required name field, LET PIK NAME IT).
+// The name lands in the Creaturepedia, whose boss pages get RENAME and REBATTLE (same boss, same moon, same map seed; normal shift payout,
+// no depth progress). Saved in PROG.pbn {depth:{n,seed,moon}}. Revert: PIT_BOSS_RULES=false
+var PIT_BOSS_RULES=true;
+var pbNaming=null,pbRe=null,pbForce=null,pbSeedS=0,pbNearSaid=false,pbIn=null;
+const PB_UNK='UNIDENTIFIED CREATURE',PB_MAX=28;
+const PB_S1=['Vor','Kra','Zhul','Mor','Thra','Gor','Xan','Bel','Skar','Ny','Ul','Drak','Vex','Ory','Kael','Sar','Grim','Ashk','Tor','Zey','Hra','Qel'];
+const PB_S2=['gath','ax','oth','ynx','mor','ruun','eth','ak','ira','os','ul','ion','esh','agar','oon','ix','undra','aal'];
+const PB_A=['Ashen','Hollow','Ninefold','Unbroken','Starving','Deepborn','Ever-Hungry','Black-Veined','Iron-Jawed','Endless','Shrieking','Crystal-Eyed','Moonbreaker','Sunless','Thousand-Legged','Burning'];
+const PB_N=['Devourer','Tyrant','Matriarch','Leviathan','Colossus','Dread','Sovereign','Behemoth','Warden','Ravager','Titan','Maw','Empress','Monarch'];
+const PB_BAD=['fuck','fuk','fck','shit','sht','bitch','biatch','cunt','cock','pussy','whore','slut','nigg','niga','fag','rape','penis','vagina','porn','dildo','boob','tits','twat','wank','bastard','piss','nazi','hitler','kkk','retard','douche','jizz','anus','orgasm','horny','sexy'];
+const PB_BADW=['ass','arse','dick','sex','damn','hell','tit','cum','crap','poop','butt','kill','die','dead','hate','stupid','idiot','dumb'];
+function pbP(){if(!PROG.pbn||typeof PROG.pbn!=='object')PROG.pbn={};return PROG.pbn}
+function pbNameOf(c){const r=pbP()[c];return r&&r.n?r.n:null}
+function pbLvl(){return PIT_BOSS_RULES&&!!(cfg&&cfg.boss&&cfg.pit&&cfg.pit.boss&&!cfg.hall&&!cfg.maze&&!cfg.tunnel)}
+function pbIsBoss(c){try{return epKind(c)==='boss'}catch(e){return false}}
+// boss gen: keep the generated name for the bio, show UNIDENTIFIED CREATURE (or the miner's name)
+function pbGen(B,c){B.gname=B.name;const n=pbNameOf(c);B.pbU=!n;B.name=n||PB_UNK;return B}
+function pbLair(B){return B.pbU?'The Uncharted Lair':'Lair of '+B.name.split(' ')[0].charAt(0)+B.name.split(' ')[0].slice(1).toLowerCase()}
+function pbBrief(cfg,c){const B=cfg.pit.boss;if(pbRe)return`Rematch, sir. ${B.name} is back in its lair at depth ${c}, same moon, same rock. I logged everything last time; it did not help my nerves. Bring it down and the crystals are yours.`;
+  if(!B.pbU)return`Deep vein. ${B.name} is down here again, sir. I would know that signature anywhere. Bring it down and it bursts with the whole quota.`;
+  return`Deep vein, sir. The life form is down here with us now, and it matches nothing in my records. Off the charts, again. Be ready. Bring it down and it should burst with every crystal the lift needs. The lift is in the middle of the cavern.`}
+function pbAhead(c){if(!PIT_BOSS_RULES||!ENDLESS_PIT)return null;if(pbIsBoss(c+1))return'It is directly below us now, sir. Another off-the-charts life form, one level down. I cannot tell you what it is. Please be ready.';
+  if(pbIsBoss(c+2))return'Sir, my long-range scanner is picking up something two levels down. Another life form, and the readings are off the charts. I cannot identify it. Only that it is big.';return null}
+// lift in the middle: the reachable tile closest to the map centre
+function pbMid(d){const cx=MW>>1,cy=MH>>1;let bd=1e9,bi=-1;for(let i=0;i<d.length;i++){if(d[i]<0)continue;const q=Math.hypot(i%MW-cx,((i/MW)|0)-cy);if(q<bd){bd=q;bi=i}}return bi}
+// the boss rises from the arena floor beside the lift, never on it, on the side away from you
+function pbSpawn(){if(!bArena)return null;const r=bArena.r||8;let best=null,bs=-1;
+  for(const f of[0.45,0.55,0.7])for(let k=0;k<24;k++){const a=k/24*6.283,x=Math.round(bArena.tx+Math.cos(a)*r*f),y=Math.round(bArena.ty+Math.sin(a)*r*f);if(Math.hypot(x+0.5-padX/T,y+0.5-padY/T)<3.6)continue;
+    let ok=true;for(let b=-1;b<=1&&ok;b++)for(let c=-1;c<=1;c++){const v=map[(y+b)*MW+x+c];if(v!==FLOOR){ok=false;break}}if(!ok)continue;const s=dist((x+0.5)*T,(y+0.5)*T,ship.x,ship.y);if(s>bs){bs=s;best=[x,y]}}return best}
+function pbNear(){if(pbNearSaid||!pbLvl()||bossWoke||state!=='play'||!bArena)return;if(dist(ship.x,ship.y,(bArena.tx+0.5)*T,(bArena.ty+0.5)*T)<T*(bArena.r+ARENA.wake+9)){pbNearSaid=true;const B=cfg.pit.boss;sayComm('D',B.pbU?'It is close, sir. Very close. The readings are off the charts. Whatever it is, be ready.':`It is close, sir. ${B.name}. Be ready.`)}}
+function pbContact(){const B=cfg.pit.boss;return B.pbU?'Contact! There it is, sir. Off every chart I own. Watch for the red warning markers and aim for the amber node on its back.':`Contact: ${B.name}. Watch for the red warning markers, sir, and aim for the amber node on its back.`}
+// slain boss: the whole quota in unstable crystals (they count double), sometimes one purple
+function pbBurst(m){const n=Math.max(1,need||cfg.crystals||1),p=n>=3&&Math.random()<0.45?1:0,u=Math.ceil((n-p)/2),N=u+p;
+  for(let k=0;k<N;k++){const a=k/N*6.283+Math.random()*0.4,r=rnd(36,100),it={x:m.x+Math.cos(a)*r,y:m.y+Math.sin(a)*r,type:'crystal',ph:Math.random()*6};if(k<u){it.unst=1;it.pbB=1}else it.rich=1;itemDrop(it)}
+  for(let k=0;k<3;k++)itemDrop({x:m.x+rnd(-50,50),y:m.y+rnd(-50,50),type:k<2?'energy':'shield',ph:0});
+  boom(m.x,m.y,2.4,'#ff8a5a');toast('CRYSTAL BURST \u00b7 THE WHOLE QUOTA',null,null,'#ffb070');setTimeout(()=>{if(state==='play')sayComm('D','It burst, sir! That is the whole quota scattered on the floor. They are unstable, so grab them fast, then the lift.')},900)}
+// Creaturepedia entry: bio built from the generated name, shown with the miner's name
+function pbTitle(n){return n.toLowerCase().replace(/\b[a-z]/g,(q,i,str)=>/^(the|of)\b/.test(str.slice(i))&&i>0?q:q.toUpperCase())}
+function pbTok(g){const short=g.split(' ')[0],sn=short.charAt(0)+short.slice(1).toLowerCase(),title=g.slice(short.length+1).toLowerCase().replace(/\b[a-z]/g,(q,i,str)=>/^(the|of)\b/.test(str.slice(i))?q:q.toUpperCase());return[sn+' '+title,sn]}
+function pbApply(e,n){if(!e.gname)e.gname=e.name;if(!e.bio0)e.bio0=e.bio;const[full,sn]=pbTok(e.gname),nm=n?pbTitle(n):'An unidentified creature';
+  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');let b=e.bio0.split(full).join(nm);if(sn.length>2)b=b.replace(new RegExp('\\b'+esc(sn)+'\\b','g'),n?nm.split(' ')[0]:'it');
+  e.name=n||PB_UNK;e.bio=b;if(!n&&!/^PIK:/.test(e.bio))e.bio='PIK: \u201cIt still needs a name, sir.\u201d '+e.bio;return e}
+function pbEntry(e,B,c){if(!PIT_BOSS_RULES||!B.gname)return e;e.gname=B.gname;e.bio0=e.bio;e.c=c;e.seed=pbSeedS;e.moon=TWO_MOONS?tmCur():null;const r=pbP()[c]||(pbP()[c]={});if(r.seed==null){r.seed=pbSeedS;r.moon=e.moon}return pbApply(e,pbNameOf(c))}
+function pbEnt(c){return Array.isArray(PROG.bp)?PROG.bp.find(e=>e.id==='bp'+c):null}
+function pbDepth(e){return e&&(e.c||(/^bp(\d+)$/.test(e.id||'')?+e.id.slice(2):0))}
+// ---- names: sanitize + family filter + PIK's generator
+function pbClean(s){return String(s||'').replace(/[^A-Za-z0-9 '\-.]/g,'').replace(/\s+/g,' ').replace(/^[\s'\-.]+/,'').slice(0,PB_MAX).toUpperCase()}
+function pbBad(s){const l=s.toLowerCase(),m=l.replace(/0/g,'o').replace(/1/g,'i').replace(/3/g,'e').replace(/4/g,'a').replace(/5/g,'s').replace(/7/g,'t').replace(/8/g,'b'),j=m.replace(/[^a-z]/g,'');
+  if(PB_BAD.some(w=>j.includes(w)))return true;const ws=m.split(/[^a-z]+/).filter(Boolean);return ws.some(w=>PB_BADW.includes(w)||PB_BADW.includes(w.replace(/s$/,'')))}
+function pbCheck(s){const v=pbClean(s).trim();if(v.replace(/[^A-Z]/g,'').length<2)return{ok:false,v,msg:'At least two letters, sir.'};if(pbBad(v))return{ok:false,v,msg:'PIK: \u201cI cannot log that one, sir. Family archive.\u201d'};return{ok:true,v,msg:''}}
+function pbPikName(){for(let k=0;k<40;k++){const p=a=>a[(Math.random()*a.length)|0],n=(p(PB_S1)+p(PB_S2)).toUpperCase(),s=Math.random()<0.25?n+' '+(p(PB_S1)+p(PB_S2)).toUpperCase():n+' THE '+p(PB_A).toUpperCase()+' '+p(PB_N).toUpperCase();if(s.length<=PB_MAX&&!pbBad(s))return s}return'VORGATH THE DEVOURER'}
+// ---- naming screen (win) / rename (Creaturepedia)
+function pbWin(){if(!pbLvl()||pbRe)return;const c=ep&&ep.c;if(!c||pbNameOf(c))return;pbOpen('win',c)}
+function pbOpen(mode,c){pbNaming={mode,c,t0:performance.now()/1000,msg:'',pik:false,from:state};const v=mode==='rename'?pbNameOf(c)||'':'';pbInEl().value=v;menuHits=[];pauseHits=[]}
+function pbInEl(){if(pbIn)return pbIn;const e=pbIn=document.createElement('input');e.type='text';e.maxLength=PB_MAX;e.autocomplete='off';e.spellcheck=false;e.setAttribute('autocapitalize','characters');e.setAttribute('enterkeyhint','done');e.placeholder='TYPE A NAME';e.id='pbName';
+  e.style.cssText='position:fixed;display:none;z-index:60;box-sizing:border-box;border:2px solid #ffd27a;border-radius:6px;background:#0b1210;color:#ffe9b0;padding:0 10px;outline:none;text-transform:uppercase;letter-spacing:1px;font-family:'+FW;
+  e.addEventListener('input',()=>{const p=e.selectionStart,c=pbClean(e.value);if(c!==e.value.toUpperCase()){e.value=c;try{e.setSelectionRange(p,p)}catch(x){}}if(pbNaming){pbNaming.msg='';pbNaming.pik=false}});
+  e.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();pbConfirm();e.blur()}else if(ev.key==='Escape'&&pbNaming&&pbNaming.mode==='rename'){pbClose()}ev.stopPropagation()});document.body.appendChild(e);return e}
+function pbActive(){return PIT_BOSS_RULES&&pbNaming&&(pbNaming.mode==='rename'||state==='levelDone')}
+function pbConfirm(){if(!pbNaming)return false;const r=pbCheck(pbInEl().value);if(!r.ok){SFX.click();pbNaming.msg=r.msg;lockFlash=performance.now()/1000;return false}
+  const c=pbNaming.c,P=pbP(),rec=P[c]||(P[c]={});rec.n=r.v;const e=pbEnt(c);if(e)pbApply(e,r.v);saveProg();SFX.pickup&&SFX.pickup('crystal');
+  if(pbNaming.mode==='win'){laneToast('LOGGED \u00b7 '+r.v,'#d080ff');if(cfg&&cfg.pit&&cfg.pit.boss&&cfg.pit.c===c){cfg.pit.boss.name=r.v;cfg.pit.boss.pbU=false}}pbClose();return true}
+function pbClose(){pbNaming=null;if(pbIn){pbIn.style.display='none';pbIn.blur()}menuHits=[];pauseHits=[]}
+function pbInSync(){if(!pbIn)return;if(!pbActive()&&pbIn.style.display!=='none'){pbIn.style.display='none';pbIn.blur()}}
+let pbHits=[];
+function pbBtn(x,y,w,h,lb,o,act){padBtn(x,y,w,h,lb,o,act);const hh=pauseHits[pauseHits.length-1];pbHits.push(hh||{x,y,w,h,act})}
+function pbNameDraw(t){pbHits=[];pauseHits=[];const N=pbNaming,c=N.c,win=N.mode==='win',L=padLayout();ctx.fillStyle='rgba(2,4,8,0.9)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L,ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2;ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();
+  const land=sw>=560&&sh<sw*0.75,tf=clamp(Math.min(sw/(land?20:13),sh/12),16,40);let y=sy+ip;
+  padChrome(win?'CREATURE DEFEATED':'RENAME CREATURE',cx,y+tf*0.85,tf,'left');const sf=clamp(tf*0.42,10,15);ctx.font=`bold ${sf}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_AMB;
+  ctx.fillText(`DEPTH ${c}  \u00b7  `+(win?'UNIDENTIFIED CREATURE  \u00b7  NOT IN ANY GUILD RECORD':'CREATUREPEDIA  \u00b7  '+(pbNameOf(c)||PB_UNK)),cx,y+tf*0.85+sf*1.7,cw);y+=tf*0.85+sf*1.7+ip*0.8;
+  const commH=clamp(sh*(land?0.22:0.2),62,116),commY=sy+sh-ip-commH,bh=Math.max(touchMode?44:34,Math.min(46,sh*0.085));
+  // portrait
+  const e=pbEnt(c),avail=commY-ip*0.6-y,pw=land?Math.min(cw*0.3,avail*0.78):Math.min(cw*0.5,avail*0.38),ph=pw*1.25;const px=land?cx:cx+(cw-pw)/2;
+  ctx.save();rrect(px,y,pw,ph,8);ctx.fillStyle='rgba(20,10,26,0.8)';ctx.fill();ctx.strokeStyle='rgba(208,128,255,0.6)';ctx.lineWidth=1.5;ctx.stroke();ctx.clip();
+  const im=e&&BOSS_PEDIA?bpImg(e):null;if(im){const k=Math.min(pw*0.94/im.naturalWidth,ph*0.94/im.naturalHeight);ctx.drawImage(im,px+(pw-im.naturalWidth*k)/2,y+(ph-im.naturalHeight*k)/2,im.naturalWidth*k,im.naturalHeight*k)}
+  else{ctx.fillStyle='rgba(208,128,255,0.6)';ctx.font=boxFont(pw*0.4);ctx.textAlign='center';ctx.fillText('?',px+pw/2,y+ph*0.62)}ctx.restore();
+  // field + buttons
+  const fx=land?cx+pw+ip:cx,fw=land?cw-pw-ip:cw;let fy=land?y:y+ph+ip*0.7;ctx.textAlign='left';ctx.font=`bold ${clamp(sf,10,14)}px ${FW}`;ctx.fillStyle='rgba(159,245,207,0.85)';ctx.fillText(win?'NAME IT (REQUIRED)':'NEW NAME',fx,fy+sf);fy+=sf*1.5;
+  const fh=Math.max(bh,40);pbFieldRect={x:fx,y:fy,w:fw,h:fh};const IN=pbInEl();
+  if(!(artView>=0)){const r=cv.getBoundingClientRect(),k=r.width/W;IN.style.display='block';IN.style.left=(r.left+fx*k)+'px';IN.style.top=(r.top+fy*k)+'px';IN.style.width=(fw*k)+'px';IN.style.height=(fh*k)+'px';IN.style.fontSize=Math.round(clamp(fh*0.42,14,20)*k)+'px'}
+  rrect(fx,fy,fw,fh,6);ctx.fillStyle='#0b1210';ctx.fill();fy+=fh+6;
+  const ok=pbCheck(IN.value).ok;ctx.font=`${clamp(sf*0.95,10,13)}px ${FB}`;ctx.fillStyle=N.msg?'#ff8a6a':'rgba(235,225,205,0.7)';ctx.fillText(N.msg||(N.pik?'PIK\u2019s pick. Keep it, edit it, or roll again.':`Letters, numbers, spaces. Up to ${PB_MAX} characters.`),fx,fy+sf*0.9,fw);fy+=sf*1.6;
+  const two=fw>=300,bw=two?(fw-8)/2:fw;pbBtn(fx,fy,bw,bh,N.pik?'\u21bb PIK, AGAIN':'LET PIK NAME IT',{},()=>{SFX.click();IN.value=pbPikName();N.pik=true;N.msg=''});
+  pbBtn(two?fx+bw+8:fx,two?fy:fy+bh+8,bw,bh,win?'CONFIRM NAME':'SAVE NAME',{hot:ok,lock:!ok,sub:ok?'':'name required'},()=>{pbConfirm()});fy+=two?bh+8:bh*2+16;
+  if(!win)pbBtn(fx,fy,fw,bh*0.85,'\u25c0 CANCEL',{},()=>{SFX.click();pbClose()});
+  padComm(cx,commY,cw,commH,t,win?{who:'D',tag:'CREATUREPEDIA',text:sh<420?'You did it, sir! Off every chart, and you brought it down. Please name it for the Creaturepedia. I am begging you!':`You did it, sir! That thing was off every chart I have, and you brought it down. It needs a name for the Creaturepedia. Please name it. I am begging you. If you will not, I will, and I will make it very dramatic.`}:{who:'D',tag:'CREATUREPEDIA',text:'A new name for the file, sir? I will update the Creaturepedia and pretend I liked the old one.'},false);
+  ctx.restore()}
+var pbFieldRect=null;
+function pbTap(x,y){if(performance.now()/1000-pbNaming.t0<0.35)return true;for(const h of pbHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return true}
+  const F=pbFieldRect;if(F&&x>=F.x&&x<=F.x+F.w&&y>=F.y&&y<=F.y+F.h){try{pbInEl().focus()}catch(e){}}return true}
+function pbKeyIn(e,k){if(!pbActive())return false;if(document.activeElement===pbIn)return true;if(k==='enter'){pbConfirm();e.preventDefault();return true}if(k==='escape'&&pbNaming.mode==='rename'){pbClose();return true}
+  if(k.length===1&&/[a-z0-9 '\-.]/.test(k)){try{pbInEl().focus()}catch(x){}return true}if(k==='m')return false;return true}
+// ---- Creaturepedia buttons + REBATTLE
+function pbCardBtns(d,x,y,w,t){if(!PIT_BOSS_RULES||!d||d.locked)return 0;const c=pbDepth(d);if(!c||!/^bp/.test(d.id||''))return 0;const bh=touchMode?40:30,two=w>=200,bw=two?(w-6)/2:w,inRun=state==='pause'||state==='levelDone'||state==='play';
+  const mk=(bx,by,bw2,lb,o,act)=>{rrect(bx,by,bw2,bh,5);ctx.fillStyle=o.lock?'rgba(40,22,12,0.6)':o.hot?'#ffd21f':'rgba(40,22,12,0.85)';ctx.fill();ctx.strokeStyle=o.lock?'rgba(255,210,31,0.3)':'rgba(255,210,31,0.75)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle=o.lock?'rgba(255,210,31,0.45)':o.hot?'#3a0a04':'#ffd21f';ctx.font=`700 ${clamp(bh*0.36,10,14)}px ${FW}`;ctx.textAlign='center';ctx.fillText(lb,bx+bw2/2,by+bh*0.64,bw2-6);ctx.textAlign='left';menuHits.push({x:bx,y:by,w:bw2,h:bh,act,pbB:lb})};
+  mk(x,y,bw,'RENAME',{},()=>{SFX.click();pbOpen('rename',c)});mk(two?x+bw+6:x,two?y:y+bh+6,bw,'REBATTLE',{hot:!inRun,lock:inRun},()=>{if(inRun){SFX.click();lockFlash=performance.now()/1000;toast('Finish your shift first, sir.',null,null,'#ffb070');return}pbRebattle(d)});
+  return two?bh+6:bh*2+12}
+function pbRebattle(d){const c=pbDepth(d);if(!c)return;const r=pbP()[c]||{},seed=d.seed!=null?d.seed:r.seed!=null?r.seed:null,moon=d.moon||r.moon||null;
+  pbRe={c,id:d.id,prev:PROG.tmCur,moon};campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;campDesk=false;campPage='room';pausePage='main';
+  if(TWO_MOONS&&moon)PROG.tmCur=moon;pbForce=seed;level=c+8;startLevel()}
+function pbEnd(){if(!pbRe)return;if(TWO_MOONS)PROG.tmCur=pbRe.prev;pbRe=null;pbForce=null;saveProg()}
+function pbReturn(){const id=pbRe&&pbRe.id;pbEnd();campOpen('menu');campPage='desk';campDesk=true;pausePage='archive';aboutTab='creatures';msgScroll=0;artPage=0;menuHits=[];const i=creatureEntries().findIndex(e=>e.id===id);if(i>=0)crIdx=i}
+// rematch end: the normal shift payout (crystal credits + the usual boss bonus); no depth, moon or record progress
+function pbRunEnd(ok){let b=0;if(CRASH_SURVIVAL&&EP_CREDITS){if(ok)PROG.cr=(PROG.cr||0)+(ep.cr||0);PROG.held=0;PROG.heldLv=0}if(ok&&EP_CREDITS){b=EP_BONUS[ep.kind]||0;PROG.cr=(PROG.cr||0)+b}
+  ep.bonus=b;if(EP_CREDITS&&typeof lvStats==='object'&&lvStats){lvStats.cr=ep.cr+b;lvStats.crB=b}const r=pbP()[ep.c]||(pbP()[ep.c]={});r.re=(r.re||0)+1;if(ok)r.reW=(r.reW||0)+1;const m=PROG.tmCur;if(TWO_MOONS)PROG.tmCur=pbRe.prev;saveProg();PROG.tmCur=m}
 const BP_ATK={ring:['fires rings of acid in every direction','slip between the globs of a ring instead of running from it'],volley:['spits fanned volleys of acid straight at you','strafe across a volley, never along it'],
   brood:['births crawler brood from its belly','clear the brood before it surrounds you'],charge:['rears back and charges across the gallery','sidestep the charge the moment it rears'],spiral:['sprays a spinning stream of acid','circle with the spiral, not against it'],
   rockrain:['shakes rock down from the ceiling onto red markers','keep moving when the red markers appear'],nova:['blasts out a shockwave when you come close','never linger inside its reach'],strike:['smashes the rock wherever you hover','do not hide in soft rock, it digs you out'],
@@ -3004,7 +3115,7 @@ function bossPortrait(B){try{const W=88,H=112,cv=document.createElement('canvas'
   const n=MOB_SPR.boss[0];if(!sprOK(n))return null;const S=SPR[n],k=Math.min(W*0.92/S.h,H*0.9/S.w);g.translate(W/2,H/2);g.rotate(-Math.PI/2);g.filter=`hue-rotate(${B.hue}deg)`;g.drawImage(S.img,-S.w*k/2,-S.h*k/2,S.w*k,S.h*k);g.filter='none';
   let u=cv.toDataURL('image/webp',0.8);if(u.indexOf('data:image/webp')!==0)u=cv.toDataURL('image/jpeg',0.82);return u}catch(e){return null}}
 function bossPedia(m){m.bpDone=1;const B=m.ep,c=epOn()&&ep?ep.c:(cfg.pit&&cfg.pit.c)||0;if(!B||!B.name||!c)return;if(!Array.isArray(PROG.bp))PROG.bp=[];if(PROG.bp.some(e=>e.id==='bp'+c||e.name===B.name&&e.c===c))return;
-  PROG.bp.push(bossPediaEntry(B,c,bossPortrait(B)||'cBoss'));while(PROG.bp.length>BP_CAP)PROG.bp.shift();saveProg();laneToast('CREATUREPEDIA UPDATED','#d080ff')}
+  PROG.bp.push(PIT_BOSS_RULES&&B.gname?pbEntry(bossPediaEntry(Object.assign({},B,{name:B.gname}),c,bossPortrait(B)||'cBoss'),B,c):bossPediaEntry(B,c,bossPortrait(B)||'cBoss'));while(PROG.bp.length>BP_CAP)PROG.bp.shift();saveProg();laneToast('CREATUREPEDIA UPDATED','#d080ff')}
 function bpImg(c){if(!c.img||c.img.indexOf('data:')!==0)return null;let im=BP_IMG[c.id];if(!im){im=BP_IMG[c.id]=new Image();im.src=c.img}return im.complete&&im.naturalWidth?im:null}
 // tinted / silhouette copies of portrait art (built once, after the image loads)
 const TINT={};function tinted(n,mode){const key=n+':'+mode;if(TINT[key])return TINT[key];if(!sprOK(n))return null;const im=SPR[n].img,c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const g=c.getContext('2d');g.drawImage(im,0,0);
@@ -3015,7 +3126,7 @@ const TINT={};function tinted(n,mode){const key=n+':'+mode;if(TINT[key])return T
 function stageInfo(lv){if(lv>8&&ENDLESS_PIT&&TWO_MOONS){const m=tmNext(),a=tmP()[m].at;return{num:'\u221e',name:'THE ENDLESS PIT',moon:'NEXT SHIFT \u00b7 '+TM_NAME[m],tags:'NO END \u00b7 CREDITS',best:a>9?'RESUME DEPTH '+(a-8)+(PIT_FLOW_V2&&EP_CYCLE?' \u00b7 '+epStep(a-8)+'/'+EP_LOOP:''):'FROM DEPTH 1'}}if(lv>8&&ENDLESS_PIT)return{num:'\u221e',name:'THE ENDLESS PIT',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END \u00b7 CREDITS',best:PROG.pitAt>9?'RESUME DEPTH '+(PROG.pitAt-8)+(PIT_FLOW_V2&&EP_CYCLE?' \u00b7 '+epStep(PROG.pitAt-8)+'/'+EP_LOOP:''):'FROM DEPTH 1'};if(lv>8)return{num:'\u221e',name:'ENDLESS SECTORS',moon:'OHMA-D\u2019UN \u00b7 RORI',tags:'NO END',best:PROG.deep?'DEEPEST SECTOR '+PROG.deep:'FROM SECTOR 9'};const c=CAMPAIGN[lv],tg=[];if(c.rescue)tg.push('RESCUE');if(c.crates)tg.push('CRATES');if(c.intelNeed)tg.push('INTEL');if(c.boss)tg.push('BOSS');if(c.timed)tg.push('TIMED');if(c.quakes)tg.push('QUAKES');
   return{num:String(lv).padStart(2,'0'),name:c.name.toUpperCase(),moon:c.moon,tags:tg.join(' \u00b7 '),best:PROG.best[lv]?'BEST '+PROG.best[lv].toLocaleString('en-US'):'NO SCORE YET'}}
 let stageSel=0,pausePage='main',pauseHits=[],pausePick=0,lockFlash=-9;
-function launchStage(n){campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;if(TWO_MOONS&&ENDLESS_PIT&&n===9){const m=tmNext();PROG.tmCur=m;PROG.shiftN++;PROG.pitAt=tmP()[m].at;saveProg()}if(ENDLESS_PIT&&n===9&&PROG.pitAt>9)n=PROG.pitAt;level=n;startLevel()}
+function launchStage(n){if(PIT_BOSS_RULES&&pbRe)pbEnd();campStageRet=false;stageCap=9;unlockAudio();SFX.click();evidence=[];score=0;kills=0;if(TWO_MOONS&&ENDLESS_PIT&&n===9){const m=tmNext();PROG.tmCur=m;PROG.shiftN++;PROG.pitAt=tmP()[m].at;saveProg()}if(ENDLESS_PIT&&n===9&&PROG.pitAt>9)n=PROG.pitAt;level=n;startLevel()}
 function lockIcon(x,y,s,col){ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=Math.max(1.5,s*0.16);ctx.beginPath();ctx.arc(x+s/2,y+s*0.42,s*0.27,Math.PI,0);ctx.stroke();rrect(x+s*0.12,y+s*0.42,s*0.76,s*0.58,s*0.1);ctx.fill();ctx.restore()}
 function aboutTabs(cx,y,cw,t,TL,LB){const th=Math.max(clamp(cw/18,24,34),touchMode&&cw<560?44:0);let fs=clamp(cw/18,24,34)*0.5;const tabs=(TL||ABOUT_TABS).map(id=>[id,LB&&LB[id]||{story:'STORY',chars:TL?'PROFILES':'CHARACTERS',creatures:cw>640?'CREATUREPEDIA':'CREATURES',art:'ARTWORK',msgs:campDesk?(cw>560?'MISSION LOGS':'LOGS'):'MESSAGES',scans:cw>560?'FOUND SCANS':'SCANS'}[id]]);let x=cx;
   ctx.font=boxFont(fs);{const tot=()=>tabs.reduce((a,[,lb])=>a+ctx.measureText(lb).width+fs*2.2+10,-10);while(tot()>cw&&fs>8){fs-=0.5;ctx.font=boxFont(fs)}}const gapX=fs*1.1;for(const[id,lb]of tabs){const lk=false,w=ctx.measureText(lb).width+gapX*2+(lk?fs*1.4:0),on=aboutTab===id;rrect(x,y,w,th,5);ctx.fillStyle=on?'#ffd21f':'rgba(40,22,12,0.85)';ctx.fill();ctx.strokeStyle=on?'#3a0a04':'rgba(255,210,31,0.6)';ctx.lineWidth=1.5;ctx.stroke();
@@ -3124,7 +3235,8 @@ function drawDossierPage(list,sel,setSel,cardFn,word,hk,cx,y,cw,avail,t){const n
   ctx.font=`italic ${Math.max(10,nf*0.62)}px ${FB}`;ctx.fillStyle='#bfae90';const rl=wrapLines(d.role,bw);rl.forEach((l,i)=>ctx.fillText(l,bx,ny-nf*0.1+i*nf*0.8+nf*0.25));ny+=rl.length*nf*0.8;
   if(d.threat){const ts=Math.max(8,nf*0.5),ty2=ny+nf*0.55;ctx.font=`700 ${ts}px ${FW}`;ctx.fillStyle='#f2741c';ctx.fillText('THREAT',bx,ty2);let px=bx+ctx.measureText('THREAT').width+ts*0.8;
     for(let k=0;k<5;k++){rrect(px,ty2-ts*0.85,ts*1.5,ts*0.85,2);ctx.fillStyle=k<d.threat?(d.threat>=4?'#ff5a3c':'#ffb040'):'rgba(255,210,31,0.15)';ctx.fill();px+=ts*1.85}ny+=nf*0.9}
-  const tx2=narrow?cx:bx,tw2=narrow?cw:bw,top2=narrow?yy+ph+8:ny+nf*0.2,space=narrow?rest-ph-8:Math.max(ph,rest)-(top2-yy);let fs=narrow?clamp(cw/24,11,16):17,lines;for(;fs>=9;fs-=0.5){ctx.font=`${fs}px ${FB}`;lines=wrapLines(d.bio,tw2);if(lines.length*fs*1.4<=space)break}
+  const pbH=PIT_BOSS_RULES&&cardFn===drawCreatureCard?pbCardBtns(d,narrow?cx:bx,narrow?yy+ph+8:ny+nf*0.2,narrow?cw:Math.min(bw,380),t):0;
+  const tx2=narrow?cx:bx,tw2=narrow?cw:bw,top2=(narrow?yy+ph+8:ny+nf*0.2)+(pbH?pbH+6:0),space=(narrow?rest-ph-8:Math.max(ph,rest)-(top2-yy))-(narrow&&pbH?pbH+6:0);let fs=narrow?clamp(cw/24,11,16):17,lines;for(;fs>=9;fs-=0.5){ctx.font=`${fs}px ${FB}`;lines=wrapLines(d.bio,tw2);if(lines.length*fs*1.4<=space)break}
   ctx.fillStyle=d.locked?'rgba(240,228,204,0.6)':'#f0e4cc';lines.forEach((l,i)=>ctx.fillText(l,tx2,top2+fs+i*fs*1.4))}
 // stage list shared by the main-menu page and the pause screen
 function drawStageList(X,y,W0,h,t,hits,onPick){const n=9,gap=clamp(h/90,3,7);
@@ -3556,7 +3668,7 @@ function drawDatapad(t){const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.78)';ctx
   if(!touchMode&&sh>360){ctx.font=`11px ${FB}`;ctx.textAlign='right';ctx.fillStyle='rgba(159,245,207,0.4)';ctx.fillText((PAUSE_RESUME?'P/ESC resume  \u00b7  Q main menu  \u00b7  A archive':'P/ESC resume  \u00b7  S stage select  \u00b7  Q main menu  \u00b7  A archive'),cx+cw,sy+sh-4)}
   ctx.restore();
   if(pausePage==='quit')drawPadQuit(L,t)}
-function padGoMenu(){SFX.click();if(score>hi){hi=score;localStorage.setItem('nm_hi',hi)}setState('menu')}
+function padGoMenu(){if(PIT_BOSS_RULES&&pbRe)pbEnd();SFX.click();if(score>hi){hi=score;localStorage.setItem('nm_hi',hi)}setState('menu')}
 function drawPadQuit(L,t){ctx.fillStyle='rgba(2,6,4,0.75)';ctx.fillRect(L.sx,L.sy,L.sw,L.sh);pauseHits=[];const cw=Math.min(440,L.sw-24),ch=Math.min(190,L.sh-20),cx=L.sx+(L.sw-cw)/2,cy=L.sy+(L.sh-ch)/2;
   rrect(cx,cy,cw,ch,8);ctx.fillStyle='rgba(6,18,13,0.97)';ctx.fill();ctx.strokeStyle=PAD_AMB;ctx.lineWidth=1.5;ctx.stroke();const tf=clamp(cw/18,16,24);padChrome('RETURN TO MAIN MENU?',cx+cw/2,cy+tf+12,tf,'center');
   ctx.font=`${clamp(cw/30,12,15)}px ${FB}`;ctx.textAlign='center';ctx.fillStyle=PAD_MINT;let yy=cy+tf+38;for(const l of wrapLines(`This run ends here. Score ${score} is kept toward your high score; mission progress is lost.`,cw-30)){ctx.fillText(l,cx+cw/2,yy);yy+=18}
@@ -3619,8 +3731,8 @@ function doneCanStages(){return gameBeaten||level===8}
 function doneNext(){if(stateT<0.8)return;SFX.click();advance()}
 function doneStages(){if(!doneCanStages()){lockFlash=performance.now()/1000;SFX.click();return}SFX.click();if(level===8&&!gameBeaten)markBeaten();const ns=clamp(level<=8?level%9:8,0,8);setState('menu');menuPage='stages';stageSel=ns;menuHits=[];if(H<520&&W>H)ap.style.display='none'}
 function doneMenu(){if(level===8&&!gameBeaten)markBeaten();padGoMenu()}
-function doneBtns(){return[[level===8?'CONTINUE':level===1&&qtNeed()?'TO QUARTERS':level<8?'NEXT MISSION':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],[campOn()?'QUARTERS':'ARCHIVE',{hot:level===1&&campOn()},()=>{SFX.click();padOpenArchive()}]].filter(b=>!(NO_STAGESEL_END&&b[2]===doneStages))}
-function drawComplete(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.8)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L;const ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2;ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();
+function doneBtns(){return[[level===8?'CONTINUE':level===1&&qtNeed()?'TO QUARTERS':level<8?'NEXT MISSION':PIT_BOSS_RULES&&pbRe?'CREATUREPEDIA':'NEXT SECTOR',{hot:true},doneNext],['STAGE SELECT',{lock:!doneCanStages(),sub:doneCanStages()?'':'beat the campaign'},doneStages],['MAIN MENU',{},()=>doneMenu()],[campOn()?'QUARTERS':'ARCHIVE',{hot:level===1&&campOn()},()=>{SFX.click();padOpenArchive()}]].filter(b=>!(NO_STAGESEL_END&&b[2]===doneStages))}
+function drawComplete(t){if(PIT_BOSS_RULES&&pbNaming&&pbNaming.mode==='win'){pbNameDraw(t);return}pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,4,8,0.8)';ctx.fillRect(0,0,W,H);padFrame(L,t);const{sx,sy,sw,sh}=L;const ip=clamp(sw*0.03,10,22),cx=sx+ip,cw=sw-ip*2;ctx.save();rrect(sx,sy,sw,sh,6);ctx.clip();
   if(pausePage==='archive'){drawPadArchive(L,cx,cw,ip,t);ctx.restore();if(artView>=0)drawArtView(t);return}
   const land=sw>=560,short=land&&sh<380,title=level===8?'EVIDENCE TRANSMITTED':level>8?(ENDLESS_PIT?'DEPTH CLEARED':'SECTOR CLEARED'):'MISSION COMPLETE',tf=clamp(Math.min(sw/(land?18:12.5),sh/(short?12:10)),18,44),bh=Math.max(touchMode?44:34,Math.min(46,sh*0.085));let y=sy+ip;
   const tw=padChrome(title,cx,y+tf*0.85,tf,'left'),sf=clamp(tf*0.4,11,16);ctx.font=`bold ${sf}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_AMB;
@@ -3645,7 +3757,7 @@ function drawComplete(t){pauseHits=[];const L=padLayout();ctx.fillStyle='rgba(2,
   ctx.restore()}
 function doneScoreList(sc,x,y,w,pf){ctx.font=`bold ${pf}px ${FW}`;ctx.textAlign='left';ctx.fillStyle=PAD_AMB;ctx.fillText('SCORE',x,y+pf);let yy=y+pf*2.4;
   for(const r of sc){if(r.rule){ctx.fillStyle='rgba(159,245,207,0.35)';ctx.fillRect(x,yy-pf*0.6,w,1);yy+=pf*0.5;continue}padLeader(r.l,r.v,x,yy+pf*0.4,w,r.tot?pf*1.08:pf,r.hot||r.tot?PAD_AMB:null);yy+=pf*1.75}return yy-pf*1.75+pf*0.6}
-function doneTap(x,y){if(stateT<0.4)return;if(pausePage==='archive'){padTap(x,y);return}for(const h of pauseHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return}}
+function doneTap(x,y){if(PIT_BOSS_RULES&&pbNaming&&pbNaming.mode==='win'){pbTap(x,y);return}if(stateT<0.4)return;if(pausePage==='archive'){padTap(x,y);return}for(const h of pauseHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return}}
 function doneKey(k){if(pausePage==='archive'){padKey(k);return}
   if(k==='enter'||k===' '){if(padSel>=0){const h=pauseHits.filter(h=>h.pad)[padSel];if(h)h.act()}else doneNext();return}
   if(k==='n'){doneNext();return}if(k==='s'&&!NO_STAGESEL_END){doneStages();return}if(k==='q'){doneMenu();return}if(k==='a'){SFX.click();padOpenArchive();return}
@@ -4753,6 +4865,7 @@ function frame(now){const dt=Math.min(0.033,(now-lastT)/1000);lastT=now;const t=
       if(COCKPIT_CINE)pitAfter(dt);
     }
     if(PIK_CREDITS_COMM)pikDraw(t);
+    if(PIT_BOSS_RULES){if(pbNaming&&pbNaming.mode==='rename')pbNameDraw(t);pbInSync()}
     if(GAMEPAD_V1)gpDraw(t);
   }catch(e){console.error(e)}
   requestAnimationFrame(frame)}

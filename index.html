@@ -859,6 +859,12 @@ function huntTick(dt){if(ep.hk>=ep.hq)return;ep.nestT-=dt;if(ep.nestT>0||gameT<e
 // Survive T = tMin + (tMax-tMin)*R^pow s (seeded per crash) until rescue arrives (floodlights, white pad) or the hull falls (fade to black pad). Revert: CRASH_SURVIVAL=false
 const CRASH_SURVIVAL=true;
 const CRASH={tMin:30,tMax:150,pow:1.5,mps:25,hull:100,lanes:5,yaw:40,rof:0.18,r0:0.6,rD:0.02,ramp:45,vMax:1.8,keep:0.5};
+// CRASH_TOUGH (Justin: "toughen survival back up with more and faster monsters" after CRASH_BOLTS' 0.13 s blaster made it ~10x easier). Bolts/rate/look untouched;
+// only spawn rate (r0, rD, ramp), speed (base v0, ramp vR s per +1x, cap vMax) and burst waves (every wv s, wn creatures + 1 per wg s survived) change. Depth scaling kept.
+// Revert: CRASH_TOUGH=false (old r0 0.6, rD 0.02, ramp 45, v0 1, vR 90, vMax 1.8, no waves)
+var CRASH_TOUGH=true;
+const CRASH_TG={r0:0.66,rD:0.01,ramp:36,v0:1.6,vR:60,vMax:3.0,wv:18,wn:3,wg:60};
+Object.assign(CRASH,{v0:1,vR:90,wv:0,wn:0,wg:0},CRASH_TOUGH?CRASH_TG:{});
 const CRASH_T={crawler:{hp:1,dmg:10,v:0.22,sz:0.8,at:0,nm:'charger'},scorpion:{hp:3,dmg:12,v:0.14,sz:1.15,at:20,nm:'scorpion'},spitter:{hp:2,dmg:8,v:0.13,sz:0.85,at:40,nm:'mite'},worm:{hp:4,dmg:15,v:0.105,sz:1.1,at:60,nm:'worm'}};
 // CRASH_AIMFIX (Justin: couldn't reach creatures on the far left): every lane + debris-peek spot spawns inside the turret's reach (|th| <= yaw - margin);
 // peeks only from wreck edges inside that arc, any creature outside it eases back in, and the auto-aim cone is at least the margin wide (so the slider ends hit edge creatures). Revert: CRASH_AIMFIX=false
@@ -1097,13 +1103,14 @@ function crashUpdate(dt){const g=crashGeo();crs.ct+=dt;
   if(crs.ph==='fadein'&&crs.ct>=CRASH_FX.slow){crs.ph='fight';crs.ft=0}
   const live=crs.ph==='fight'||crs.ph==='rescue'||crs.ph==='over';
   if(crs.ph==='fight'){crs.ft+=dt;crs.tl=Math.max(0,crs.T-crs.ft);const t=crs.ft;
-    if(t>1.2){crs.acc+=(CRASH.r0+CRASH.rD*crs.depth)*(1+t/CRASH.ramp)*dt;while(crs.acc>=1){crs.acc-=1;if(crs.mobs.length<CRASH_FX.maxMobs)crashSpawn()}}
+    if(t>1.2){crs.acc+=(CRASH.r0+CRASH.rD*crs.depth)*(1+t/CRASH.ramp)*dt;while(crs.acc>=1){crs.acc-=1;if(crs.mobs.length<CRASH_FX.maxMobs)crashSpawn()}
+      if(CRASH.wv){if(crs.nw==null)crs.nw=CRASH.wv;if(t>=crs.nw){crs.nw+=CRASH.wv;for(let i=0,n=CRASH.wn+(CRASH.wg?Math.floor(t/CRASH.wg):0);i<n&&crs.mobs.length<CRASH_FX.maxMobs;i++){const n0=crs.mobs.length;crashSpawn();const m=crs.mobs[n0];if(m&&!m.peek)m.z+=i*0.06}}}}
     crs.fire-=dt;if(crs.fire<=0){crs.fire+=CRASH.rof;crashShoot()}
     if(crs.tl<=0){crs.ph='rescue';crs.ot=0;crs.out='rescued';crs.kept=crashSettle(CRASH.keep);SFX.mech&&SFX.mech(true)}
     else if(crs.hull<=0){crs.ph='over';crs.ot=0;crs.out='overrun';crs.kept=0;crs.lost=PROG.held||0;crashSettle(0)}}
   if(crs.ph==='rescue'||crs.ph==='over'){crs.ot+=dt;if(crs.ot>=(crs.ph==='rescue'?2.9:3.4)){crs.ph='pad';crs.pt=0;crs.sel=-1;pauseHits=[]}}
   if(crs.ph==='pad')crs.pt+=dt;
-  if(live){const sp=Math.min(CRASH.vMax,1+crs.ft/90);
+  if(live){const sp=Math.min(CRASH.vMax,CRASH.v0+crs.ft/CRASH.vR);
     for(const m of crs.mobs){if(m.dead)continue;const P=CRASH_T[m.type];m.ph+=dt*(6+P.v*30);m.hf=Math.max(0,m.hf-dt);
       if(crs.ph==='rescue'){m.z+=dt*0.35;if(m.z>1.1)m.dead=1;continue}
       if(CRASH_AIMFIX){const A=crashReach();if(Math.abs(m.th)>A)m.th=Math.sign(m.th)*Math.max(A,Math.abs(m.th)-30*dt)}

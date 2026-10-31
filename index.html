@@ -884,6 +884,15 @@ const CRASH_T={crawler:{hp:1,dmg:10,v:0.22,sz:0.8,at:0,nm:'charger'},scorpion:{h
 // peeks only from wreck edges inside that arc, any creature outside it eases back in, and the auto-aim cone is at least the margin wide (so the slider ends hit edge creatures). Revert: CRASH_AIMFIX=false
 var CRASH_AIMFIX=true;
 const CRASH_AIM={m:4};function crashReach(){return CRASH.yaw-CRASH_AIM.m}
+// CRASH_TURRET (Justin: "the cannon toggle is far too wobbly and flings from side to side... think under falcon blaster from rebel strike, very wide angle view,
+// doesn't have to rotate at all, but the cannon does"): the camera/backdrop is locked (no pan, sway or aim parallax; impact shake + slow-mo kept) and the field of
+// view widens so the whole +-40 deg turret arc fits on screen in portrait and landscape. Input sets an aim target (slider = absolute, drag elsewhere in the lower
+// screen = relative); the cannon yaw follows it with a first-order (critically damped, never overshoots, no momentum) lag capped at a max turn rate, pivots at its
+// base and points its barrels at the aim point (bolts still leave the barrel tips); a subtle reticle marks the aim point. Revert: CRASH_TURRET=false
+var CRASH_TURRET=true;
+const CRASH_TU={k:13,rate:150,edge:0.08,edgeP:0.15,band:26};
+function crashAimStep(dt){if(crs.yawS!==undefined&&crs.yaw!==crs.yawS)crs.aim=crs.yaw;if(crs.aim==null)crs.aim=crs.yaw;crs.aim=clamp(crs.aim,-CRASH.yaw,CRASH.yaw);
+  const d=crs.aim-crs.yaw,st=d*(1-Math.exp(-CRASH_TU.k*dt)),mx=CRASH_TU.rate*dt;crs.yaw=Math.abs(d)<1e-4?crs.aim:crs.yaw+clamp(st,-mx,mx);crs.yawS=crs.yaw}
 const CRASH_FX={slow:4.6,white:1.6,comm:[2.1,3.9],fadeIn:[3.2,4.6],lane:16,maxMobs:36,maxFlame:72,maxSmoke:50,peek:0.35,wrk:2.4};
 let crs=null,gpLX=0,crashLP=null;
 function crashOn(){return CRASH_SURVIVAL&&epOn()&&!!ep}
@@ -910,8 +919,8 @@ function crashWreck(R){const W2=[],n=6+((R()*3)|0);for(let i=0;i<n;i++){let th,z
   const F=[];for(let i=0;i<6;i++)F.push({th:(i%2?-1:1)*(12+i*9+R()*8),z:0.45+R()*0.5,wall:1,ph:R()*6});for(const w of W2)if(w.fire)F.push({th:w.th+(R()-0.5)*w.sz*14,z:w.z-0.01,w,ph:R()*6});crs.fires=F}
 // ---- geometry (bearing th in degrees, depth z 1 far -> 0 front line)
 function crashGeo(){if(crs.geo&&crs.geo.W===W&&crs.geo.H===H)return crs.geo;const land=W>H,hz=H*(land?0.40:0.38),yB=H*(land?0.80:0.78),f=Math.min(W,H*1.1)*0.5/0.62,S0=Math.min(W,H)*(land?0.55:0.46);
-  crs.geo={W,H,hz,yB,K:(yB-hz)/4,f,S0,BW:Math.ceil(W+f*2*1.6+80)};crs.bd=null;crs.frame=null;for(const w of crs.wreck)w.cv=null;return crs.geo}
-function crashX(th){const g=crs.geo;return W/2+g.f*((th-crs.yaw)*Math.PI/180)}
+  const fT=CRASH_TURRET?Math.min(f,W*(0.5-(land?CRASH_TU.edge:CRASH_TU.edgeP))/(CRASH.yaw*Math.PI/180)):f;crs.geo={W,H,hz,yB,K:(yB-hz)/4,f:fT,S0,BW:Math.ceil(W+fT*2*1.6+80)};crs.bd=null;crs.frame=null;for(const w of crs.wreck)w.cv=null;return crs.geo}
+function crashX(th){const g=crs.geo;return W/2+g.f*((th-(CRASH_TURRET?0:crs.yaw))*Math.PI/180)}
 function crashY(z){const g=crs.geo;return g.hz+g.K/(Math.max(0,z)+0.25)}
 function crashS(z){return crs.geo.S0*0.25/(Math.max(0,z)+0.25)}
 // ---- pre-rendered layers (once per screen size)
@@ -1010,7 +1019,7 @@ if(CRASH_ART){
     for(const p of crs.emb){p.l-=dt;p.y+=p.vy*dt;p.th+=p.dx*dt*6+Math.sin(p.l*5+p.ph)*dt*3}crs.emb=crs.emb.filter(p=>p.l>0);
     while(crs.dust.length<A.dust)crs.dust.push({x:R()*W,y:R()*H*0.8,vx:rnd(-6,6),vy:rnd(-3,5),ph:R()*6,s:rnd(0.6,1.8)});for(const p of crs.dust){p.x+=p.vx*dt-(crs.yawV||0)*dt*0.6;p.y+=p.vy*dt;if(p.x<-5)p.x=W+4;if(p.x>W+5)p.x=-4;if(p.y>H*0.85)p.y=0;if(p.y<0)p.y=H*0.8}
     if(crs.peb.length<A.peb&&R()<dt*0.5)crs.peb.push({th:crs.yaw+rnd(-35,35),z:rnd(0.2,1),y:0,v:0,drip:R()<0.5,sp:0});for(const p of crs.peb){if(p.land){p.sp-=dt;continue}p.v+=dt*3.2;p.y=Math.min(1,p.y+p.v*dt);if(p.y>=1){p.land=1;p.sp=0.35}}crs.peb=crs.peb.filter(p=>!p.land||p.sp>0);
-    const yv=crs.yaw-(crs.yawL==null?crs.yaw:crs.yawL);crs.yawV=dt>0&&crs.geo?yv/dt*crs.geo.f*Math.PI/180:0;crs.yawL=crs.yaw};
+    const yv=crs.yaw-(crs.yawL==null?crs.yaw:crs.yawL);crs.yawV=CRASH_TURRET?0:dt>0&&crs.geo?yv/dt*crs.geo.f*Math.PI/180:0;crs.yawL=crs.yaw};
   // cracked visor: 3 cumulative stages, procedural radial cracks, cached once per size (1x)
   window.crashCrack=function(n){crs.crk=crs.crk||{};const key=n+'|'+W+'x'+H;if(crs.crk[key])return crs.crk[key];const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),R=mulberry(crs.seed^0x7a11);
     const pts=[[0.14,0.22],[0.86,0.3],[0.22,0.78]].slice(0,n);x.lineCap='round';
@@ -1024,14 +1033,14 @@ if(CRASH_ART){
   let FLASH=null;const flashSpr=()=>{if(FLASH)return FLASH;const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.translate(32,32);x.globalCompositeOperation='lighter';
     for(let i=0;i<6;i++){x.rotate(Math.PI/3);const g=x.createLinearGradient(0,0,0,-30);g.addColorStop(0,'rgba(255,240,200,0.95)');g.addColorStop(1,'rgba(255,120,60,0)');x.fillStyle=g;x.beginPath();x.moveTo(-3,0);x.lineTo(0,i%2?-30:-20);x.lineTo(3,0);x.fill()}
     const g=x.createRadialGradient(0,0,0,0,0,16);g.addColorStop(0,'rgba(255,255,235,1)');g.addColorStop(1,'rgba(255,150,80,0)');x.fillStyle=g;x.beginPath();x.arc(0,0,16,0,6.283);x.fill();return FLASH=c};
-  crashGun=function(t){const im=crashImg('tur');if(!im)return _gun(t);const s=crashSlider(),u=Math.min(W,H)*(W>H?0.3:0.24),gx=W/2-crs.yaw/CRASH.yaw*W*0.08,gy=s.y-u*0.12,rot=CRASH_BOLTS?crashGunPose().rot:crs.yaw/CRASH.yaw*0.32,rc=crs.recoil*u*0.06,T=A.tur,h=u*1.3,k=h/T.h,w=T.w*k;
+  crashGun=function(t){const im=crashImg('tur');if(!im)return _gun(t);const s=crashSlider(),u=Math.min(W,H)*(W>H?0.3:0.24),gx=CRASH_TURRET?W/2:W/2-crs.yaw/CRASH.yaw*W*0.08,gy=s.y-u*0.12,rot=CRASH_BOLTS?crashGunPose().rot:crs.yaw/CRASH.yaw*0.32,rc=crs.recoil*u*0.06,T=A.tur,h=u*1.3,k=h/T.h,w=T.w*k;
     ctx.save();ctx.translate(gx,gy);ctx.rotate(rot);const by=u*0.32+rc;ctx.drawImage(im,-T.bx*k,by-h,w,h);
     if(CRASH_BOLTS){ctx.restore();crashBoltFlash();return}
     if(crs.recoil>0.45){const fs=flashSpr(),a=(crs.recoil-0.45)/0.55,r=u*(0.22+0.12*Math.random())*a+u*0.06;ctx.globalCompositeOperation='lighter';for(const sx of[-1,1]){ctx.save();ctx.translate(sx*T.dx*k,by-h+T.ty*k);ctx.rotate(Math.random()*6);ctx.globalAlpha=Math.min(1,a*1.2);ctx.drawImage(fs,-r,-r,r*2,r*2);ctx.restore()}
       ctx.globalAlpha=1;glowAt(ctx,0,by-h*0.75,u*0.9,'255,170,90',0.35*a)}
     ctx.restore()};
   // full scene (same layering as before + ground light, splats, glints, embers, shimmer, dust, pebbles, muzzle light, visor)
-  crashScene=function(t){if(!crashImg('bg'))return _scene(t);const g=crashGeo(),ox=(Math.random()-0.5)*crs.shake,oy=(Math.random()-0.5)*crs.shake,pan=W/2-g.f*crs.yaw*Math.PI/180;ctx.save();ctx.translate(ox,oy);
+  crashScene=function(t){if(!crashImg('bg'))return _scene(t);const g=crashGeo(),ox=(Math.random()-0.5)*crs.shake,oy=(Math.random()-0.5)*crs.shake,pan=W/2-g.f*(CRASH_TURRET?0:crs.yaw)*Math.PI/180;ctx.save();ctx.translate(ox,oy);
     const bd=crashBackdrop();ctx.drawImage(bd,pan-g.BW/2,0,g.BW,H);
     ctx.globalCompositeOperation='lighter';if(crs.glints)for(const q of crs.glints.slice(0,10)){const x=pan+q.x;if(x<-20||x>W+20)continue;const a=0.5+0.5*Math.sin(t*2.3+q.ph);if(a>0.15)glowAt(ctx,x,q.y,Math.min(W,H)*0.02*(0.6+a),roriOn()?'150,255,140':'150,255,220',0.55*a)}
     // flickering firelight on walls + pools on the ground
@@ -1065,7 +1074,7 @@ if(CRASH_ART){
     ctx.globalAlpha=Math.max(0,0.55-m.z*0.4);ctx.drawImage(crashSoft(0),x-s*0.55,y-s*0.08,s*1.1,s*0.24);ctx.globalAlpha=1;
     const near=clamp((0.2-m.z)/0.2,0,1),ln=near*(0.12+0.06*Math.sin(t*14+m.th));if(ln>0&&!m.peek){ctx.save();ctx.translate(x,y);ctx.scale(1+ln,1+ln*1.4);ctx.translate(-x,-y);crashDrawMob(m,t);ctx.restore()}else crashDrawMob(m,t);
     if(m.hf>0){ctx.globalCompositeOperation='lighter';glowAt(ctx,x,y-s*0.3,s*0.6,'255,255,240',0.9*m.hf/0.1);ctx.globalCompositeOperation='source-over'}
-    if(mz>0&&m.z<0.7){const d=Math.abs(x-W/2)/(W*0.5),a=mz*(1-m.z/0.7)*Math.max(0,1-d);if(a>0.02){ctx.globalCompositeOperation='lighter';glowAt(ctx,x,y-s*0.35,s*0.55,CRASH_BOLTS?'120,190,255':'255,170,100',0.6*a);ctx.globalCompositeOperation='source-over'}}};
+    if(mz>0&&m.z<0.7){const d=Math.abs(x-crashX(crs.yaw))/(W*0.5),a=mz*(1-m.z/0.7)*Math.max(0,1-d);if(a>0.02){ctx.globalCompositeOperation='lighter';glowAt(ctx,x,y-s*0.35,s*0.55,CRASH_BOLTS?'120,190,255':'255,170,100',0.6*a);ctx.globalCompositeOperation='source-over'}}};
 }
 // CRASH_BOLTS (Justin: "get the turret blast lined up with the turret... exactly the same as the blaster bolt size shape and fire rate, same noise"; "blood splatter can be removed";
 // kills explode exactly like top-down kills). Bolts leave the painted barrel tips (alternating twin barrels) and fly along the tip->target line, drawn with the
@@ -1074,8 +1083,8 @@ if(CRASH_ART){
 // Revert: CRASH_BOLTS=false
 var CRASH_BOLTS=true;
 const CRASH_BP={fl0:0.05,fl1:0.2,mf:0.07,body:2.5};
-function crashGunPose(){const s=crashSlider(),u=Math.min(W,H)*(W>H?0.3:0.24),gx=W/2-crs.yaw/CRASH.yaw*W*0.08,gy=s.y-u*0.12,g=crs.geo||crashGeo(),ay=crs.aimY==null?g.hz+(g.yB-g.hz)*0.12:crs.aimY,T=CRASH_ARTP.tur,h=u*1.3,k=h/T.h;
-  return{gx,gy,u,rot:Math.atan2(W/2-gx,gy-ay),k,by:u*0.32+crs.recoil*u*0.06,h,T}}
+function crashGunPose(){const s=crashSlider(),u=Math.min(W,H)*(W>H?0.3:0.24),gx=CRASH_TURRET?W/2:W/2-crs.yaw/CRASH.yaw*W*0.08,gy=s.y-u*0.12,g=crs.geo||crashGeo(),ay=crs.aimY==null?g.hz+(g.yB-g.hz)*0.12:crs.aimY,T=CRASH_ARTP.tur,h=u*1.3,k=h/T.h;
+  return{gx,gy,u,rot:Math.atan2(crashX(crs.yaw)-gx,gy-ay),k,by:u*0.32+crs.recoil*u*0.06,h,T}}
 function crashTip(sd){const P=crashGunPose(),lx=sd*P.T.dx*P.k,ly=P.by-P.h+P.T.ty*P.k,c=Math.cos(P.rot),s=Math.sin(P.rot);return[P.gx+c*lx-s*ly,P.gy+s*lx+c*ly]}
 function crashBoltSc(){return Math.max(1,Math.min(W,H)*(W>H?0.3:0.24)/60)}
 function crashBoltFlash(){if(!(crs.mf>0))return;const[x,y]=crashTip(crs.side||1),r=6*crashBoltSc(),g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(220,245,255,${Math.min(1,crs.mf*12)})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,6.283);ctx.fill()}
@@ -1098,7 +1107,7 @@ if(CRASH_BOLTS&&CRASH_ART){
     if(crs.db){for(const d of crs.db){for(const p of d.ps)partStep(p,dt);d.ps=d.ps.filter(p=>p.life>0)}crs.db=crs.db.filter(d=>d.ps.length);if(crs.db.length>24)crs.db.splice(0,crs.db.length-24)}};
 }
 function crashSlider(){const land=W>H,w=Math.min(W*0.82,560),h=touchMode?34:26,y=H-h-(land?8:14);return{x:W/2-w/2,y,w,h}}
-function crashSetYaw(px){const s=crashSlider();crs.yaw=clamp(((px-s.x)/s.w*2-1)*CRASH.yaw,-CRASH.yaw,CRASH.yaw)}
+function crashSetYaw(px){const s=crashSlider(),v=clamp(((px-s.x)/s.w*2-1)*CRASH.yaw,-CRASH.yaw,CRASH.yaw);if(CRASH_TURRET)crs.aim=v;else crs.yaw=v}
 // ---- update
 function crashPeekHW(w){return Math.atan((w.sz*CRASH_FX.wrk*crashS(w.z)*0.5)/crs.geo.f)*180/Math.PI}
 function crashPeekSides(w){const A=crashReach(),hw=crashPeekHW(w);return[-1,1].filter(sd=>Math.abs(w.th+sd*hw*0.95)<=A)}
@@ -1111,7 +1120,7 @@ function crashHit(m,dmg){m.hp-=dmg;m.hf=0.1;if(m.hp>0)return;m.dead=1;crs.kills+
 function crashDamage(d){crs.hull=Math.max(0,crs.hull-d);crs.hurt=0.35;crs.shake=Math.max(crs.shake,10);SFX.hurt();if(GAMEPAD_V1)gpRumble(160,0.7)}
 function crashUpdate(dt){const g=crashGeo();crs.ct+=dt;
   // yaw: keyboard, controller stick, slider drag
-  if(crs.ph==='fight'||crs.ph==='fadein'){if(Math.abs(gpLX)>0.08)crs.yaw=clamp(gpLX,-1,1)*CRASH.yaw;if(K.left)crs.yaw=Math.max(-CRASH.yaw,crs.yaw-90*dt);if(K.right)crs.yaw=Math.min(CRASH.yaw,crs.yaw+90*dt)}
+  if(crs.ph==='fight'||crs.ph==='fadein'){if(CRASH_TURRET){if(crs.aim==null)crs.aim=crs.yaw;if(Math.abs(gpLX)>0.08)crs.aim=clamp(gpLX,-1,1)*CRASH.yaw;if(K.left)crs.aim=Math.max(-CRASH.yaw,crs.aim-90*dt);if(K.right)crs.aim=Math.min(CRASH.yaw,crs.aim+90*dt)}else{if(Math.abs(gpLX)>0.08)crs.yaw=clamp(gpLX,-1,1)*CRASH.yaw;if(K.left)crs.yaw=Math.max(-CRASH.yaw,crs.yaw-90*dt);if(K.right)crs.yaw=Math.min(CRASH.yaw,crs.yaw+90*dt)}}if(CRASH_TURRET)crashAimStep(dt);
   crs.recoil=Math.max(0,crs.recoil-dt*8);crs.hurt=Math.max(0,crs.hurt-dt);crs.shake=Math.max(0,crs.shake-dt*30);
   if(crs.ph==='slow'){crashWarm();crashWarm();updateParts(dt*0.18);for(const m of mobs)m.t+=dt*0.18;if(crs.ct>=CRASH_FX.fadeIn[0])crs.ph='fadein'}
   if(crs.ph==='fadein'&&crs.ct>=CRASH_FX.slow){crs.ph='fight';crs.ft=0}
@@ -1141,9 +1150,9 @@ function crashUpdate(dt){const g=crashGeo();crs.ct+=dt;
   if(crs.ph!=='slow'&&crs.ph!=='pad'){for(const f of crs.fires){if(crs.fl.length<CRASH_FX.maxFlame&&Math.random()<dt*10)crs.fl.push({th:f.th+(Math.random()-0.5)*3,z:f.z,y:0,vy:rnd(0.5,1.1),l:rnd(0.5,0.9),m:0.9,s:rnd(0.6,1.1)})}
     for(const w of crs.wreck)if(w.smoke&&crs.sm.length<CRASH_FX.maxSmoke&&Math.random()<dt*3)crs.sm.push({th:w.th+(Math.random()-0.5)*w.sz*6,z:w.z,y:0.3,vy:rnd(0.25,0.45),dx:rnd(-0.1,0.1),l:2.6,m:2.6})}
   for(const p of crs.fl){p.l-=dt;p.y+=p.vy*dt}crs.fl=crs.fl.filter(p=>p.l>0);for(const p of crs.sm){p.l-=dt;p.y+=p.vy*dt;p.th+=p.dx*dt*10}crs.sm=crs.sm.filter(p=>p.l>0)}
-function crashTarget(){let best=null;for(const m of crs.mobs){if(m.dead||m.z<-0.05)continue;if(m.peek>0&&m.peek>m.pk*0.55)continue;const x=crashX(m.th),r=crashS(m.z)*CRASH_T[m.type].sz*0.5;if(x<-r||x>W+r)continue;if(Math.abs(x-W/2)<(CRASH_AIMFIX?Math.max(r,crs.geo.f*CRASH_AIM.m*Math.PI/180):r)&&(!best||m.z<best.z))best=m}return best}
-function crashShoot(){const m=crashTarget(),g=crs.geo,gx=W/2-crs.yaw/CRASH.yaw*W*0.08,s=crashSlider(),gy=s.y-Math.min(W,H)*0.2;crs.recoil=1;SFX.laser();
-  if(m){const s2=crashS(m.z)*CRASH_T[m.type].sz;crs.bolts.push({x0:gx,y0:gy,x1:crashX(m.th),y1:crashY(m.z)-s2*0.25,l:0.07});crashHit(m,1)}else crs.bolts.push({x0:gx,y0:gy,x1:W/2,y1:g.hz+(g.yB-g.hz)*0.12,l:0.06})}
+function crashTarget(){let best=null;for(const m of crs.mobs){if(m.dead||m.z<-0.05)continue;if(m.peek>0&&m.peek>m.pk*0.55)continue;const x=crashX(m.th),r=crashS(m.z)*CRASH_T[m.type].sz*0.5;if(x<-r||x>W+r)continue;if(Math.abs(x-crashX(crs.yaw))<(CRASH_AIMFIX?Math.max(r,crs.geo.f*CRASH_AIM.m*Math.PI/180):r)&&(!best||m.z<best.z))best=m}return best}
+function crashShoot(){const m=crashTarget(),g=crs.geo,gx=CRASH_TURRET?W/2:W/2-crs.yaw/CRASH.yaw*W*0.08,s=crashSlider(),gy=s.y-Math.min(W,H)*0.2;crs.recoil=1;SFX.laser();
+  if(m){const s2=crashS(m.z)*CRASH_T[m.type].sz;crs.bolts.push({x0:gx,y0:gy,x1:crashX(m.th),y1:crashY(m.z)-s2*0.25,l:0.07});crashHit(m,1)}else crs.bolts.push({x0:gx,y0:gy,x1:crashX(crs.yaw),y1:g.hz+(g.yB-g.hz)*0.12,l:0.06})}
 // ---- draw
 function crashDrawMob(m,t){const P=CRASH_T[m.type],x=crashX(m.th),s=crashS(m.z)*P.sz,y=crashY(m.z);if(x<-s||x>W+s)return;const fr=(Math.floor(m.ph/Math.PI)&1),fog=Math.min(3,Math.floor(m.z*4)),bob=Math.abs(Math.sin(m.ph))*s*0.05;
   let dx=0,a=1;if(m.peek>0){const k=1-m.peek/m.pk;dx=(crashX(m.th0)-x)*(1-Math.min(1,k*1.6))}if(m.burrow)a=0.5;
@@ -1153,7 +1162,7 @@ function crashDrawMob(m,t){const P=CRASH_T[m.type],x=crashX(m.th),s=crashS(m.z)*
   if(m.spit>=0&&m.spit<0.55){ctx.globalCompositeOperation='lighter';glowAt(ctx,x+dx,y-s*0.35,s*0.4,'140,220,255',0.6*m.spit/0.55);ctx.globalCompositeOperation='source-over'}}
 function crashDrawWreck(w,t){const c=crashPlate(w),s=crashS(w.z)*w.sz*CRASH_FX.wrk,x=crashX(w.th);if(x<-s||x>W+s)return;const y=crashY(w.z);ctx.drawImage(c,x-s/2,y-s*w.ah/w.aw+s*0.04,s,s*w.ah/w.aw)}
 function crashScene(t){const g=crashGeo(),ox=(Math.random()-0.5)*crs.shake,oy=(Math.random()-0.5)*crs.shake;ctx.save();ctx.translate(ox,oy);
-  ctx.drawImage(crashBackdrop(),W/2-g.f*crs.yaw*Math.PI/180-g.BW/2,0,g.BW,H);
+  ctx.drawImage(crashBackdrop(),W/2-g.f*(CRASH_TURRET?0:crs.yaw)*Math.PI/180-g.BW/2,0,g.BW,H);
   // wall fire glow (flicker) under everything
   ctx.globalCompositeOperation='lighter';for(const f of crs.fires){const x=crashX(f.th);if(x<-200||x>W+200)continue;const fl=0.55+0.25*Math.sin(t*11+f.ph)+0.15*Math.sin(t*23+f.ph*2);glowAt(ctx,x,crashY(f.z)-crashS(f.z)*0.3,crashS(f.z)*(f.wall?2.2:1.4),'255,120,40',0.5*fl)}ctx.globalCompositeOperation='source-over';
   // depth-sorted wreckage + creatures + flames/smoke
@@ -1167,7 +1176,7 @@ function crashScene(t){const g=crashGeo(),ox=(Math.random()-0.5)*crs.shake,oy=(M
   if(crs.globs)for(const q of crs.globs){const k=Math.min(1,q.t/0.45),x=lerp(crashX(q.th),W/2,k),y=lerp(crashY(q.z)-crashS(q.z)*0.3,H*0.7,k),r=4+k*k*Math.min(W,H)*0.25;ctx.fillStyle=`rgba(150,230,120,${q.hit?0.5*(1-(q.t-0.45)/0.15):0.85})`;ctx.beginPath();ctx.arc(x,y,r,0,6.283);ctx.fill()}
   ctx.drawImage(crashFrameCv(),0,0,W,H);crashGun(t);ctx.restore();
   if(crs.hurt>0){ctx.fillStyle=`rgba(255,40,30,${crs.hurt*0.6})`;ctx.fillRect(0,0,W,H)}}
-function crashGun(t){const s=crashSlider(),u=Math.min(W,H)*(W>H?0.3:0.24),gx=W/2-crs.yaw/CRASH.yaw*W*0.08,gy=s.y-u*0.12,rot=crs.yaw/CRASH.yaw*0.32,rc=crs.recoil*u*0.05;ctx.save();ctx.translate(gx,gy);ctx.rotate(rot);
+function crashGun(t){const s=crashSlider(),u=Math.min(W,H)*(W>H?0.3:0.24),gx=CRASH_TURRET?W/2:W/2-crs.yaw/CRASH.yaw*W*0.08,gy=s.y-u*0.12,rot=CRASH_TURRET?crashGunPose().rot:crs.yaw/CRASH.yaw*0.32,rc=crs.recoil*u*0.05;ctx.save();ctx.translate(gx,gy);ctx.rotate(rot);
   // mount + housing (welded scrap)
   ctx.fillStyle='#2a2d33';ctx.beginPath();ctx.moveTo(-u*0.55,u*0.2);ctx.lineTo(u*0.55,u*0.2);ctx.lineTo(u*0.32,-u*0.22);ctx.lineTo(-u*0.32,-u*0.22);ctx.fill();
   ctx.fillStyle='#4b515a';ctx.fillRect(-u*0.3,-u*0.42+rc,u*0.6,u*0.26);ctx.fillStyle='#d9a72a';ctx.fillRect(-u*0.3,-u*0.2+rc,u*0.6,u*0.04);
@@ -1181,10 +1190,11 @@ function crashHud(t){const sm=W<640||H<520,fs=sm?12:15,pad=sm?10:16,y=pad+fs;ctx
   ctx.textAlign='left';ctx.strokeText(dTxt,pad+4,y);ctx.fillStyle='#ffd27a';ctx.fillText(dTxt,pad+4,y);ctx.textAlign='right';ctx.strokeText(tTxt,W-pad-4,y);ctx.fillStyle=crs.tl<10?'#9ff5cf':'#fff2c8';ctx.fillText(tTxt,W-pad-4,y);
   const bw=Math.min(W*0.5,300),bx=W-pad-4-bw,by=y+8;ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(bx,by,bw,5);ctx.fillStyle=crs.hull<30?'#ff5a4a':'#9ff5cf';ctx.fillRect(bx,by,bw*crs.hull/CRASH.hull,5);ctx.font=`bold ${sm?8:10}px ${FW}`;ctx.textAlign='right';ctx.fillStyle='rgba(255,255,255,0.8)';ctx.fillText('HULL',bx-6,by+6);
   // AIM slider
-  const S=crashSlider(),k=(crs.yaw/CRASH.yaw+1)/2;ctx.fillStyle='rgba(8,12,14,0.55)';rrect(S.x,S.y,S.w,S.h,S.h/2);ctx.fill();ctx.strokeStyle='rgba(159,245,207,0.5)';ctx.lineWidth=1.2;ctx.stroke();
+  const S=crashSlider(),k=((CRASH_TURRET&&crs.aim!=null?crs.aim:crs.yaw)/CRASH.yaw+1)/2;ctx.fillStyle='rgba(8,12,14,0.55)';rrect(S.x,S.y,S.w,S.h,S.h/2);ctx.fill();ctx.strokeStyle='rgba(159,245,207,0.5)';ctx.lineWidth=1.2;ctx.stroke();
   ctx.fillStyle='rgba(159,245,207,0.6)';ctx.font=`bold ${S.h*0.5}px ${FW}`;ctx.textAlign='left';ctx.fillText('\u2039\u2039',S.x+10,S.y+S.h*0.68);ctx.textAlign='right';ctx.fillText('\u203a\u203a',S.x+S.w-10,S.y+S.h*0.68);ctx.textAlign='center';ctx.font=`bold ${S.h*0.34}px ${FW}`;ctx.fillText('AIM',W/2,S.y+S.h*0.62);
   const tx=S.x+S.h/2+k*(S.w-S.h);ctx.fillStyle='#ffbe55';ctx.beginPath();ctx.arc(tx,S.y+S.h/2,S.h*0.42,0,6.283);ctx.fill();ctx.strokeStyle='#3a2a10';ctx.lineWidth=2;ctx.stroke();
   // crosshair
+  if(CRASH_TURRET){const rx=crashX(crs.yaw),ry=crs.aimY==null?crs.geo.hz+(crs.geo.yB-crs.geo.hz)*0.25:crs.aimY,rr=Math.max(9,Math.min(W,H)*0.028);ctx.strokeStyle='rgba(160,215,255,0.5)';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(rx,ry,rr,0,6.283);ctx.stroke();ctx.beginPath();for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){ctx.moveTo(rx+dx*rr*0.55,ry+dy*rr*0.55);ctx.lineTo(rx+dx*rr*1.5,ry+dy*rr*1.5)}ctx.stroke();ctx.restore();return}
   const ch=crs.geo.hz+(crs.geo.yB-crs.geo.hz)*0.25;ctx.strokeStyle='rgba(255,200,150,0.55)';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(W/2,ch-14);ctx.lineTo(W/2,ch-5);ctx.moveTo(W/2,ch+5);ctx.lineTo(W/2,ch+14);ctx.stroke();ctx.restore()}
 function crashComm(t,a){const w=Math.min(620,W-24),h=Math.min(120,Math.max(78,H*0.15)),x=W/2-w/2,y=H*0.5-h/2;ctx.save();ctx.globalAlpha=a;padComm(x,y,w,h,t,{who:'D',text:'Hold on, sir! Rescue has your location and is en route!',tag:'EMERGENCY'},false);ctx.restore()}
 function crashFrame(dt,t){crashUpdate(dt);const c=crs,g=crashGeo();
@@ -1234,7 +1244,9 @@ function crashPad(t){pauseHits=[];const c=crs,light=c.out==='rescued',L=padLayou
 // ---- input
 function crashKey(k){if(!crs)return;if(crs.ph==='pad'){if(k==='enter'||k===' '){const h=pauseHits.filter(h=>h.pad)[crs.sel<0?0:crs.sel];if(h)h.act()}else if(k==='q'||k==='escape')crashGo('menu');else if(k==='c')crashGo('quarters');else if(k==='tab'||k==='arrowright'||k==='arrowdown')crs.sel=(crs.sel+1)%3;else if(k==='arrowleft'||k==='arrowup')crs.sel=(crs.sel+2)%3;return}}
 function crashPtr(x,y,kind,id){if(!crs)return;if(crs.ph==='pad'){if(kind===0)for(const h of pauseHits)if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h){h.act();return}return}
-  if(crs.ph!=='fight'&&crs.ph!=='fadein')return;const s=crashSlider();if(kind===0&&y>Math.min(s.y-40,H*0.62)){crs.drag=id;crashSetYaw(x)}else if(kind===1&&crs.drag===id)crashSetYaw(x);else if(kind===2&&crs.drag===id)crs.drag=null}
+  if(crs.ph!=='fight'&&crs.ph!=='fadein')return;const s=crashSlider();if(CRASH_TURRET){if(kind===0&&y>Math.min(s.y-40,H*0.62)){crs.drag=id;if(crs.aim==null)crs.aim=crs.yaw;if(y>=s.y-CRASH_TU.band&&y<=s.y+s.h+CRASH_TU.band){crs.dm=null;crashSetYaw(x)}else crs.dm={x0:x,a0:crs.aim}}
+    else if(kind===1&&crs.drag===id){if(crs.dm)crs.aim=clamp(crs.dm.a0+(x-crs.dm.x0)/s.w*2*CRASH.yaw,-CRASH.yaw,CRASH.yaw);else crashSetYaw(x)}else if(kind===2&&crs.drag===id){crs.drag=null;crs.dm=null}return}
+  if(kind===0&&y>Math.min(s.y-40,H*0.62)){crs.drag=id;crashSetYaw(x)}else if(kind===1&&crs.drag===id)crashSetYaw(x);else if(kind===2&&crs.drag===id)crs.drag=null}
 // ---- procedural boss
 function epBossInit(m){if(!EP_BOSSGEN)return;const B=cfg.pit&&cfg.pit.boss;if(!B)return;m.ep=Object.assign({i:0,cd:3,wind:0,act:null,tele:null,dash:0,hitT:0,stream:0},B);let hp=80+ep.c*7;if(B.mods.includes('armored'))hp*=1.4;m.hp=m.max=Math.round(hp);if(BOSS_CHIMERA&&B.chim)try{chimDraw(document.createElement('canvas').getContext('2d'),B.chim,0,m.r,null,false,0)}catch(e){}}
 function epBossTick(m,dt,d,dx,dy,spd){const E=m.ep,mod=k=>E.mods.includes(k),ph2=m.hp<m.max/2,M=epMul(ep.c);spd*=(mod('swift')?1.25:1)*(ph2?1.3:1);
